@@ -61,32 +61,18 @@ bot.command('menu', (ctx) => ctx.reply('اضغط الزر أدناه لتصفح 
 bot.command('track', async (ctx) => { const dbUser = await getDbUser(ctx.from.id); if (dbUser?.role !== 'rider') return ctx.reply('❌ هذا الأمر للسائقين فقط.'); ctx.reply('📍 الرجاء مشاركة موقعك المباشر (Live Location) من قائمة المرفقات 📎', { reply_markup: { keyboard: [[{ text: '📍 مشاركة الموقع', request_location: true }]], one_time_keyboard: true, resize_keyboard: true } }); });
 bot.on(':location', async (ctx) => { const dbUser = await getDbUser(ctx.from.id); if (dbUser?.role !== 'rider') return; const { latitude, longitude } = ctx.message.location; const activeOrder = await pool.query(`SELECT id FROM orders WHERE rider_id=$1 AND status='delivering' ORDER BY created_at DESC LIMIT 1`,[dbUser.id]); if (activeOrder.rows[0]) { await pool.query(`INSERT INTO rider_locations (order_id, latitude, longitude) VALUES ($1,$2,$3)`,[activeOrder.rows[0].id, latitude, longitude]); ctx.reply('✅ تم تحديث موقعك.'); } else { ctx.reply('⚠️ لا يوجد طلب نشط مرتبط بك حاليًا.'); } });
 
-// استقبال الصورة تلقائياً مع تسجيل وتحقق
+// استقبال الصورة تلقائياً
 bot.on(':photo', async (ctx) => {
   const userId = ctx.from.id;
   const dbUser = await getDbUser(userId);
-  if (!dbUser) {
-    console.log(`User ${userId} not found`);
-    return ctx.reply('❌ لم يتم العثور على حسابك. أرسل /start أولاً.');
-  }
+  if (!dbUser) return ctx.reply('❌ لم يتم العثور على حسابك. أرسل /start أولاً.');
   const order = await pool.query(`SELECT id, total_price FROM orders WHERE customer_id=$1 AND status='verifying' ORDER BY created_at DESC LIMIT 1`, [dbUser.id]);
-  if (!order.rows[0]) {
-    console.log(`No verifying order for user ${dbUser.id}`);
-    return ctx.reply('❌ لا يوجد طلب معلق بانتظار الدفع. قم بإنشاء طلب أولاً من التطبيق.');
-  }
+  if (!order.rows[0]) return ctx.reply('❌ لا يوجد طلب معلق بانتظار الدفع. قم بإنشاء طلب أولاً من التطبيق.');
   const orderId = order.rows[0].id;
   const fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
-  console.log(`Updating order ${orderId} to pending with screenshot`);
-  const result = await pool.query(`UPDATE orders SET screenshot_file_id=$1, status=$2 WHERE id=$3 AND status='verifying'`, [fileId, 'pending', orderId]);
-  if (result.rowCount === 0) {
-    console.error(`Order ${orderId} not updated - may have been already processed`);
-    return ctx.reply('❌ حدث خطأ: الطلب غير موجود أو تمت معالجته بالفعل.');
-  }
-  console.log(`Order ${orderId} updated successfully`);
+  await pool.query(`UPDATE orders SET screenshot_file_id=$1, status=$2 WHERE id=$3 AND status='verifying'`, [fileId, 'pending', orderId]);
   if (ADMIN_ID) {
-    try {
-      await bot.api.sendMessage(ADMIN_ID, `🛡 *طلب جديد للمراجعة*\n\nرقم الطلب: #${orderId}\nالزبون: ${dbUser.name || ctx.from.first_name}\nالمبلغ: ${order.rows[0].total_price} ل.س\n\n[اضغط لمراجعة الطلب](${MINI_APP_URL}/admin-dashboard.html)`, { parse_mode: 'Markdown' });
-    } catch(e) { console.error('Failed to notify admin:',e); }
+    await bot.api.sendMessage(ADMIN_ID, `🛡 *طلب جديد للمراجعة*\n\nرقم الطلب: #${orderId}\nالزبون: ${dbUser.name || ctx.from.first_name}\nالمبلغ: ${order.rows[0].total_price} ل.س\n\n[اضغط لمراجعة الطلب](${MINI_APP_URL}/admin-dashboard.html)`, { parse_mode: 'Markdown' });
   }
   ctx.reply('✅ تم استلام لقطة الشاشة. سيقوم الأدمن بمراجعة طلبك قريباً.');
 });
@@ -146,7 +132,7 @@ app.get('/api/rider/available-orders', async (req, res) => { try { const initDat
 app.post('/api/rider/accept-order', async (req, res) => { try { const initData = req.headers['x-telegram-init-data']; if (!initData) return res.status(401).json({ error: 'Unauthorized' }); const urlParams = new URLSearchParams(initData); const userString = urlParams.get('user'); if (!userString) return res.status(401).json({ error: 'Unauthorized' }); const tgUser = JSON.parse(userString); const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'rider') return res.status(403).json({ error: 'Forbidden' }); const { order_id } = req.body; const result = await pool.query(`UPDATE orders SET rider_id=$1, status='delivering', rider_accepted_at=NOW() WHERE id=$2 AND rider_id IS NULL AND status='ready_for_pickup'`,[dbUser.id, order_id]); if (result.rowCount===0) return res.status(409).json({ error:'Order already taken' }); await notifyCustomer(order_id, 'delivering'); res.json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.post('/api/rider/complete-order', async (req, res) => { try { const initData = req.headers['x-telegram-init-data']; if (!initData) return res.status(401).json({ error: 'Unauthorized' }); const urlParams = new URLSearchParams(initData); const userString = urlParams.get('user'); if (!userString) return res.status(401).json({ error: 'Unauthorized' }); const tgUser = JSON.parse(userString); const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'rider') return res.status(403).json({ error: 'Forbidden' }); const { order_id } = req.body; const order = await pool.query('SELECT * FROM orders WHERE id=$1 AND rider_id=$2 AND status=$3',[order_id, dbUser.id, 'delivering']); if (order.rowCount===0) return res.status(400).json({ error:'Invalid order' }); await pool.query(`UPDATE orders SET status='completed' WHERE id=$1`,[order_id]); const o = order.rows[0]; const platformCommission = PLATFORM_FIXED_FEE; const shopNet = o.subtotal; const riderFee = o.delivery_fee - platformCommission; await pool.query(`UPDATE orders SET platform_commission=$1, shop_net=$2, rider_fee=$3 WHERE id=$4`,[platformCommission, shopNet, riderFee, order_id]); await pool.query(`INSERT INTO financial_transactions (order_id, transaction_type, amount) VALUES ($1,'platform_fee',$2),($1,'shop_payout',$3),($1,'rider_payout',$4)`,[order_id, platformCommission, shopNet, riderFee]); await notifyCustomer(order_id, 'completed'); res.json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
 
-// الأدمن (مع تعديلات حاسمة)
+// الأدمن (تم تعديل /api/admin/orders/pending)
 app.get('/api/admin/pending', async (req, res) => { try { const initData = req.headers['x-telegram-init-data']; if (!initData) return res.status(401).json({ error: 'Unauthorized' }); const urlParams = new URLSearchParams(initData); const userString = urlParams.get('user'); if (!userString) return res.status(401).json({ error: 'Unauthorized' }); const tgUser = JSON.parse(userString); const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' }); const pending = await pool.query(`SELECT id, telegram_id, name, phone, role, created_at FROM users WHERE is_approved=false AND role IN ('shop','rider') ORDER BY created_at DESC`); res.json(pending.rows); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.post('/api/admin/approve', async (req, res) => { try { const initData = req.headers['x-telegram-init-data']; if (!initData) return res.status(401).json({ error: 'Unauthorized' }); const urlParams = new URLSearchParams(initData); const userString = urlParams.get('user'); if (!userString) return res.status(401).json({ error: 'Unauthorized' }); const tgUser = JSON.parse(userString); const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' }); const { user_id } = req.body; await pool.query(`UPDATE users SET is_approved=true WHERE id=$1`,[user_id]); res.json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
 
@@ -155,19 +141,19 @@ app.get('/api/admin/orders/pending', async (req, res) => {
     const initData = req.headers['x-telegram-init-data']; if (!initData) return res.status(401).json({ error: 'Unauthorized' });
     const urlParams = new URLSearchParams(initData); const userString = urlParams.get('user'); if (!userString) return res.status(401).json({ error: 'Unauthorized' });
     const tgUser = JSON.parse(userString); const dbUser = await getDbUser(tgUser.id);
-    console.log(`Admin pending orders requested by ${tgUser.id}, role: ${dbUser?.role}`);
-    if (dbUser?.role !== 'admin') { console.log(`Forbidden: user ${tgUser.id} is not admin`); return res.status(403).json({ error: 'Forbidden' }); }
+    if (dbUser?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+    // إزالة شرط screenshot_file_id لضمان ظهور جميع الطلبات المعلقة
     const orders = await pool.query(`
       SELECT o.*, u.name as customer_name, s.shop_name 
       FROM orders o 
       JOIN users u ON o.customer_id = u.id 
       JOIN shops s ON o.shop_id = s.id 
-      WHERE o.status = 'pending' AND o.screenshot_file_id IS NOT NULL
+      WHERE o.status = 'pending'
       ORDER BY o.created_at DESC
     `);
     console.log(`Found ${orders.rows.length} pending orders`);
     res.json(orders.rows);
-  } catch(error) { console.error('/api/admin/orders/pending error:', error); res.status(500).json({ error: error.message }); }
+  } catch (error) { console.error('/api/admin/orders/pending error:', error); res.status(500).json({ error: error.message }); }
 });
 
 app.post('/api/admin/orders/:orderId/approve', async (req, res) => { try { const initData = req.headers['x-telegram-init-data']; if (!initData) return res.status(401).json({ error: 'Unauthorized' }); const urlParams = new URLSearchParams(initData); const userString = urlParams.get('user'); if (!userString) return res.status(401).json({ error: 'Unauthorized' }); const tgUser = JSON.parse(userString); const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' }); const { orderId } = req.params; await pool.query(`UPDATE orders SET status='paid' WHERE id=$1`,[orderId]); await notifyShop(orderId); await notifyCustomer(orderId, 'paid'); res.json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
