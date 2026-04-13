@@ -1,0 +1,24 @@
+<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>لوحة الأدمن</title><script src="https://telegram.org/js/telegram-web-app.js"></script><style>body{font-family:'Segoe UI'; padding:16px;} .card{background:white; border-radius:16px; padding:12px; margin-bottom:8px;}</style></head>
+<body><h2>👑 لوحة الأدمن</h2><h3>طلبات التسجيل المعلقة</h3><div id="pending"></div>
+<script>
+    const tg = window.Telegram.WebApp; tg.ready();
+    const API = window.location.origin;
+    async function load() {
+        const res = await fetch(`${API}/api/admin/pending`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
+        const users = await res.json();
+        document.getElementById('pending').innerHTML = users.map(u => `
+            <div class="card"><b>${u.name}</b> (${u.role})<br>هاتف: ${u.phone||''}<br>
+                <button data-id="${u.id}" class="approve">✅ موافقة</button>
+            </div>
+        `).join('');
+        document.querySelectorAll('.approve').forEach(b => b.onclick = async () => {
+            await fetch(`${API}/api/admin/approve`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData },
+                body: JSON.stringify({ user_id: b.dataset.id })
+            });
+            b.closest('.card').remove();
+        });
+    }
+    load();
+</script></body></html>

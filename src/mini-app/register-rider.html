@@ -1,0 +1,21 @@
+<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>تسجيل سائق</title><script src="https://telegram.org/js/telegram-web-app.js"></script><style>body{font-family:'Segoe UI'; padding:20px;} input,select,button{width:100%; padding:14px; margin:8px 0; border-radius:12px; border:1px solid #ccc;} button{background:#e67e22; color:white;}</style></head>
+<body><h2>🛵 تسجيل عامل توصيل</h2><form id="form"><input id="name" placeholder="اسمك الكامل" required><input id="phone" placeholder="رقم الهاتف" required><select id="vehicle"><option value="دراجة">دراجة</option><option value="سيارة">سيارة</option></select><button type="submit">تقديم الطلب</button></form>
+<script>
+    const tg = window.Telegram.WebApp; tg.ready();
+    const API = window.location.origin;
+    document.getElementById('form').onsubmit = async (e) => {
+        e.preventDefault();
+        const data = {
+            name: document.getElementById('name').value,
+            phone: document.getElementById('phone').value,
+            vehicle_type: document.getElementById('vehicle').value
+        };
+        const res = await fetch(`${API}/api/register/rider`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData },
+            body: JSON.stringify(data)
+        });
+        if (res.ok) { alert('تم تقديم الطلب!'); tg.close(); }
+        else alert('خطأ');
+    };
+</script></body></html>

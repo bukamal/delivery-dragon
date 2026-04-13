@@ -1,0 +1,22 @@
+<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>تتبع الطلب</title><script src="https://telegram.org/js/telegram-web-app.js"></script><style>body{font-family:'Segoe UI'; padding:20px; background:#f0f2f5; text-align:center;} .card{background:white; border-radius:28px; padding:24px; max-width:400px; margin:20px auto;} .status{font-size:48px;} button{background:#3498db; color:white; border:none; padding:14px; border-radius:60px; width:100%; margin-top:20px;}</style></head>
+<body><div class="card"><div class="order-id">طلب #<span id="orderId"></span></div><div class="status" id="emoji">⏳</div><div id="message">جاري التحميل...</div><button id="refresh">🔄 تحديث</button></div>
+<script>
+    const tg = window.Telegram.WebApp; tg.ready();
+    const API = window.location.origin;
+    const params = new URLSearchParams(location.search);
+    const oid = params.get('order_id');
+    document.getElementById('orderId').innerText = oid || '—';
+    async function fetchStatus() {
+        try {
+            const res = await fetch(`${API}/api/orders/${oid}/status`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
+            const d = await res.json();
+            const emojiMap = { paid:'💰', preparing:'👨‍🍳', ready:'📦', delivering:'🛵', completed:'✅' };
+            const msgMap = { paid:'مدفوع - بانتظار التحضير', preparing:'قيد التحضير', ready:'جاهز للتوصيل', delivering:'في الطريق', completed:'تم التوصيل' };
+            document.getElementById('emoji').innerText = emojiMap[d.status] || '⏳';
+            document.getElementById('message').innerText = msgMap[d.status] || d.status;
+        } catch (e) {}
+    }
+    fetchStatus();
+    document.getElementById('refresh').onclick = fetchStatus;
+    setInterval(fetchStatus, 15000);
+</script></body></html>

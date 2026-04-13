@@ -1,0 +1,30 @@
+<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>تسجيل محل</title><script src="https://telegram.org/js/telegram-web-app.js"></script><style>body{font-family:'Segoe UI'; padding:20px;} input,select,button{width:100%; padding:14px; margin:8px 0; border-radius:12px; border:1px solid #ccc;} button{background:#e67e22; color:white;}</style></head>
+<body><h2>🏪 تسجيل محل تجاري</h2><form id="form"><input id="name" placeholder="اسمك الكامل" required><input id="shop_name" placeholder="اسم المحل" required><input id="phone" placeholder="رقم الهاتف" required><input id="address" placeholder="العنوان" required><select id="category" required></select><button type="submit">تقديم الطلب</button></form>
+<script>
+    const tg = window.Telegram.WebApp; tg.ready();
+    const API = window.location.origin;
+    async function loadCats() {
+        const res = await fetch(`${API}/api/categories`);
+        const cats = await res.json();
+        const sel = document.getElementById('category');
+        cats.forEach(c => sel.add(new Option(c.name, c.id)));
+    }
+    document.getElementById('form').onsubmit = async (e) => {
+        e.preventDefault();
+        const data = {
+            name: document.getElementById('name').value,
+            shop_name: document.getElementById('shop_name').value,
+            phone: document.getElementById('phone').value,
+            address: document.getElementById('address').value,
+            category_id: document.getElementById('category').value
+        };
+        const res = await fetch(`${API}/api/register/shop`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData },
+            body: JSON.stringify(data)
+        });
+        if (res.ok) { alert('تم تقديم الطلب بنجاح!'); tg.close(); }
+        else alert('خطأ');
+    };
+    loadCats();
+</script></body></html>

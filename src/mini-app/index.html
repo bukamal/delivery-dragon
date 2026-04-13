@@ -1,0 +1,29 @@
+<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>منصة التنين</title><script src="https://telegram.org/js/telegram-web-app.js"></script><style>body{font-family:'Segoe UI',sans-serif; margin:0; padding:20px; background:#f4f6f9; text-align:center;}.btn{display:block; background:#e67e22; color:white; padding:16px; margin:12px 0; border-radius:40px; text-decoration:none; font-weight:bold;}.container{max-width:400px; margin:0 auto;}</style></head>
+<body><div class="container"><h1>🐉 منصة التنين</h1><div id="loading">جاري التحميل...</div><div id="content" style="display:none;"></div></div>
+<script>
+    const tg = window.Telegram.WebApp; tg.ready(); tg.expand();
+    const API_BASE = window.location.origin;
+    async function init(){
+        try{
+            const res = await fetch(`${API_BASE}/api/me`,{headers:{'X-Telegram-Init-Data':tg.initData}});
+            const user = await res.json();
+            const c = document.getElementById('content');
+            document.getElementById('loading').style.display='none';
+            c.style.display='block';
+            if(!user||user.role==='customer'){
+                c.innerHTML='<p>مرحباً '+ (user?.name||'بك') +'!</p><a href="customer-home.html" class="btn">🍔 تصفح المطاعم</a><a href="register-shop.html" class="btn">🏪 سجل كمحل تجاري</a><a href="register-rider.html" class="btn">🛵 سجل كعامل توصيل</a>';
+            } else if(user.role==='shop'&&user.is_approved){
+                window.location.href='shop-dashboard.html';
+            } else if(user.role==='rider'&&user.is_approved){
+                window.location.href='rider-dashboard.html';
+            } else if(user.role==='admin'){
+                window.location.href='admin-dashboard.html';
+            } else {
+                c.innerHTML='<p>حسابك قيد المراجعة. يرجى الانتظار.</p>';
+            }
+        } catch(e){
+            document.getElementById('loading').innerText = 'حدث خطأ: '+e.message;
+        }
+    }
+    init();
+</script></body></html>

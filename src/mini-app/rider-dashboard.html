@@ -1,0 +1,26 @@
+<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>لوحة السائق</title><script src="https://telegram.org/js/telegram-web-app.js"></script><style>body{font-family:'Segoe UI'; padding:16px; background:#f8f9fa;} .card{background:white; border-radius:16px; padding:16px; margin-bottom:12px;}</style></head>
+<body><h2>🛵 الطلبات المتاحة</h2><div id="orders"></div>
+<script>
+    const tg = window.Telegram.WebApp; tg.ready();
+    const API = window.location.origin;
+    async function load() {
+        const res = await fetch(`${API}/api/rider/available-orders`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
+        const orders = await res.json();
+        document.getElementById('orders').innerHTML = orders.map(o => `
+            <div class="card"><b>طلب #${o.id}</b> من ${o.shop_name}<br>إلى: ${o.zone_name} - ${o.address}<br>الأجرة: ${o.delivery_fee} ل.س
+                <button data-id="${o.id}" class="accept">✅ قبول</button>
+            </div>
+        `).join('');
+        document.querySelectorAll('.accept').forEach(b => b.onclick = async () => {
+            const res = await fetch(`${API}/api/rider/accept-order`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData },
+                body: JSON.stringify({ order_id: b.dataset.id })
+            });
+            if (res.ok) { alert('تم قبول الطلب!'); load(); }
+            else alert('الطلب لم يعد متاحاً');
+        });
+    }
+    load();
+    setInterval(load, 10000);
+</script></body></html>

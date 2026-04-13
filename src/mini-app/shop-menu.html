@@ -1,0 +1,50 @@
+<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>قائمة الطعام</title><script src="https://telegram.org/js/telegram-web-app.js"></script><style>body{font-family:'Segoe UI'; padding:16px; background:#f8f9fa;} .category{margin:20px 0 10px; color:#2c3e50;} .item{background:white; border-radius:12px; padding:12px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;} .add-btn{background:#e67e22; color:white; border:none; border-radius:30px; padding:8px 20px;}</style></head>
+<body><a href="customer-home.html" style="color:#e67e22;">← العودة</a><h1 id="shopName"></h1><div id="menu"></div>
+<script>
+    const tg = window.Telegram.WebApp; tg.ready(); tg.expand();
+    const API = window.location.origin;
+    const params = new URLSearchParams(location.search);
+    const shopId = params.get('id');
+    const shopName = decodeURIComponent(params.get('name') || '');
+    document.getElementById('shopName').innerText = shopName;
+    let cart = JSON.parse(localStorage.getItem('dragon_cart')) || [];
+    
+    async function load() {
+        try {
+            const res = await fetch(`${API}/api/shops/${shopId}/products`);
+            const data = await res.json();
+            let html = '';
+            for (let cat in data.categories) {
+                html += `<div class="category"><h3>${cat}</h3></div>`;
+                data.categories[cat].forEach(p => {
+                    html += `<div class="item"><div><b>${p.name}</b><br>${p.price} ل.س</div><button class="add-btn" data-id="${p.id}" data-name="${p.name}" data-price="${p.price}">➕ أضف</button></div>`;
+                });
+            }
+            document.getElementById('menu').innerHTML = html || '<p>لا توجد منتجات</p>';
+            document.querySelectorAll('.add-btn').forEach(b => {
+                b.onclick = () => {
+                    const item = {
+                        id: b.dataset.id,
+                        name: b.dataset.name,
+                        price: parseFloat(b.dataset.price),
+                        shopId,
+                        shopName,
+                        quantity: 1
+                    };
+                    const existing = cart.find(i => i.id === item.id && i.shopId === shopId);
+                    if (existing) existing.quantity++;
+                    else {
+                        if (cart.length && cart[0].shopId !== shopId) cart = [];
+                        cart.push(item);
+                    }
+                    localStorage.setItem('dragon_cart', JSON.stringify(cart));
+                    tg.HapticFeedback.impactOccurred('light');
+                    alert('تمت الإضافة');
+                };
+            });
+        } catch (e) {
+            document.getElementById('menu').innerText = 'تعذر تحميل القائمة';
+        }
+    }
+    load();
+</script></body></html>
