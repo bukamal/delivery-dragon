@@ -6,13 +6,13 @@ const { Pool } = pkg;
 
 const app = express();
 
-// ========== إعداد CORS (تم إضافة رابط workers.dev) ==========
+// ========== إعداد CORS (يشمل رابط workers.dev) ==========
 app.use(cors({
   origin: [
     'https://f8d8f121.delivery-mini-app.pages.dev',
     'https://delivery-mini-app.pages.dev',
     'https://72cdd4ae.delivery-mini-app.pages.dev',
-    'https://delivery-mini-app.manhal-almasriiii199119.workers.dev', // النطاق الجديد
+    'https://delivery-mini-app.manhal-almasriiii199119.workers.dev',
     'https://delivery-dragon.vercel.app'
   ],
   credentials: true
@@ -28,7 +28,6 @@ const pool = new Pool({
 // ========== إعداد البوت ==========
 const bot = new Bot(process.env.BOT_TOKEN);
 const MINI_APP_URL = process.env.MINI_APP_URL || 'https://delivery-mini-app.manhal-almasriiii199119.workers.dev';
-const RIDERS_CHANNEL_ID = process.env.RIDERS_CHANNEL_ID;
 const ADMIN_ID = process.env.ADMIN_ID;
 
 let botInitialized = false;
@@ -101,16 +100,29 @@ async function notifyRiders(orderId) {
       WHERE o.id = $1
     `, [orderId]);
     const o = order.rows[0];
-    if (RIDERS_CHANNEL_ID) {
-      await bot.api.sendMessage(RIDERS_CHANNEL_ID,
-        `🚨 *طلب توصيل جديد!*\n\n` +
-        `🆔 #${orderId}\n` +
-        `🏪 ${o.shop_name} - ${o.shop_address}\n` +
-        `📍 إلى: ${o.zone_name} - ${o.address}\n` +
-        `💵 الأجرة: ${o.delivery_fee} ل.س\n\n` +
-        `_اضغط لفتح لوحة السائق لقبول الطلب._`,
-        { parse_mode: 'Markdown' }
-      );
+    if (!o) return;
+
+    // جلب السائقين المعتمدين فقط الذين لديهم chat_id
+    const riders = await pool.query(`
+      SELECT u.chat_id, u.name 
+      FROM users u 
+      WHERE u.role = 'rider' AND u.is_approved = true AND u.chat_id IS NOT NULL
+    `);
+
+    const messageText = 
+      `🚨 *طلب توصيل جديد!*\n\n` +
+      `🆔 #${orderId}\n` +
+      `🏪 ${o.shop_name} - ${o.shop_address}\n` +
+      `📍 إلى: ${o.zone_name} - ${o.address}\n` +
+      `💵 الأجرة: ${o.delivery_fee} ل.س\n\n` +
+      `_اضغط لفتح لوحة السائق لقبول الطلب._`;
+
+    for (const rider of riders.rows) {
+      try {
+        await bot.api.sendMessage(rider.chat_id, messageText, { parse_mode: 'Markdown' });
+      } catch (e) {
+        console.error(`فشل إرسال إشعار إلى ${rider.name || rider.chat_id}:`, e.message);
+      }
     }
   } catch (e) { console.error('Notify riders error:', e); }
 }
