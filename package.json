@@ -1,10 +1,8 @@
 {
-  "name": "delivery-dragon",
-  "version": "1.0.0",
+  "name": "shahin-delivery",
+  "version": "2.0.0",
   "type": "module",
-  "scripts": {
-    "start": "node src/index.js"
-  },
+  "scripts": { "start": "node src/index.js" },
   "dependencies": {
     "express": "^4.18.2",
     "grammy": "^1.21.2",
