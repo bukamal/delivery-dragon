@@ -1,1 +1,220 @@
-<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>شاهين - لوحة الأدمن</title><script src="https://telegram.org/js/telegram-web-app.js"></script><link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet"><style>body{font-family:'Tajawal',sans-serif;background:#f5f7fa;padding:16px}.tabs{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}.tab{padding:12px 16px;background:#e0e0e0;border-radius:30px;cursor:pointer;font-weight:500}.tab.active{background:#e67e22;color:#fff}.panel{display:none}.panel.active{display:block}.card{background:#fff;border-radius:20px;padding:16px;margin-bottom:16px}.btn{background:#e67e22;color:#fff;border:none;padding:8px 16px;border-radius:30px;cursor:pointer;margin:2px}.btn-danger{background:#e74c3c}table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px solid #ddd;text-align:right}</style></head><body><h2>👑 لوحة الأدمن</h2><div class="tabs"><div class="tab active" data-tab="pending">📋 طلبات تسجيل</div><div class="tab" data-tab="orders">🛒 طلبات للمراجعة</div><div class="tab" data-tab="shops">🏪 المحلات</div><div class="tab" data-tab="riders">🛵 السائقين</div><div class="tab" data-tab="cities">🌍 المدن</div><div class="tab" data-tab="finance">💰 التقارير المالية</div></div><div id="pendingPanel" class="panel active"><div id="pendingContainer"></div></div><div id="ordersPanel" class="panel"><div id="ordersContainer"></div></div><div id="shopsPanel" class="panel"><div id="shopsContainer"></div></div><div id="ridersPanel" class="panel"><div id="ridersContainer"></div></div><div id="citiesPanel" class="panel"><button class="btn" id="addCityBtn" style="margin-bottom:16px">➕ إضافة مدينة</button><div id="citiesContainer"></div></div><div id="financePanel" class="panel"><div id="financeContainer">جاري التحميل...</div></div><script>const tg=window.Telegram.WebApp;tg.ready();tg.expand();const API='https://delivery-dragon.vercel.app';let currentOrders=[];document.querySelectorAll('.tab').forEach(tab=>{tab.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));tab.classList.add('active');document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.getElementById(tab.dataset.tab+'Panel').classList.add('active');if(tab.dataset.tab==='pending')loadPending();else if(tab.dataset.tab==='orders')loadPendingOrders();else if(tab.dataset.tab==='shops')loadShops();else if(tab.dataset.tab==='riders')loadRiders();else if(tab.dataset.tab==='cities')loadCities();else if(tab.dataset.tab==='finance')loadFinance()})});async function loadPending(){const res=await fetch(`${API}/api/admin/pending`,{headers:{'X-Telegram-Init-Data':tg.initData}});const users=await res.json();document.getElementById('pendingContainer').innerHTML=users.map(u=>`<div class="card"><b>${u.name}</b> (${u.role})<br>هاتف: ${u.phone||''}<br><button class="btn" data-id="${u.id}" onclick="approveUser('${u.id}')">✅ موافقة</button></div>`).join('')||'<p>لا توجد طلبات معلقة</p>'}window.approveUser=async id=>{await fetch(`${API}/api/admin/approve`,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify({user_id:id})});loadPending()};async function loadPendingOrders(){try{const res=await fetch(`${API}/api/admin/orders/pending`,{headers:{'X-Telegram-Init-Data':tg.initData}});if(!res.ok)throw new Error(`HTTP ${res.status}`);const orders=await res.json();const container=document.getElementById('ordersContainer');if(!orders.length){container.innerHTML='<p>لا توجد طلبات للمراجعة حالياً.</p>';return}container.innerHTML=orders.map(o=>{let itemsArray=[];try{if(typeof o.items==='string')itemsArray=JSON.parse(o.items);else if(Array.isArray(o.items))itemsArray=o.items;else if(o.items&&typeof o.items==='object')itemsArray=Object.values(o.items)}catch(e){}const itemsText=itemsArray.map(i=>`${i.name||'منتج'} ×${i.quantity||1}`).join('، ')||'تفاصيل غير متوفرة';return`<div class="card"><b>طلب #${o.id}</b> - ${o.customer_name||'غير معروف'}<br>🏪 ${o.shop_name||'غير معروف'}<br>📦 ${itemsText}<br>💰 ${o.total_price||0} ل.س<br>📍 ${o.address||'لا يوجد عنوان'}<br><button class="btn" onclick="approveOrder(${o.id})">✅ قبول</button><button class="btn btn-danger" onclick="rejectOrder(${o.id})">❌ رفض</button></div>`}).join('')}catch(e){document.getElementById('ordersContainer').innerHTML=`<p>خطأ: ${e.message}</p>`}}window.approveOrder=async id=>{await fetch(`${API}/api/admin/orders/${id}/approve`,{method:'POST',headers:{'X-Telegram-Init-Data':tg.initData}});loadPendingOrders()};window.rejectOrder=async id=>{await fetch(`${API}/api/admin/orders/${id}/reject`,{method:'POST',headers:{'X-Telegram-Init-Data':tg.initData}});loadPendingOrders()};async function loadShops(){const res=await fetch(`${API}/api/admin/shops`,{headers:{'X-Telegram-Init-Data':tg.initData}});const shops=await res.json();let html='<table><tr><th>الاسم</th><th>المالك</th><th>المدينة</th><th>الهاتف</th><th>الحالة</th><th>إجراءات</th></tr>';shops.forEach(s=>{html+=`<tr><td>${s.shop_name}</td><td>${s.owner_name}</td><td>${s.city_name||''}</td><td>${s.phone||''}</td><td><span style="background:${s.is_open?'#27ae60':'#f1c40f'};color:white;padding:4px 8px;border-radius:20px">${s.is_open?'مفتوح':'مغلق'}</span></td><td><button class="btn" onclick="editShop(${s.id})">✏️</button><button class="btn btn-danger" onclick="deleteShop(${s.id})">🗑️</button></td></tr>`});html+='</table>';document.getElementById('shopsContainer').innerHTML=html}window.editShop=id=>tg.showPopup({title:'تعديل',message:'قريباً'});window.deleteShop=async id=>{if(!confirm('حذف المحل؟'))return;await fetch(`${API}/api/admin/shops/${id}`,{method:'DELETE',headers:{'X-Telegram-Init-Data':tg.initData}});loadShops()};async function loadRiders(){const res=await fetch(`${API}/api/admin/riders`,{headers:{'X-Telegram-Init-Data':tg.initData}});const riders=await res.json();let html='<table><tr><th>الاسم</th><th>الهاتف</th><th>المركبة</th><th>الحالة</th><th>إجراءات</th></tr>';riders.forEach(r=>{html+=`<tr><td>${r.name}</td><td>${r.phone||''}</td><td>${r.vehicle_type||''}</td><td><span style="background:${r.is_approved?'#27ae60':'#f1c40f'};color:white;padding:4px 8px;border-radius:20px">${r.is_approved?'مفعل':'غير مفعل'}</span></td><td><button class="btn" onclick="editRider(${r.id})">✏️</button><button class="btn btn-danger" onclick="deleteRider(${r.id})">🗑️</button></td></tr>`});html+='</table>';document.getElementById('ridersContainer').innerHTML=html}window.editRider=id=>tg.showPopup({title:'تعديل',message:'قريباً'});window.deleteRider=async id=>{if(!confirm('حذف السائق؟'))return;await fetch(`${API}/api/admin/riders/${id}`,{method:'DELETE',headers:{'X-Telegram-Init-Data':tg.initData}});loadRiders()};async function loadCities(){const res=await fetch(`${API}/api/admin/cities`,{headers:{'X-Telegram-Init-Data':tg.initData}});const cities=await res.json();let html='<table><tr><th>الاسم</th><th>الحالة</th><th>إجراءات</th></tr>';cities.forEach(c=>{html+=`<tr><td>${c.name}</td><td>${c.is_active?'نشطة':'غير نشطة'}</td><td><button class="btn" onclick="editCity(${c.id},'${c.name}',${c.is_active})">✏️</button><button class="btn btn-danger" onclick="deleteCity(${c.id})">🗑️</button></td></tr>`});html+='</table>';document.getElementById('citiesContainer').innerHTML=html}window.editCity=(id,name,isActive)=>{const newName=prompt('اسم المدينة',name);if(!newName)return;const newStatus=confirm('هل المدينة نشطة؟')?true:false;fetch(`${API}/api/admin/cities/${id}`,{method:'PUT',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify({name:newName,is_active:newStatus})}).then(()=>loadCities())};window.deleteCity=async id=>{if(!confirm('حذف المدينة؟'))return;await fetch(`${API}/api/admin/cities/${id}`,{method:'DELETE',headers:{'X-Telegram-Init-Data':tg.initData}});loadCities()};document.getElementById('addCityBtn').onclick=()=>{const name=prompt('اسم المدينة الجديدة');if(!name)return;fetch(`${API}/api/admin/cities`,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify({name})}).then(()=>loadCities())};async function loadFinance(){const container=document.getElementById('financeContainer');container.innerHTML='<p>جاري تحميل التقارير...</p>';try{const summaryRes=await fetch(`${API}/api/admin/finance`,{headers:{'X-Telegram-Init-Data':tg.initData}});const summary=await summaryRes.json();const today=new Date();const lastMonth=new Date(today);lastMonth.setDate(today.getDate()-30);const startDate=lastMonth.toISOString().split('T')[0];const endDate=today.toISOString().split('T')[0];const cityRes=await fetch(`${API}/api/admin/cities`,{headers:{'X-Telegram-Init-Data':tg.initData}});const cities=await cityRes.json();const cityOptions=cities.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');const ordersRes=await fetch(`${API}/api/admin/completed-orders?startDate=${startDate}&endDate=${endDate}`,{headers:{'X-Telegram-Init-Data':tg.initData}});const orders=await ordersRes.json();currentOrders=orders;let tableRows='';orders.forEach(o=>{tableRows+=`<tr><td>${o.id}</td><td>${o.customer_name||''}</td><td>${o.shop_name||''}</td><td>${o.total_price||0} ل.س</td><td>${o.platform_commission||0} ل.س</td><td>${o.shop_net||0} ل.س</td><td>${o.rider_fee||0} ل.س</td><td>${new Date(o.created_at).toLocaleDateString('ar-SY')}</td></tr>`});const html=`<div class="card"><h3>ملخص الأرباح</h3><p>إجمالي عمولات المنصة: ${summary.total_platform_fees||0} ل.س</p><p>مستحقات المتاجر المعلقة: ${summary.pending_shop_payouts||0} ل.س</p><p>مستحقات السائقين المعلقة: ${summary.pending_rider_payouts||0} ل.س</p></div><div class="card"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><h3>الطلبات المكتملة</h3><div><input type="date" id="startDate" value="${startDate}"><input type="date" id="endDate" value="${endDate}"><select id="cityFilter"><option value="">كل المدن</option>${cityOptions}</select><button class="btn" onclick="filterOrders()">تصفية</button><button class="btn" onclick="exportToCSV()">تصدير CSV</button></div></div><div style="overflow-x:auto;"><table><tr><th>رقم</th><th>الزبون</th><th>المتجر</th><th>الإجمالي</th><th>العمولة</th><th>صافي التاجر</th><th>أجرة السائق</th><th>التاريخ</th></tr>${tableRows}</table></div></div>`;container.innerHTML=html}catch(error){container.innerHTML=`<p>خطأ: ${error.message}</p>`}}window.filterOrders=async()=>{const start=document.getElementById('startDate').value;const end=document.getElementById('endDate').value;const cityId=document.getElementById('cityFilter').value;if(!start||!end)return;let url=`${API}/api/admin/completed-orders?startDate=${start}&endDate=${end}`;if(cityId)url+=`&city_id=${cityId}`;const res=await fetch(url,{headers:{'X-Telegram-Init-Data':tg.initData}});const orders=await res.json();currentOrders=orders;let tableRows='';orders.forEach(o=>{tableRows+=`<tr><td>${o.id}</td><td>${o.customer_name||''}</td><td>${o.shop_name||''}</td><td>${o.total_price||0} ل.س</td><td>${o.platform_commission||0} ل.س</td><td>${o.shop_net||0} ل.س</td><td>${o.rider_fee||0} ل.س</td><td>${new Date(o.created_at).toLocaleDateString('ar-SY')}</td></tr>`});document.querySelector('#financeContainer table tbody').innerHTML=tableRows};window.exportToCSV=()=>{let csv='رقم,الزبون,المتجر,الإجمالي,العمولة,صافي التاجر,أجرة السائق,التاريخ\n';currentOrders.forEach(o=>{csv+=`${o.id},${o.customer_name},${o.shop_name},${o.total_price},${o.platform_commission},${o.shop_net},${o.rider_fee},${new Date(o.created_at).toLocaleDateString('ar-SY')}\n`});const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download='orders.csv';link.click()};loadPending();</script></body></html>
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>شاهين | لوحة الأدمن</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Tajawal', sans-serif; background: var(--tg-theme-bg-color, #f5f7fb); color: var(--tg-theme-text-color, #1a1a2c); padding: 16px 12px 24px; line-height: 1.5; }
+    .app-header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+    .app-header h1 { font-size: 2rem; font-weight: 700; color: #d35400; }
+    .tabs-container { display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 8px; padding-bottom: 12px; margin-bottom: 20px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+    .tabs-container::-webkit-scrollbar { display: none; }
+    .tab { flex: 0 0 auto; padding: 10px 20px; background: var(--tg-theme-secondary-bg-color, #ffffff); border-radius: 40px; font-weight: 500; color: var(--tg-theme-text-color, #1a1a2c); box-shadow: 0 2px 6px rgba(0,0,0,0.02); border: 1px solid var(--tg-theme-hint-color, rgba(0,0,0,0.05)); cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+    .tab.active { background: #e67e22; color: white; border-color: #e67e22; box-shadow: 0 4px 12px rgba(230,126,34,0.2); }
+    .panel { display: none; animation: fadeIn 0.2s ease; }
+    .panel.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0.5; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    .card { background: var(--tg-theme-secondary-bg-color, #ffffff); border-radius: 20px; padding: 18px; margin-bottom: 16px; box-shadow: 0 6px 18px rgba(0,0,0,0.03); border: 1px solid var(--tg-theme-hint-color, rgba(0,0,0,0.03)); }
+    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .card-title { font-weight: 700; font-size: 1.2rem; }
+    .badge { padding: 4px 12px; border-radius: 30px; font-size: 0.75rem; font-weight: 600; background: #ecf0f1; }
+    .badge-success { background: #27ae60; color: white; }
+    .badge-warning { background: #f1c40f; color: #1a1a2c; }
+    .btn { background: #e67e22; color: white; border: none; padding: 10px 16px; border-radius: 60px; font-weight: 600; font-size: 0.9rem; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 4px 10px rgba(230,126,34,0.15); }
+    .btn-outline { background: transparent; color: var(--tg-theme-text-color, #1a1a2c); border: 1.5px solid #e67e22; box-shadow: none; }
+    .btn-danger { background: #e74c3c; box-shadow: 0 4px 10px rgba(231,76,60,0.15); }
+    .btn-sm { padding: 6px 12px; font-size: 0.8rem; }
+    .table-responsive { overflow-x: auto; margin: 0 -4px; padding: 4px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 600px; }
+    th { text-align: right; padding: 12px 6px; color: var(--tg-theme-hint-color, #7f8c8d); font-weight: 500; border-bottom: 1px solid var(--tg-theme-hint-color, #ddd); }
+    td { padding: 12px 6px; border-bottom: 1px solid var(--tg-theme-hint-color, rgba(0,0,0,0.05)); }
+    .flex-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .gap-2 { gap: 8px; }
+    .mt-4 { margin-top: 16px; }
+    .w-full { width: 100%; }
+    .skeleton { background: linear-gradient(90deg, var(--tg-theme-secondary-bg-color, #eee) 25%, #ddd 50%, #eee 75%); background-size: 200% 100%; animation: loading 1.5s infinite; border-radius: 16px; height: 60px; margin-bottom: 12px; }
+    @keyframes loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+    .empty-state { text-align: center; padding: 32px 16px; color: var(--tg-theme-hint-color, #95a5a6); }
+  </style>
+</head>
+<body>
+
+<div class="app-header">
+  <div>
+    <h1>🦅 شاهين</h1>
+    <p>لوحة التحكم الرئيسية</p>
+  </div>
+</div>
+
+<div class="tabs-container">
+  <div class="tab active" data-tab="pending">📋 طلبات التسجيل</div>
+  <div class="tab" data-tab="orders">🛒 طلبات للمراجعة</div>
+  <div class="tab" data-tab="shops">🏪 إدارة المتاجر</div>
+  <div class="tab" data-tab="riders">🛵 إدارة السائقين</div>
+  <div class="tab" data-tab="cities">🌍 المدن والمناطق</div>
+  <div class="tab" data-tab="ratings">⭐ التقييمات</div>
+  <div class="tab" data-tab="finance">💰 التقارير المالية</div>
+</div>
+
+<div id="pendingPanel" class="panel active"><div id="pendingContainer"><div class="skeleton"></div></div></div>
+<div id="ordersPanel" class="panel"><div id="ordersContainer"><div class="skeleton"></div></div></div>
+<div id="shopsPanel" class="panel"><div class="card"><div class="card-header"><span class="card-title">🏪 جميع المتاجر</span><span class="badge" id="shopCount">0</span></div><div class="table-responsive" id="shopsContainer"><div class="skeleton"></div></div></div></div>
+<div id="ridersPanel" class="panel"><div class="card"><div class="card-header"><span class="card-title">🛵 جميع السائقين</span><span class="badge" id="riderCount">0</span></div><div class="table-responsive" id="ridersContainer"><div class="skeleton"></div></div></div></div>
+<div id="citiesPanel" class="panel">
+  <div class="card"><div class="card-header"><span class="card-title">🌍 المدن</span><button class="btn btn-sm" id="addCityBtn">➕ إضافة مدينة</button></div><div id="citiesContainer"></div></div>
+  <div class="card mt-4"><div class="card-header"><span class="card-title">📍 مناطق التوصيل</span><button class="btn btn-sm" id="addZoneBtn">➕ إضافة منطقة</button></div><div class="table-responsive" id="zonesContainer"></div></div>
+</div>
+<div id="ratingsPanel" class="panel"><div class="card"><div class="card-header"><span class="card-title">⭐ تقييمات المستخدمين</span></div><div id="ratingsContainer"><div class="skeleton"></div></div></div></div>
+<div id="financePanel" class="panel"><div id="financeContainer"><div class="skeleton" style="height:100px"></div></div></div>
+
+<script>
+  const tg = window.Telegram.WebApp; tg.ready(); tg.expand(); tg.BackButton.show(); tg.BackButton.onClick(() => window.history.back());
+  const API = 'https://delivery-dragon.vercel.app';
+  let currentOrders = [];
+
+  const tabs = document.querySelectorAll('.tab');
+  const panels = { pending: document.getElementById('pendingPanel'), orders: document.getElementById('ordersPanel'), shops: document.getElementById('shopsPanel'), riders: document.getElementById('ridersPanel'), cities: document.getElementById('citiesPanel'), ratings: document.getElementById('ratingsPanel'), finance: document.getElementById('financePanel') };
+
+  function switchTab(tabId) {
+    tabs.forEach(t => t.classList.remove('active')); document.querySelector(`.tab[data-tab="${tabId}"]`).classList.add('active');
+    Object.values(panels).forEach(p => p.classList.remove('active')); panels[tabId].classList.add('active');
+    if (tabId === 'pending') loadPending(); else if (tabId === 'orders') loadPendingOrders(); else if (tabId === 'shops') loadShops(); else if (tabId === 'riders') loadRiders(); else if (tabId === 'cities') { loadCities(); loadZones(); } else if (tabId === 'ratings') loadRatings(); else if (tabId === 'finance') loadFinance();
+  }
+  tabs.forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
+
+  async function loadPending() {
+    const container = document.getElementById('pendingContainer');
+    try {
+      const res = await fetch(`${API}/api/admin/pending`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
+      const users = await res.json();
+      if (!users.length) { container.innerHTML = '<div class="empty-state">✅ لا توجد طلبات تسجيل معلقة</div>'; return; }
+      container.innerHTML = users.map(u => `<div class="card"><div class="flex-row" style="justify-content: space-between;"><div><b>${u.name}</b> (${u.role === 'shop' ? 'متجر' : 'سائق'})<br><span style="font-size:0.85rem; color: var(--tg-theme-hint-color);">📞 ${u.phone || 'غير متوفر'}</span></div><button class="btn btn-sm" onclick="approveUser(${u.id})">✅ موافقة</button></div></div>`).join('');
+    } catch (e) { container.innerHTML = '<div class="empty-state">❌ خطأ في التحميل</div>'; }
+  }
+  window.approveUser = async (id) => { await fetch(`${API}/api/admin/approve`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData }, body: JSON.stringify({ user_id: id }) }); loadPending(); };
+
+  async function loadPendingOrders() {
+    const container = document.getElementById('ordersContainer');
+    try {
+      const res = await fetch(`${API}/api/admin/orders/pending`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
+      const orders = await res.json();
+      if (!orders.length) { container.innerHTML = '<div class="empty-state">📭 لا توجد طلبات بانتظار المراجعة</div>'; return; }
+      container.innerHTML = orders.map(o => {
+        let items = []; try { items = typeof o.items === 'string' ? JSON.parse(o.items) : o.items; } catch(e){}
+        const itemsText = items.map(i => `${i.name} ×${i.quantity}`).join('، ');
+        return `<div class="card"><div class="flex-row" style="justify-content: space-between;"><div><b>طلب #${o.id}</b> - ${o.customer_name}<br><small>🏪 ${o.shop_name}  |  💰 ${o.total_price} ل.س</small><br><small>📦 ${itemsText}</small><br><small>📍 ${o.address}</small></div><div class="flex-row gap-2"><button class="btn btn-sm" onclick="approveOrder(${o.id})">✅ قبول</button><button class="btn btn-sm btn-danger" onclick="rejectOrder(${o.id})">❌ رفض</button></div></div></div>`;
+      }).join('');
+    } catch (e) { container.innerHTML = '<div class="empty-state">❌ خطأ في التحميل</div>'; }
+  }
+  window.approveOrder = async (id) => { await fetch(`${API}/api/admin/orders/${id}/approve`, { method: 'POST', headers: { 'X-Telegram-Init-Data': tg.initData } }); loadPendingOrders(); };
+  window.rejectOrder = async (id) => { await fetch(`${API}/api/admin/orders/${id}/reject`, { method: 'POST', headers: { 'X-Telegram-Init-Data': tg.initData } }); loadPendingOrders(); };
+
+  async function loadShops() {
+    const container = document.getElementById('shopsContainer');
+    try {
+      const res = await fetch(`${API}/api/admin/shops`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
+      const shops = await res.json(); document.getElementById('shopCount').innerText = shops.length;
+      if (!shops.length) { container.innerHTML = '<div class="empty-state">لا توجد متاجر مسجلة</div>'; return; }
+      let html = `<table><tr><th>المتجر</th><th>المالك</th><th>المدينة</th><th>الهاتف</th><th>الحالة</th><th></th></tr>`;
+      shops.forEach(s => { html += `<tr><td>${s.shop_name}</td><td>${s.owner_name}</td><td>${s.city_name || '—'}</td><td>${s.phone || '—'}</td><td><span class="badge ${s.is_open ? 'badge-success' : 'badge-warning'}">${s.is_open ? 'مفتوح' : 'مغلق'}</span></td><td><button class="btn btn-sm btn-danger" onclick="deleteShop(${s.id})">🗑️ حذف</button></td></tr>`; });
+      html += '</table>'; container.innerHTML = html;
+    } catch (e) { container.innerHTML = '<div class="empty-state">❌ خطأ في التحميل</div>'; }
+  }
+  window.deleteShop = async (id) => { tg.showConfirm('⚠️ هل أنت متأكد من حذف المتجر؟ لا يمكن التراجع.', async (confirmed) => { if (!confirmed) return; await fetch(`${API}/api/admin/shops/${id}`, { method: 'DELETE', headers: { 'X-Telegram-Init-Data': tg.initData } }); loadShops(); }); };
+
+  async function loadRiders() {
+    const container = document.getElementById('ridersContainer');
+    try {
+      const res = await fetch(`${API}/api/admin/riders`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
+      const riders = await res.json(); document.getElementById('riderCount').innerText = riders.length;
+      if (!riders.length) { container.innerHTML = '<div class="empty-state">لا يوجد سائقين مسجلين</div>'; return; }
+      let html = `<table><tr><th>الاسم</th><th>الهاتف</th><th>المركبة</th><th>الحالة</th><th></th></tr>`;
+      riders.forEach(r => { html += `<tr><td>${r.name}</td><td>${r.phone || '—'}</td><td>${r.vehicle_type || '—'}</td><td><span class="badge ${r.is_approved ? 'badge-success' : 'badge-warning'}">${r.is_approved ? 'مفعل' : 'غير مفعل'}</span></td><td><button class="btn btn-sm btn-danger" onclick="deleteRider(${r.id})">🗑️ حذف</button></td></tr>`; });
+      html += '</table>'; container.innerHTML = html;
+    } catch (e) { container.innerHTML = '<div class="empty-state">❌ خطأ في التحميل</div>'; }
+  }
+  window.deleteRider = async (id) => { tg.showConfirm('⚠️ هل أنت متأكد من حذف السائق؟', async (confirmed) => { if (!confirmed) return; await fetch(`${API}/api/admin/riders/${id}`, { method: 'DELETE', headers: { 'X-Telegram-Init-Data': tg.initData } }); loadRiders(); }); };
+
+  async function loadCities() {
+    const container = document.getElementById('citiesContainer');
+    try {
+      const res = await fetch(`${API}/api/admin/cities`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
+      const cities = await res.json();
+      let html = `<table><tr><th>المدينة</th><th>الحالة</th><th>إجراءات</th></tr>`;
+      cities.forEach(c => { html += `<tr><td>${c.name}</td><td><span class="badge ${c.is_active ? 'badge-success' : 'badge-warning'}">${c.is_active ? 'نشطة' : 'غير نشطة'}</span></td><td><button class="btn btn-sm btn-outline" onclick="editCity(${c.id}, '${c.name}', ${c.is_active})">✏️</button><button class="btn btn-sm btn-danger" onclick="deleteCity(${c.id})">🗑️</button></td></tr>`; });
+      html += '</table>'; container.innerHTML = html;
+    } catch (e) { container.innerHTML = '<div class="empty-state">❌ خطأ في التحميل</div>'; }
+  }
+  window.editCity = (id, name, isActive) => {
+    const newName = prompt('اسم المدينة:', name); if (!newName) return;
+    const newStatus = confirm('هل المدينة نشطة؟') ? true : false;
+    fetch(`${API}/api/admin/cities/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData }, body: JSON.stringify({ name: newName, is_active: newStatus }) }).then(() => loadCities());
+  };
+  window.deleteCity = async (id) => { tg.showConfirm('حذف المدينة سيؤدي أيضاً لحذف مناطقها!', async (confirmed) => { if (!confirmed) return; await fetch(`${API}/api/admin/cities/${id}`, { method: 'DELETE', headers: { 'X-Telegram-Init-Data': tg.initData } }); loadCities(); loadZones(); }); };
+  document.getElementById('addCityBtn').onclick = () => { const name = prompt('اسم المدينة الجديدة:'); if (!name) return; fetch(`${API}/api/admin/cities`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData }, body: JSON.stringify({ name }) }).then(() => loadCities()); };
+
+  async function loadZones() {
+    const container = document.getElementById('zonesContainer');
+    try {
+      const res = await fetch(`${API}/api/admin/zones`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
+      const zones = await res.json();
+      let html = `<table><tr><th>المدينة</th><th>المنطقة</th><th>الأجرة</th><th>الحالة</th><th>إجراءات</th></tr>`;
+      zones.forEach(z => { html += `<tr><td>${z.city_name}</td><td>${z.zone_name}</td><td>${z.base_fee} ل.س</td><td><span class="badge ${z.is_active ? 'badge-success' : 'badge-warning'}">${z.is_active ? 'نشطة' : 'غير نشطة'}</span></td><td><button class="btn btn-sm btn-outline" onclick="editZone(${z.id}, ${z.city_id}, '${z.zone_name}', ${z.base_fee}, ${z.is_active})">✏️</button><button class="btn btn-sm btn-danger" onclick="deleteZone(${z.id})">🗑️</button></td></tr>`; });
+      html += '</table>'; container.innerHTML = html;
+    } catch (e) { container.innerHTML = '<div class="empty-state">❌ خطأ في التحميل</div>'; }
+  }
+  window.editZone = (id, cityId, zoneName, baseFee, isActive) => {
+    tg.showPopup({ title: 'قريباً', message: 'سيتم تطوير واجهة تعديل المنطقة قريباً.' });
+  };
+  window.deleteZone = async (id) => { tg.showConfirm('حذف المنطقة؟', async (confirmed) => { if (!confirmed) return; await fetch(`${API}/api/admin/zones/${id}`, { method: 'DELETE', headers: { 'X-Telegram-Init-Data': tg.initData } }); loadZones(); }); };
+  document.getElementById('addZoneBtn').onclick = async () => {
+    const citiesRes = await fetch(`${API}/api/admin/cities`, { headers: { 'X-Telegram-Init-Data': tg.initData } }); const cities = await citiesRes.json();
+    if (!cities.length) { tg.showAlert('أضف مدينة أولاً.'); return; }
+    let cityOptions = ''; cities.forEach(c => { cityOptions += `<option value="${c.id}">${c.name}</option>`; });
+    tg.showPopup({
+      title: 'إضافة منطقة جديدة',
+      message: `<select id="popupCitySelect" style="width:100%; padding:12px; border-radius:12px; margin:8px 0;">${cityOptions}</select><input id="popupZoneName" placeholder="اسم المنطقة" style="width:100%; padding:12px; border-radius:12px; margin:8px 0;"><input id="popupBaseFee" type="number" placeholder="أجرة التوصيل" value="20000" style="width:100%; padding:12px; border-radius:12px; margin:8px 0;">`,
+      buttons: [{ id: 'save', type: 'default', text: 'حفظ' }, { type: 'cancel', text: 'إلغاء' }]
+    }, async (btn) => {
+      if (btn !== 'save') return;
+      const cityId = document.getElementById('popupCitySelect').value;
+      const zoneName = document.getElementById('popupZoneName').value.trim();
+      const baseFee = parseFloat(document.getElementById('popupBaseFee').value);
+      if (!zoneName || !baseFee) { tg.showAlert('جميع الحقول مطلوبة'); return; }
+      await fetch(`${API}/api/admin/zones`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData }, body: JSON.stringify({ city_id: cityId, zone_name: zoneName, base_fee: baseFee }) });
+      loadZones();
+    });
+  };
+
+  async function loadRatings() {
+    const container = document.getElementById('ratingsContainer');
+    try {
+      const res = await fetch(`${API}/api/admin/ratings`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
+      const ratings = await res.json();
+      if (!ratings.length) { container.innerHTML = '<div class="empty-state">⭐ لا توجد تقييمات بعد</div>'; return; }
+      let html = `<table><tr><th>الطلب</th><th>من</th><th>إلى</th><th>التقييم</th><th>تعليق</th></tr>`;
+      ratings.forEach(r => { html += `<tr><td>#${r.order_id}</td><td>${r.from_name}</td><td>${r.to_name}</td><td>${'★'.repeat(r.rating)}${'☆'.repeat(5-r.rating)}</td><td>${r.comment || ''}</td></tr>`; });
+      html += '</table>'; container.innerHTML = html;
+    } catch (e) { container.innerHTML = '<div class="empty-state">❌ خطأ في التحميل</div>'; }
+  }
+
+  async function loadFinance() {
+    const container = document.getElementById('financeContainer');
+    try {
+      const sumRes = await fetch(`${API}/api/admin/finance`, { headers: { 'X-Telegram-Init-Data': tg.initData } }); const summary = await sumRes.json();
+      const today = new Date(); const lastMonth = new Date(today); lastMonth.setDate(today.getDate() - 30); const start = lastMonth.toISOString().split('T')[0]; const end = today.toISOString().split('T')[0];
+      const ordersRes = await fetch(`${API}/api/admin/completed-orders?startDate=${start}&endDate=${end}`, { headers: { 'X-Telegram-Init-Data': tg.initData } }); const orders = await ordersRes.json(); currentOrders = orders;
+      let rows = ''; orders.forEach(o => { rows += `<tr><td>${o.id}</td><td>${o.customer_name}</td><td>${o.shop_name}</td><td>${o.total_price} ل.س</td><td>${o.platform_commission} ل.س</td><td>${o.shop_net} ل.س</td><td>${o.rider_fee} ل.س</td></tr>`; });
+      container.innerHTML = `<div class="card"><div class="card-title">📊 ملخص الأرباح</div><p>💰 إجمالي عمولات المنصة: <b>${summary.total_platform_fees || 0} ل.س</b></p><p>🏪 مستحقات المتاجر المعلقة: ${summary.pending_shop_payouts || 0} ل.س</p><p>🛵 مستحقات السائقين المعلقة: ${summary.pending_rider_payouts || 0} ل.س</p></div><div class="card"><div class="card-header"><span class="card-title">📋 الطلبات المكتملة (آخر 30 يوم)</span><button class="btn btn-sm btn-outline" onclick="exportToCSV()">📥 تصدير CSV</button></div><div class="table-responsive"><table><tr><th>#</th><th>الزبون</th><th>المتجر</th><th>الإجمالي</th><th>العمولة</th><th>صافي المتجر</th><th>أجرة السائق</th></tr>${rows}</table></div></div>`;
+    } catch (e) { container.innerHTML = '<div class="empty-state">❌ خطأ في التحميل</div>'; }
+  }
+  window.exportToCSV = () => { let csv = 'رقم,الزبون,المتجر,الإجمالي,العمولة,صافي المتجر,أجرة السائق\n'; currentOrders.forEach(o => { csv += `${o.id},${o.customer_name},${o.shop_name},${o.total_price},${o.platform_commission},${o.shop_net},${o.rider_fee}\n`; }); const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'orders.csv'; link.click(); };
+
+  loadPending();
+</script>
+</body>
+</html>
