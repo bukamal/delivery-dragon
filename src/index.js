@@ -1,9 +1,20 @@
 import express from 'express';
+import cors from 'cors';
 import { Bot } from 'grammy';
 import pkg from 'pg';
 const { Pool } = pkg;
 
 const app = express();
+
+// ========== إعداد CORS ==========
+app.use(cors({
+  origin: [
+    'https://f8d8f121.delivery-mini-app.pages.dev',
+    'https://delivery-mini-app.pages.dev',
+    'https://72cdd4ae.delivery-mini-app.pages.dev'
+  ],
+  credentials: true
+}));
 app.use(express.json());
 
 // ========== إعداد قاعدة البيانات Supabase ==========
@@ -14,7 +25,7 @@ const pool = new Pool({
 
 // ========== إعداد البوت ==========
 const bot = new Bot(process.env.BOT_TOKEN);
-const MINI_APP_URL = process.env.MINI_APP_URL || 'https://delivery-mini-app.pages.dev';
+const MINI_APP_URL = process.env.MINI_APP_URL || 'https://f8d8f121.delivery-mini-app.pages.dev';
 
 // دالة مساعدة لجلب المستخدم
 async function getDbUser(telegramId) {
