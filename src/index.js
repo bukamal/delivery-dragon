@@ -29,6 +29,7 @@ const pool = new Pool({
 const bot = new Bot(process.env.BOT_TOKEN);
 const MINI_APP_URL = process.env.MINI_APP_URL || 'https://delivery-mini-app.manhal-almasriiii199119.workers.dev';
 const ADMIN_ID = process.env.ADMIN_ID;
+const PLATFORM_FIXED_FEE = parseFloat(process.env.PLATFORM_FIXED_FEE || '5000'); // عمولة ثابتة
 
 let botInitialized = false;
 async function ensureBotInitialized() {
@@ -568,9 +569,10 @@ app.post('/api/rider/complete-order', async (req, res) => {
     await pool.query(`UPDATE orders SET status = 'completed' WHERE id = $1`, [order_id]);
     
     const o = order.rows[0];
-    const platformCommission = o.subtotal * parseFloat(process.env.PLATFORM_COMMISSION_RATE || '0.05');
-    const shopNet = o.subtotal - platformCommission;
-    const riderFee = o.delivery_fee;
+    // عمولة ثابتة 5000 ل.س
+    const platformCommission = PLATFORM_FIXED_FEE;
+    const shopNet = o.subtotal; // كامل قيمة الطلب تذهب للتاجر
+    const riderFee = o.delivery_fee - platformCommission; // 20000 - 5000 = 15000 للسائق
     
     await pool.query(
       `UPDATE orders SET platform_commission = $1, shop_net = $2, rider_fee = $3 WHERE id = $4`,

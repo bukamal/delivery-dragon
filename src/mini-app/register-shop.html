@@ -1,30 +1,53 @@
-<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>تسجيل محل</title><script src="https://telegram.org/js/telegram-web-app.js"></script><style>body{font-family:'Segoe UI'; padding:20px;} input,select,button{width:100%; padding:14px; margin:8px 0; border-radius:12px; border:1px solid #ccc;} button{background:#e67e22; color:white;}</style></head>
-<body><h2>🏪 تسجيل محل تجاري</h2><form id="form"><input id="name" placeholder="اسمك الكامل" required><input id="shop_name" placeholder="اسم المحل" required><input id="phone" placeholder="رقم الهاتف" required><input id="address" placeholder="العنوان" required><select id="category" required></select><button type="submit">تقديم الطلب</button></form>
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>تسجيل محل تجاري</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Tajawal', sans-serif; background: var(--tg-theme-bg-color, #f5f7fa); color: var(--tg-theme-text-color, #1e1e2f); padding: 20px; }
+    .form-group { margin-bottom: 20px; }
+    label { display: block; margin-bottom: 8px; font-weight: 500; }
+    input, select { width: 100%; padding: 16px; border-radius: 16px; border: 1px solid var(--tg-theme-hint-color, #ccc); background: var(--tg-theme-secondary-bg-color, white); color: inherit; }
+    .btn { background: var(--tg-theme-button-color, #e67e22); color: white; border: none; padding: 18px; border-radius: 60px; width: 100%; font-size: 1.2rem; font-weight: bold; margin-top: 20px; cursor: pointer; }
+  </style>
+</head>
+<body>
+<h2>🏪 تسجيل محل تجاري</h2>
+<form id="registerForm">
+  <div class="form-group"><label>اسمك الكامل</label><input type="text" id="name" required></div>
+  <div class="form-group"><label>اسم المحل</label><input type="text" id="shopName" required></div>
+  <div class="form-group"><label>رقم الهاتف</label><input type="tel" id="phone" required></div>
+  <div class="form-group"><label>العنوان</label><input type="text" id="address" required></div>
+  <div class="form-group"><label>الفئة</label><select id="category" required></select></div>
+  <button type="submit" class="btn">تقديم الطلب</button>
+</form>
 <script>
-    const tg = window.Telegram.WebApp; tg.ready();
-    const API = window.location.origin;
-    async function loadCats() {
-        const res = await fetch(`${API}/api/categories`);
-        const cats = await res.json();
-        const sel = document.getElementById('category');
-        cats.forEach(c => sel.add(new Option(c.name, c.id)));
-    }
-    document.getElementById('form').onsubmit = async (e) => {
-        e.preventDefault();
-        const data = {
-            name: document.getElementById('name').value,
-            shop_name: document.getElementById('shop_name').value,
-            phone: document.getElementById('phone').value,
-            address: document.getElementById('address').value,
-            category_id: document.getElementById('category').value
-        };
-        const res = await fetch(`${API}/api/register/shop`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData },
-            body: JSON.stringify(data)
-        });
-        if (res.ok) { alert('تم تقديم الطلب بنجاح!'); tg.close(); }
-        else alert('خطأ');
+  const tg = window.Telegram.WebApp; tg.ready();
+  const API = 'https://delivery-dragon.vercel.app';
+  async function loadCategories() {
+    const res = await fetch(`${API}/api/categories`); const cats = await res.json();
+    const sel = document.getElementById('category');
+    cats.forEach(c => sel.add(new Option(c.name, c.id)));
+  }
+  document.getElementById('registerForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const data = {
+      name: document.getElementById('name').value,
+      shop_name: document.getElementById('shopName').value,
+      phone: document.getElementById('phone').value,
+      address: document.getElementById('address').value,
+      category_id: document.getElementById('category').value
     };
-    loadCats();
-</script></body></html>
+    const res = await fetch(`${API}/api/register/shop`, {
+      method: 'POST', headers: { 'Content-Type':'application/json', 'X-Telegram-Init-Data': tg.initData }, body: JSON.stringify(data)
+    });
+    if (res.ok) { tg.showAlert('تم تقديم الطلب بنجاح!'); tg.close(); }
+    else tg.showAlert('خطأ في التسجيل');
+  };
+  loadCategories();
+</script>
+</body>
+</html>

@@ -1,26 +1,42 @@
-<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>لوحة السائق</title><script src="https://telegram.org/js/telegram-web-app.js"></script><style>body{font-family:'Segoe UI'; padding:16px; background:#f8f9fa;} .card{background:white; border-radius:16px; padding:16px; margin-bottom:12px;}</style></head>
-<body><h2>🛵 الطلبات المتاحة</h2><div id="orders"></div>
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>لوحة السائق</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Tajawal', sans-serif; background: var(--tg-theme-bg-color, #f5f7fa); color: var(--tg-theme-text-color, #1e1e2f); padding: 16px; }
+    .card { background: var(--tg-theme-secondary-bg-color, white); border-radius: 20px; padding: 16px; margin-bottom: 16px; }
+    .btn { background: var(--tg-theme-button-color, #e67e22); color: white; border: none; padding: 12px 20px; border-radius: 40px; cursor: pointer; margin-right: 8px; }
+  </style>
+</head>
+<body>
+<h2>🛵 الطلبات المتاحة</h2>
+<div id="ordersContainer"></div>
 <script>
-    const tg = window.Telegram.WebApp; tg.ready();
-    const API = window.location.origin;
-    async function load() {
-        const res = await fetch(`${API}/api/rider/available-orders`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
-        const orders = await res.json();
-        document.getElementById('orders').innerHTML = orders.map(o => `
-            <div class="card"><b>طلب #${o.id}</b> من ${o.shop_name}<br>إلى: ${o.zone_name} - ${o.address}<br>الأجرة: ${o.delivery_fee} ل.س
-                <button data-id="${o.id}" class="accept">✅ قبول</button>
-            </div>
-        `).join('');
-        document.querySelectorAll('.accept').forEach(b => b.onclick = async () => {
-            const res = await fetch(`${API}/api/rider/accept-order`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData },
-                body: JSON.stringify({ order_id: b.dataset.id })
-            });
-            if (res.ok) { alert('تم قبول الطلب!'); load(); }
-            else alert('الطلب لم يعد متاحاً');
-        });
-    }
-    load();
-    setInterval(load, 10000);
-</script></body></html>
+  const tg = window.Telegram.WebApp; tg.ready();
+  const API = 'https://delivery-dragon.vercel.app';
+  async function loadOrders() {
+    const res = await fetch(`${API}/api/rider/available-orders`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
+    const orders = await res.json();
+    document.getElementById('ordersContainer').innerHTML = orders.map(o => `
+      <div class="card">
+        <b>#${o.id}</b> من ${o.shop_name}<br>
+        إلى: ${o.zone_name} - ${o.address}<br>
+        الأجرة: ${o.delivery_fee} ل.س
+        <div style="margin-top:12px;">
+          <button class="btn" data-id="${o.id}" onclick="acceptOrder('${o.id}')">✅ قبول</button>
+        </div>
+      </div>`).join('');
+  }
+  window.acceptOrder = async (id) => {
+    const res = await fetch(`${API}/api/rider/accept-order`, { method:'POST', headers: { 'Content-Type':'application/json', 'X-Telegram-Init-Data': tg.initData }, body: JSON.stringify({ order_id: id }) });
+    if (res.ok) { tg.showAlert('تم قبول الطلب!'); loadOrders(); }
+    else tg.showAlert('الطلب لم يعد متاحاً');
+  };
+  loadOrders(); setInterval(loadOrders, 10000);
+</script>
+</body>
+</html>
