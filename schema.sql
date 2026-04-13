@@ -58,14 +58,14 @@ CREATE TABLE IF NOT EXISTS delivery_zones (
     is_active BOOLEAN DEFAULT true
 );
 INSERT INTO delivery_zones (zone_name, base_fee) VALUES ('نوى', 20000) ON CONFLICT (zone_name) DO UPDATE SET base_fee=20000;
--- الطلبات
+-- الطلبات (تم إضافة حالات جديدة)
 CREATE TABLE IF NOT EXISTS orders (
     id SERIAL PRIMARY KEY,
     customer_id INTEGER NOT NULL REFERENCES users(id),
     shop_id INTEGER NOT NULL REFERENCES shops(id),
     zone_id INTEGER REFERENCES delivery_zones(id),
     rider_id INTEGER REFERENCES users(id),
-    status TEXT DEFAULT 'pending',
+    status TEXT DEFAULT 'verifying' CHECK(status IN ('verifying','pending','paid','preparing','ready_for_pickup','delivering','completed','rejected')),
     items JSONB NOT NULL,
     subtotal REAL NOT NULL,
     delivery_fee REAL NOT NULL,
