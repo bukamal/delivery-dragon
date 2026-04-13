@@ -6,12 +6,13 @@ const { Pool } = pkg;
 
 const app = express();
 
-// ========== إعداد CORS ==========
+// ========== إعداد CORS (تم إضافة رابط workers.dev) ==========
 app.use(cors({
   origin: [
     'https://f8d8f121.delivery-mini-app.pages.dev',
     'https://delivery-mini-app.pages.dev',
     'https://72cdd4ae.delivery-mini-app.pages.dev',
+    'https://delivery-mini-app.manhal-almasriiii199119.workers.dev', // النطاق الجديد
     'https://delivery-dragon.vercel.app'
   ],
   credentials: true
@@ -26,8 +27,8 @@ const pool = new Pool({
 
 // ========== إعداد البوت ==========
 const bot = new Bot(process.env.BOT_TOKEN);
-const MINI_APP_URL = process.env.MINI_APP_URL || 'https://f8d8f121.delivery-mini-app.pages.dev';
-const RIDERS_CHANNEL_ID = process.env.RIDERS_CHANNEL_ID; // معرف قناة السائقين (اختياري)
+const MINI_APP_URL = process.env.MINI_APP_URL || 'https://delivery-mini-app.manhal-almasriiii199119.workers.dev';
+const RIDERS_CHANNEL_ID = process.env.RIDERS_CHANNEL_ID;
 const ADMIN_ID = process.env.ADMIN_ID;
 
 let botInitialized = false;
@@ -165,7 +166,6 @@ bot.on(':location', async (ctx) => {
 
 // ========== API Routes ==========
 
-// ---- معلومات المستخدم ----
 app.get('/api/me', async (req, res) => {
   try {
     const initData = req.headers['x-telegram-init-data'];
@@ -189,13 +189,11 @@ app.get('/api/me', async (req, res) => {
   }
 });
 
-// ---- فئات المحلات ----
 app.get('/api/categories', async (req, res) => {
   const result = await pool.query('SELECT * FROM shop_categories');
   res.json(result.rows);
 });
 
-// ---- تسجيل تاجر ----
 app.post('/api/register/shop', async (req, res) => {
   try {
     const initData = req.headers['x-telegram-init-data'];
@@ -229,7 +227,6 @@ app.post('/api/register/shop', async (req, res) => {
   }
 });
 
-// ---- تسجيل سائق ----
 app.post('/api/register/rider', async (req, res) => {
   try {
     const initData = req.headers['x-telegram-init-data'];
@@ -264,7 +261,6 @@ app.post('/api/register/rider', async (req, res) => {
   }
 });
 
-// ---- جلب المحلات ----
 app.get('/api/shops', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -279,7 +275,6 @@ app.get('/api/shops', async (req, res) => {
   }
 });
 
-// ---- جلب منتجات محل ----
 app.get('/api/shops/:shopId/products', async (req, res) => {
   try {
     const { shopId } = req.params;
@@ -302,13 +297,11 @@ app.get('/api/shops/:shopId/products', async (req, res) => {
   }
 });
 
-// ---- مناطق التوصيل ----
 app.get('/api/zones', async (req, res) => {
   const result = await pool.query('SELECT * FROM delivery_zones WHERE is_active = true');
   res.json(result.rows);
 });
 
-// ---- إنشاء طلب ----
 app.post('/api/orders', async (req, res) => {
   try {
     const initData = req.headers['x-telegram-init-data'];
@@ -343,7 +336,6 @@ app.post('/api/orders', async (req, res) => {
     );
     const orderId = orderResult.rows[0].id;
     
-    // إشعار التاجر
     await notifyShop(orderId);
     
     res.status(201).json({ order_id: orderId, total });
@@ -352,7 +344,6 @@ app.post('/api/orders', async (req, res) => {
   }
 });
 
-// ---- جلب موقع السائق لطلب معين ----
 app.get('/api/orders/:orderId/location', async (req, res) => {
   try {
     const { orderId } = req.params;
@@ -366,7 +357,6 @@ app.get('/api/orders/:orderId/location', async (req, res) => {
   }
 });
 
-// ---- تقييم طلب ----
 app.post('/api/orders/:orderId/rate', async (req, res) => {
   try {
     const initData = req.headers['x-telegram-init-data'];
@@ -377,7 +367,7 @@ app.post('/api/orders/:orderId/rate', async (req, res) => {
     const tgUser = JSON.parse(userString);
     const dbUser = await getDbUser(tgUser.id);
     const { orderId } = req.params;
-    const { rating, comment, target } = req.body; // target: 'shop' or 'rider'
+    const { rating, comment, target } = req.body;
     
     const order = await pool.query('SELECT shop_id, rider_id FROM orders WHERE id = $1 AND customer_id = $2', [orderId, dbUser.id]);
     if (!order.rows[0]) return res.status(403).json({ error: 'Order not found or not yours' });
@@ -444,7 +434,6 @@ app.post('/api/shop/orders/:orderId/status', async (req, res) => {
       [status, orderId, dbUser.id]
     );
     
-    // إشعارات
     if (status === 'ready_for_pickup') {
       await notifyRiders(orderId);
     }
@@ -567,7 +556,6 @@ app.post('/api/rider/complete-order', async (req, res) => {
     
     await pool.query(`UPDATE orders SET status = 'completed' WHERE id = $1`, [order_id]);
     
-    // حساب العمولة والمستحقات
     const o = order.rows[0];
     const platformCommission = o.subtotal * parseFloat(process.env.PLATFORM_COMMISSION_RATE || '0.05');
     const shopNet = o.subtotal - platformCommission;
