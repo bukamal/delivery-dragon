@@ -29,7 +29,7 @@ const pool = new Pool({
 const bot = new Bot(process.env.BOT_TOKEN);
 const MINI_APP_URL = process.env.MINI_APP_URL || 'https://delivery-mini-app.manhal-almasriiii199119.workers.dev';
 const ADMIN_ID = process.env.ADMIN_ID;
-const PLATFORM_FIXED_FEE = parseFloat(process.env.PLATFORM_FIXED_FEE || '5000'); // عمولة ثابتة
+const PLATFORM_FIXED_FEE = parseFloat(process.env.PLATFORM_FIXED_FEE || '5000'); // عمولة ثابتة 5000 ل.س
 
 let botInitialized = false;
 async function ensureBotInitialized() {
@@ -316,42 +316,66 @@ app.get('/api/zones', async (req, res) => {
 
 app.post('/api/orders', async (req, res) => {
   try {
+    console.log('📦 /api/orders called');
     const initData = req.headers['x-telegram-init-data'];
-    if (!initData) return res.status(401).json({ error: 'Unauthorized' });
+    if (!initData) {
+      console.log('❌ Missing initData');
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
     const urlParams = new URLSearchParams(initData);
     const userString = urlParams.get('user');
-    if (!userString) return res.status(401).json({ error: 'Unauthorized' });
+    if (!userString) {
+      console.log('❌ Missing user in initData');
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
     const tgUser = JSON.parse(userString);
-    const dbUser = await getDbUser(tgUser.id);
-    const { shop_id, items, zone_id, address } = req.body;
+    console.log(`👤 User: ${tgUser.id}`);
     
+    const dbUser = await getDbUser(tgUser.id);
+    if (!dbUser) {
+      console.log('❌ User not found in DB');
+      return res.status(401).json({ error: 'User not found' });
+    }
+    console.log(`✅ DB User ID: ${dbUser.id}`);
+
+    const { shop_id, items, zone_id, address } = req.body;
+    console.log(`🛒 Shop: ${shop_id}, Zone: ${zone_id}, Items: ${items.length}`);
+
     const productIds = items.map(i => i.id);
+    const placeholders = productIds.map(() => '?').join(',');
     const productsResult = await pool.query(
-      'SELECT id, name, price FROM products WHERE id = ANY($1::int[]) AND shop_id = $2',
+      `SELECT id, name, price FROM products WHERE id = ANY($1::int[]) AND shop_id = $2`,
       [productIds, shop_id]
     );
+    console.log(`📋 Found ${productsResult.rows.length} products`);
+
     const productsMap = new Map(productsResult.rows.map(p => [p.id, p]));
     const frozenItems = items.map(item => {
       const p = productsMap.get(item.id);
+      if (!p) throw new Error(`Product ${item.id} not found`);
       return { id: p.id, name: p.name, price: p.price, quantity: item.quantity };
     });
-    
+
     const subtotal = frozenItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
     const zoneResult = await pool.query('SELECT base_fee FROM delivery_zones WHERE id = $1', [zone_id]);
+    if (!zoneResult.rows[0]) throw new Error('Zone not found');
     const deliveryFee = zoneResult.rows[0].base_fee;
     const total = subtotal + deliveryFee;
-    
+    console.log(`💰 Subtotal: ${subtotal}, Delivery: ${deliveryFee}, Total: ${total}`);
+
     const orderResult = await pool.query(
       `INSERT INTO orders (customer_id, shop_id, zone_id, items, subtotal, delivery_fee, total_price, address, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending') RETURNING id`,
       [dbUser.id, shop_id, zone_id, JSON.stringify(frozenItems), subtotal, deliveryFee, total, address]
     );
     const orderId = orderResult.rows[0].id;
-    
+    console.log(`✅ Order created: ${orderId}`);
+
     await notifyShop(orderId);
-    
+
     res.status(201).json({ order_id: orderId, total });
   } catch (error) {
+    console.error('🔥 /api/orders FATAL ERROR:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -500,6 +524,27 @@ app.post('/api/shop/products', async (req, res) => {
   }
 });
 
+app.delete('/api/shop/products/:productId', async (req, res) => {
+  try {
+    const initData = req.headers['x-telegram-init-data'];
+    if (!initData) return res.status(401).json({ error: 'Unauthorized' });
+    const urlParams = new URLSearchParams(initData);
+    const userString = urlParams.get('user');
+    if (!userString) return res.status(401).json({ error: 'Unauthorized' });
+    const tgUser = JSON.parse(userString);
+    const dbUser = await getDbUser(tgUser.id);
+    if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' });
+    
+    await pool.query(
+      `DELETE FROM products WHERE id = $1 AND shop_id = (SELECT id FROM shops WHERE owner_id = $2)`,
+      [req.params.productId, dbUser.id]
+    );
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ========== لوحة السائق ==========
 app.get('/api/rider/available-orders', async (req, res) => {
   try {
@@ -569,10 +614,9 @@ app.post('/api/rider/complete-order', async (req, res) => {
     await pool.query(`UPDATE orders SET status = 'completed' WHERE id = $1`, [order_id]);
     
     const o = order.rows[0];
-    // عمولة ثابتة 5000 ل.س
     const platformCommission = PLATFORM_FIXED_FEE;
-    const shopNet = o.subtotal; // كامل قيمة الطلب تذهب للتاجر
-    const riderFee = o.delivery_fee - platformCommission; // 20000 - 5000 = 15000 للسائق
+    const shopNet = o.subtotal;
+    const riderFee = o.delivery_fee - platformCommission;
     
     await pool.query(
       `UPDATE orders SET platform_commission = $1, shop_net = $2, rider_fee = $3 WHERE id = $4`,
@@ -592,7 +636,7 @@ app.post('/api/rider/complete-order', async (req, res) => {
   }
 });
 
-// ========== لوحة الأدمن (الصلاحيات الأساسية + إدارة المحلات والسائقين) ==========
+// ========== لوحة الأدمن ==========
 app.get('/api/admin/pending', async (req, res) => {
   try {
     const initData = req.headers['x-telegram-init-data'];
