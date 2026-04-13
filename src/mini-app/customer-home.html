@@ -1,1 +1,319 @@
-<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>شاهين | المطاعم</title><script src="https://telegram.org/js/telegram-web-app.js"></script><link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Tajawal',sans-serif;background:var(--tg-theme-bg-color,#f5f7fb);color:var(--tg-theme-text-color,#1e1e2f);padding:16px 16px 90px}.header{display:flex;align-items:center;gap:10px;margin-bottom:16px}.header h2{font-size:1.8rem;color:#e67e22}.city-selector{background:var(--tg-theme-secondary-bg-color,#fff);border-radius:30px;padding:12px 20px;margin-bottom:16px;border:1px solid var(--tg-theme-hint-color,#ddd)}select{width:100%;padding:12px;border-radius:30px;border:1px solid #ccc;background:transparent;color:inherit;font-family:inherit}.search-bar{background:var(--tg-theme-secondary-bg-color,#fff);border-radius:30px;padding:12px 20px;margin-bottom:20px;display:flex;gap:12px;border:1px solid var(--tg-theme-hint-color,#ddd)}.search-bar input{flex:1;border:none;background:transparent;outline:none;color:inherit;font-family:inherit}.shop-grid{display:grid;gap:16px}.shop-card{background:var(--tg-theme-secondary-bg-color,#fff);border-radius:24px;padding:16px;box-shadow:0 4px 12px rgba(0,0,0,.02);display:flex;align-items:center;gap:16px;cursor:pointer;transition:.2s;border:1px solid var(--tg-theme-hint-color,rgba(0,0,0,.03))}.shop-card:active{transform:scale(.98);background:var(--tg-theme-secondary-bg-color,#f0f0f0)}.shop-icon{font-size:40px;background:var(--tg-theme-bg-color,#f0f2f5);width:60px;height:60px;border-radius:20px;display:flex;align-items:center;justify-content:center}.shop-info h3{font-size:1.2rem;margin-bottom:4px}.shop-info p{color:var(--tg-theme-hint-color,#666);font-size:.9rem}.cart-bar{position:fixed;bottom:0;left:0;right:0;background:var(--tg-theme-secondary-bg-color,#1e1e2f);color:#fff;padding:12px 24px;display:flex;justify-content:space-between;align-items:center;backdrop-filter:blur(10px)}.cart-btn{background:#e67e22;border:none;color:#fff;padding:12px 28px;border-radius:40px;font-weight:700;cursor:pointer}.skeleton-shop{height:90px;background:linear-gradient(90deg,#eee 25%,#ddd 50%,#eee 75%);background-size:200% 100%;animation:loading 1.5s infinite;border-radius:24px;margin-bottom:16px}@keyframes loading{0%{background-position:200% 0}100%{background-position:-200% 0}}</style></head><body><div class="header"><h2>🦅 شاهين</h2><span style="color:#e67e22">نحن أسرع إليك</span></div><div class="city-selector"><select id="citySelect"><option value="">اختر المدينة...</option></select></div><div class="search-bar"><span>🔍</span><input type="text" id="searchInput" placeholder="ابحث عن مطعم..."></div><div class="shop-grid" id="shopsContainer"><div class="skeleton-shop"></div><div class="skeleton-shop"></div><div class="skeleton-shop"></div></div><div class="cart-bar"><span>🛒 السلة (<span id="cartCount">0</span>)</span><button class="cart-btn" id="viewCartBtn">عرض السلة</button></div><script>const tg=window.Telegram.WebApp;tg.ready();tg.expand();tg.BackButton.show();tg.BackButton.onClick(()=>window.history.back());const API='https://delivery-dragon.vercel.app';let shops=[];let cart=JSON.parse(localStorage.getItem('dragon_cart'))||[];let currentCityId=null;function updateCartCount(){document.getElementById('cartCount').innerText=cart.reduce((s,i)=>s+i.quantity,0)}async function loadCities(){try{const res=await fetch(`${API}/api/cities`);if(!res.ok)throw new Error('تعذر تحميل المدن');const cities=await res.json();const sel=document.getElementById('citySelect');cities.forEach(c=>sel.add(new Option(c.name,c.id)));if(cities.length){sel.value=cities[0].id;currentCityId=cities[0].id;loadShops()}}catch(e){document.getElementById('shopsContainer').innerHTML=`<p style="color:red">⚠️ ${e.message}</p>`}}document.getElementById('citySelect').addEventListener('change',e=>{currentCityId=e.target.value;loadShops()});async function loadShops(){if(!currentCityId)return;try{const res=await fetch(`${API}/api/shops?city_id=${currentCityId}`);if(!res.ok)throw new Error('تعذر تحميل المطاعم');shops=await res.json();renderShops(shops)}catch(e){document.getElementById('shopsContainer').innerHTML=`<p style="color:red">⚠️ ${e.message}<br><button onclick="loadShops()" style="margin-top:12px;padding:8px 20px;background:#e67e22;color:white;border:none;border-radius:30px;">إعادة المحاولة</button></p>`}}function renderShops(filtered){const html=filtered.map(s=>`<div class="shop-card" onclick="location.href='shop-menu.html?id=${s.id}&name=${encodeURIComponent(s.shop_name)}'"><div class="shop-icon">${s.icon||'🏪'}</div><div class="shop-info"><h3>${s.shop_name}</h3><p>${s.address||''}</p></div></div>`).join('');document.getElementById('shopsContainer').innerHTML=html||'<p>لا توجد نتائج</p>'}document.getElementById('searchInput').addEventListener('input',e=>{renderShops(shops.filter(s=>s.shop_name.toLowerCase().includes(e.target.value.toLowerCase())))});document.getElementById('viewCartBtn').onclick=()=>location.href='cart.html';loadCities();updateCartCount()</script></body></html>
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>شاهين | المطاعم والمتاجر</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Tajawal', sans-serif;
+      background: var(--tg-theme-bg-color, #f5f7fb);
+      color: var(--tg-theme-text-color, #1a1a2c);
+      padding: 0 0 90px 0;
+      margin: 0;
+      line-height: 1.5;
+    }
+    /* شريط علوي */
+    .app-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      background: var(--tg-theme-secondary-bg-color, #ffffff);
+      border-bottom: 1px solid var(--tg-theme-hint-color, rgba(0,0,0,0.05));
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      backdrop-filter: blur(10px);
+    }
+    .app-header h1 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: #e67e22;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .app-header h1 span {
+      font-size: 0.9rem;
+      font-weight: 400;
+      color: var(--tg-theme-hint-color, #7f8c8d);
+      margin-right: 8px;
+    }
+    .back-btn {
+      background: transparent;
+      border: none;
+      color: #e67e22;
+      font-size: 1.5rem;
+      cursor: pointer;
+      padding: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    /* المحتوى */
+    .container {
+      padding: 16px 16px 0;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .city-selector {
+      background: var(--tg-theme-secondary-bg-color, #ffffff);
+      border-radius: 60px;
+      padding: 6px 6px 6px 20px;
+      margin-bottom: 20px;
+      border: 1px solid var(--tg-theme-hint-color, rgba(0,0,0,0.05));
+      display: flex;
+      align-items: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+    }
+    .city-selector select {
+      flex: 1;
+      padding: 12px 0;
+      border: none;
+      background: transparent;
+      color: inherit;
+      font-family: inherit;
+      font-size: 1rem;
+      outline: none;
+    }
+    .search-bar {
+      background: var(--tg-theme-secondary-bg-color, #ffffff);
+      border-radius: 60px;
+      padding: 6px 20px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border: 1px solid var(--tg-theme-hint-color, rgba(0,0,0,0.05));
+      box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+    }
+    .search-bar span { font-size: 1.2rem; }
+    .search-bar input {
+      flex: 1;
+      border: none;
+      background: transparent;
+      outline: none;
+      color: inherit;
+      font-family: inherit;
+      font-size: 1rem;
+    }
+    /* شبكة المتاجر */
+    .shop-grid {
+      display: grid;
+      gap: 16px;
+      animation: fadeInUp 0.3s ease;
+    }
+    .shop-card {
+      background: var(--tg-theme-secondary-bg-color, #ffffff);
+      border-radius: 24px;
+      padding: 16px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.03);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: 1px solid var(--tg-theme-hint-color, rgba(0,0,0,0.03));
+      animation: fadeIn 0.3s ease;
+    }
+    .shop-card:active { transform: scale(0.98); background: var(--tg-theme-secondary-bg-color, #f8f9fa); }
+    .shop-icon {
+      font-size: 44px;
+      background: var(--tg-theme-bg-color, #f0f2f5);
+      width: 70px;
+      height: 70px;
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .shop-info h3 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .shop-info p {
+      color: var(--tg-theme-hint-color, #7f8c8d);
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    /* شريط السلة السفلي */
+    .cart-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--tg-theme-secondary-bg-color, #1a1a2c);
+      color: white;
+      padding: 12px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      backdrop-filter: blur(10px);
+      border-top: 1px solid var(--tg-theme-hint-color, rgba(255,255,255,0.1));
+    }
+    .cart-btn {
+      background: #e67e22;
+      border: none;
+      color: white;
+      padding: 12px 32px;
+      border-radius: 60px;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 1rem;
+      box-shadow: 0 6px 14px rgba(230,126,34,0.2);
+    }
+    /* رسومات */
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--tg-theme-hint-color, #95a5a6);
+    }
+    .skeleton-shop {
+      height: 100px;
+      background: linear-gradient(90deg, var(--tg-theme-secondary-bg-color, #eee) 25%, #ddd 50%, #eee 75%);
+      background-size: 200% 100%;
+      animation: loading 1.5s infinite;
+      border-radius: 24px;
+      margin-bottom: 16px;
+    }
+    @keyframes loading {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- شريط علوي -->
+<div class="app-header">
+  <button class="back-btn" id="backButton">←</button>
+  <h1>🦅 شاهين <span>أسرع إليك</span></h1>
+  <div style="width: 40px;"></div>
+</div>
+
+<div class="container">
+  <!-- اختيار المدينة -->
+  <div class="city-selector">
+    <select id="citySelect">
+      <option value="">اختر المدينة...</option>
+    </select>
+  </div>
+
+  <!-- شريط البحث -->
+  <div class="search-bar">
+    <span>🔍</span>
+    <input type="text" id="searchInput" placeholder="ابحث عن مطعم أو متجر...">
+  </div>
+
+  <!-- شبكة المتاجر -->
+  <div class="shop-grid" id="shopsContainer">
+    <div class="skeleton-shop"></div>
+    <div class="skeleton-shop"></div>
+    <div class="skeleton-shop"></div>
+  </div>
+</div>
+
+<!-- شريط السلة -->
+<div class="cart-bar">
+  <span>🛒 السلة (<span id="cartCount">0</span>)</span>
+  <button class="cart-btn" id="viewCartBtn">عرض السلة</button>
+</div>
+
+<script>
+  const tg = window.Telegram.WebApp;
+  tg.ready();
+  tg.expand();
+  tg.BackButton.show();
+  tg.BackButton.onClick(() => window.history.back());
+  document.getElementById('backButton').onclick = () => window.history.back();
+
+  const API = 'https://delivery-dragon.vercel.app';
+  let shops = [];
+  let cart = JSON.parse(localStorage.getItem('dragon_cart')) || [];
+  let currentCityId = null;
+
+  function updateCartCount() {
+    document.getElementById('cartCount').innerText = cart.reduce((s,i) => s + i.quantity, 0);
+  }
+
+  async function loadCities() {
+    try {
+      const res = await fetch(`${API}/api/cities`);
+      if (!res.ok) throw new Error('تعذر تحميل المدن');
+      const cities = await res.json();
+      const sel = document.getElementById('citySelect');
+      cities.forEach(c => sel.add(new Option(c.name, c.id)));
+      if (cities.length) {
+        sel.value = cities[0].id;
+        currentCityId = cities[0].id;
+        loadShops();
+      }
+    } catch(e) {
+      document.getElementById('shopsContainer').innerHTML = `<div class="empty-state">⚠️ ${e.message}</div>`;
+    }
+  }
+
+  document.getElementById('citySelect').addEventListener('change', e => {
+    currentCityId = e.target.value;
+    loadShops();
+  });
+
+  async function loadShops() {
+    if (!currentCityId) return;
+    const container = document.getElementById('shopsContainer');
+    container.innerHTML = '<div class="skeleton-shop"></div><div class="skeleton-shop"></div><div class="skeleton-shop"></div>';
+    try {
+      const res = await fetch(`${API}/api/shops?city_id=${currentCityId}`);
+      if (!res.ok) throw new Error('تعذر تحميل المتاجر');
+      shops = await res.json();
+      renderShops(shops);
+    } catch(e) {
+      container.innerHTML = `<div class="empty-state">⚠️ ${e.message}<br><button onclick="loadShops()" style="margin-top:16px; padding:10px 20px; background:#e67e22; color:white; border:none; border-radius:30px;">إعادة المحاولة</button></div>`;
+    }
+  }
+
+  function renderShops(filtered) {
+    const container = document.getElementById('shopsContainer');
+    if (!filtered.length) {
+      container.innerHTML = '<div class="empty-state">😕 لا توجد متاجر في هذه المدينة حالياً</div>';
+      return;
+    }
+    const html = filtered.map(s => `
+      <div class="shop-card" onclick="location.href='shop-menu.html?id=${s.id}&name=${encodeURIComponent(s.shop_name)}'">
+        <div class="shop-icon">${s.icon || '🏪'}</div>
+        <div class="shop-info">
+          <h3>${s.shop_name}</h3>
+          <p>📍 ${s.address || 'العنوان غير محدد'}</p>
+        </div>
+      </div>
+    `).join('');
+    container.innerHTML = html;
+  }
+
+  document.getElementById('searchInput').addEventListener('input', e => {
+    const term = e.target.value.toLowerCase();
+    renderShops(shops.filter(s => s.shop_name.toLowerCase().includes(term)));
+  });
+
+  document.getElementById('viewCartBtn').onclick = () => location.href = 'cart.html';
+
+  loadCities();
+  updateCartCount();
+</script>
+</body>
+</html>
