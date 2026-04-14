@@ -1,1 +1,164 @@
-<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><title>شاهين | لوحة السائق</title><script src="https://telegram.org/js/telegram-web-app.js"></script><script src="https://unpkg.com/lucide@latest"></script><link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Tajawal',sans-serif;background:var(--tg-theme-bg-color,#f5f7fb);color:var(--tg-theme-text-color,#1a1a2c);padding:0 0 20px}.app-header{display:flex;align-items:center;padding:16px 20px;background:var(--tg-theme-secondary-bg-color,#fff);border-bottom:1px solid #ddd;position:sticky;top:0;z-index:10}.app-header h1{font-size:1.7rem;color:#e67e22;margin-right:12px}.back-btn{background:0 0;border:none;color:#e67e22;font-size:1.8rem;cursor:pointer}.container{padding:16px;max-width:600px;margin:0 auto}.tabs{display:flex;gap:10px;margin-bottom:20px}.tab{flex:1;padding:14px;background:var(--tg-theme-secondary-bg-color,#fff);border-radius:30px;text-align:center;cursor:pointer;font-weight:500;border:1px solid #ddd}.tab.active{background:#e67e22;color:#fff}.panel{display:none}.panel.active{display:block}.card{background:var(--tg-theme-secondary-bg-color,#fff);border-radius:20px;padding:16px;margin-bottom:16px;box-shadow:0 4px 12px rgba(0,0,0,.02)}.btn{background:#e67e22;color:#fff;border:none;padding:10px 20px;border-radius:30px;cursor:pointer;margin-right:8px}.btn-danger{background:#e74c3c}.skeleton{height:120px;background:linear-gradient(90deg,#eee 25%,#ddd 50%,#eee 75%);background-size:200% 100%;animation:loading 1.5s infinite;border-radius:20px}@keyframes loading{0%{background-position:200% 0}100%{background-position:-200% 0}}</style></head><body><div class="app-header"><button class="back-btn" onclick="history.back()"><i data-lucide="arrow-right"></i></button><h1>🦅 شاهين</h1></div><div class="container"><h2>🛵 لوحة السائق</h2><div class="tabs"><div class="tab active" data-tab="available">🟢 المتاحة</div><div class="tab" data-tab="active">🔵 نشطة</div></div><div id="availablePanel" class="panel active"></div><div id="activePanel" class="panel"></div></div><script>const tg=Telegram.WebApp;tg.ready();tg.BackButton.show();tg.BackButton.onClick(()=>history.back());const API='https://delivery-dragon.vercel.app';const tabs=document.querySelectorAll('.tab');tabs.forEach(t=>t.onclick=()=>{tabs.forEach(x=>x.classList.remove('active'));t.classList.add('active');['availablePanel','activePanel'].forEach(p=>document.getElementById(p).classList.remove('active'));document.getElementById(t.dataset.tab+'Panel').classList.add('active');if(t.dataset.tab==='available')loadAvailable();else loadActive()});async function loadAvailable(){const c=document.getElementById('availablePanel');c.innerHTML='<div class="skeleton"></div>';const r=await fetch(`${API}/api/rider/available-orders`,{headers:{'X-Telegram-Init-Data':tg.initData}});const orders=await r.json();if(!orders.length){c.innerHTML='<div style="text-align:center;padding:40px"><svg width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg><h3>لا توجد طلبات</h3></div>';return}c.innerHTML=orders.map(o=>`<div class="card"><b>#${o.id}</b> - ${o.shop_name}<br>📍 ${o.zone_name} - ${o.address}<br>💰 ${o.delivery_fee} ل.س<br><button class="btn" onclick="accept('${o.id}')"><i data-lucide="check"></i> قبول</button></div>`).join('');if(typeof lucide!=='undefined')lucide.createIcons()}window.accept=async id=>{await fetch(`${API}/api/rider/accept-order`,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify({order_id:id})});loadAvailable();loadActive()};async function loadActive(){const c=document.getElementById('activePanel');c.innerHTML='<div class="skeleton"></div>';const r=await fetch(`${API}/api/rider/active-order`,{headers:{'X-Telegram-Init-Data':tg.initData}});const o=await r.json();if(!o){c.innerHTML='<div style="text-align:center;padding:40px"><p>لا يوجد طلب نشط</p></div>';return}c.innerHTML=`<div class="card"><b>#${o.id}</b> - ${o.shop_name}<br>📞 ${o.customer_phone||''}<br>📍 ${o.address}<br>💰 ${o.delivery_fee} ل.س<br><button class="btn" onclick="complete(${o.id})"><i data-lucide="check-circle"></i> تم التوصيل</button><button class="btn btn-danger" onclick="cancel(${o.id})"><i data-lucide="x"></i> إلغاء</button></div>`;if(typeof lucide!=='undefined')lucide.createIcons()}window.complete=async id=>{await fetch(`${API}/api/rider/complete-order`,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify({order_id:id})});loadActive()};window.cancel=async id=>{await fetch(`${API}/api/rider/cancel-order`,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify({order_id:id})});loadActive();loadAvailable()};loadAvailable();setInterval(()=>{if(document.querySelector('.tab.active').dataset.tab==='available')loadAvailable();else loadActive()},10000)</script></body></html>
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <title>شاهين | لوحة السائق</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Tajawal',sans-serif;background:var(--tg-theme-bg-color,#f5f7fb);color:var(--tg-theme-text-color,#1a1a2c);padding:0 0 20px}
+    .app-header{display:flex;align-items:center;padding:16px 20px;background:var(--tg-theme-secondary-bg-color,#fff);border-bottom:1px solid #ddd;position:sticky;top:0;z-index:10}
+    .app-header h1{font-size:1.7rem;color:#e67e22;margin-right:12px}
+    .back-btn{background:0 0;border:none;color:#e67e22;font-size:1.8rem;cursor:pointer}
+    .container{padding:16px;max-width:600px;margin:0 auto}
+    .tabs{display:flex;gap:10px;margin-bottom:20px}
+    .tab{flex:1;padding:14px;background:var(--tg-theme-secondary-bg-color,#fff);border-radius:30px;text-align:center;cursor:pointer;font-weight:500;border:1px solid #ddd}
+    .tab.active{background:#e67e22;color:#fff}
+    .panel{display:none}
+    .panel.active{display:block}
+    .card{background:var(--tg-theme-secondary-bg-color,#fff);border-radius:20px;padding:16px;margin-bottom:16px;box-shadow:0 4px 12px rgba(0,0,0,.02)}
+    .btn{background:#e67e22;color:#fff;border:none;padding:10px 20px;border-radius:30px;cursor:pointer;margin-right:8px}
+    .btn-danger{background:#e74c3c}
+    .btn:disabled{background:#95a5a6;cursor:not-allowed}
+    .code-box{background:#f1c40f;padding:16px;border-radius:20px;margin:16px 0;text-align:center}
+    .code-box .label{font-size:0.9rem;opacity:0.8}
+    .code-box .value{font-size:2.8rem;font-weight:700;letter-spacing:12px}
+    .verified-badge{background:#27ae60;color:#fff;padding:4px 12px;border-radius:30px;font-size:0.8rem;display:inline-block}
+    .skeleton{height:120px;background:linear-gradient(90deg,#eee 25%,#ddd 50%,#eee 75%);background-size:200% 100%;animation:loading 1.5s infinite;border-radius:20px}
+    @keyframes loading{0%{background-position:200% 0}100%{background-position:-200% 0}}
+  </style>
+</head>
+<body>
+<div class="app-header">
+  <button class="back-btn" onclick="history.back()"><i data-lucide="arrow-right"></i></button>
+  <h1>🦅 شاهين</h1>
+</div>
+<div class="container">
+  <h2>🛵 لوحة السائق</h2>
+  <div class="tabs">
+    <div class="tab active" data-tab="available">🟢 المتاحة</div>
+    <div class="tab" data-tab="active">🔵 نشطة</div>
+  </div>
+  <div id="availablePanel" class="panel active"></div>
+  <div id="activePanel" class="panel"></div>
+</div>
+<script>
+  const tg = Telegram.WebApp; tg.ready(); tg.BackButton.show(); tg.BackButton.onClick(() => history.back());
+  const API = 'https://delivery-dragon.vercel.app';
+  const tabs = document.querySelectorAll('.tab');
+  tabs.forEach(t => t.onclick = () => {
+    tabs.forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    ['availablePanel','activePanel'].forEach(p => document.getElementById(p).classList.remove('active'));
+    document.getElementById(t.dataset.tab + 'Panel').classList.add('active');
+    if(t.dataset.tab === 'available') loadAvailable(); else loadActive();
+  });
+
+  async function loadAvailable() {
+    const c = document.getElementById('availablePanel');
+    c.innerHTML = '<div class="skeleton"></div>';
+    const r = await fetch(`${API}/api/rider/available-orders`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
+    const orders = await r.json();
+    if(!orders.length) {
+      c.innerHTML = '<div style="text-align:center;padding:40px"><h3>لا توجد طلبات</h3></div>';
+      return;
+    }
+    c.innerHTML = orders.map(o => `
+      <div class="card">
+        <b>#${o.id}</b> - ${o.shop_name}<br>
+        📍 ${o.zone_name} - ${o.address}<br>
+        💰 ${o.delivery_fee} ل.س<br>
+        <button class="btn" onclick="accept('${o.id}')"><i data-lucide="check"></i> قبول</button>
+      </div>
+    `).join('');
+    if(typeof lucide !== 'undefined') lucide.createIcons();
+  }
+
+  window.accept = async id => {
+    await fetch(`${API}/api/rider/accept-order`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData },
+      body: JSON.stringify({ order_id: id })
+    });
+    loadAvailable();
+    loadActive();
+    document.querySelector('[data-tab="active"]').click();
+  };
+
+  async function loadActive() {
+    const c = document.getElementById('activePanel');
+    c.innerHTML = '<div class="skeleton"></div>';
+    const r = await fetch(`${API}/api/rider/active-order`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
+    const o = await r.json();
+    if(!o) {
+      c.innerHTML = '<div style="text-align:center;padding:40px"><p>لا يوجد طلب نشط</p></div>';
+      return;
+    }
+
+    const statusRes = await fetch(`${API}/api/orders/${o.id}/status`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
+    const statusData = await statusRes.json();
+    const isVerified = statusData.code_verified;
+
+    c.innerHTML = `
+      <div class="card">
+        <b>#${o.id}</b> - ${o.shop_name}<br>
+        📞 ${o.customer_phone || ''}<br>
+        📍 ${o.address}<br>
+        💰 ${o.delivery_fee} ل.س
+        <div class="code-box">
+          <div class="label">🔐 كود التأكيد</div>
+          <div class="value">${o.confirmation_code || '----'}</div>
+          ${isVerified ? '<span class="verified-badge">✅ تم التحقق من الكود</span>' : '<span style="color:#e67e22;">⏳ بانتظار إدخال الزبون للكود</span>'}
+        </div>
+        <button class="btn" onclick="complete(${o.id})" ${!isVerified ? 'disabled' : ''}>
+          <i data-lucide="check-circle"></i> تم التوصيل
+        </button>
+        <button class="btn btn-danger" onclick="cancel(${o.id})">
+          <i data-lucide="x"></i> إلغاء
+        </button>
+        ${!isVerified ? '<p style="margin-top:12px;color:#e67e22;">⚠️ لا يمكن إنهاء الطلب حتى يدخل الزبون الكود</p>' : ''}
+      </div>
+    `;
+    if(typeof lucide !== 'undefined') lucide.createIcons();
+  }
+
+  window.complete = async id => {
+    try {
+      const res = await fetch(`${API}/api/rider/complete-order`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData },
+        body: JSON.stringify({ order_id: id })
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        tg.showAlert('❌ ' + (err.error || 'فشل الإكمال'));
+        return;
+      }
+      loadActive();
+      document.querySelector('[data-tab="available"]').click();
+    } catch (e) {
+      tg.showAlert('❌ خطأ في الاتصال');
+    }
+  };
+
+  window.cancel = async id => {
+    await fetch(`${API}/api/rider/cancel-order`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData },
+      body: JSON.stringify({ order_id: id })
+    });
+    loadActive();
+    loadAvailable();
+  };
+
+  loadAvailable();
+  setInterval(() => {
+    if (document.querySelector('.tab.active')?.dataset.tab === 'available') loadAvailable();
+    else loadActive();
+  }, 10000);
+</script>
+</body>
+</html>

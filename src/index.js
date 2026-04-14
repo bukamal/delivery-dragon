@@ -195,7 +195,22 @@ app.get('/api/cities', optionalAuth, async (req, res) => { const result = await 
 app.get('/api/zones', optionalAuth, async (req, res) => { const { city_id } = req.query; let query = 'SELECT * FROM delivery_zones WHERE is_active = true'; const params = []; if (city_id) { query += ' AND city_id = $1'; params.push(city_id); } query += ' ORDER BY zone_name'; const result = await pool.query(query, params); res.json(result.rows); });
 app.get('/api/shops', optionalAuth, async (req, res) => { try { const { city_id, page=1, limit=20 } = req.query; const offset = (page-1)*limit; let query = `SELECT s.*, c.name as category_name, c.icon FROM shops s LEFT JOIN shop_categories c ON s.category_id=c.id WHERE s.is_open=true`; const params = []; if (city_id) { query += ' AND s.city_id = $1'; params.push(city_id); } query += ` ORDER BY s.created_at DESC LIMIT $${params.length+1} OFFSET $${params.length+2}`; params.push(limit, offset); const result = await pool.query(query, params); res.json(result.rows); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.get('/api/shops/:shopId/products', optionalAuth, async (req, res) => { try { const { shopId } = req.params; const result = await pool.query(`SELECT p.*, pc.name as category_name FROM products p LEFT JOIN product_categories pc ON p.category_id=pc.id WHERE p.shop_id=$1 AND p.is_available=true ORDER BY pc.display_order, p.name`,[shopId]); const categories = {}; result.rows.forEach(p => { const cat = p.category_name || 'أخرى'; if (!categories[cat]) categories[cat] = []; categories[cat].push(p); }); res.json({ categories }); } catch(error) { res.status(500).json({ error: error.message }); } });
-app.get('/api/orders/:orderId/status', optionalAuth, async (req, res) => { try { const { orderId } = req.params; const order = await pool.query(`SELECT o.status, u_rider.name as rider_name, u_rider.phone as rider_phone FROM orders o LEFT JOIN users u_rider ON o.rider_id = u_rider.id WHERE o.id = $1`, [orderId]); if (!order.rows[0]) return res.status(404).json({ error: 'Order not found' }); res.json(order.rows[0]); } catch(error) { res.status(500).json({ error: error.message }); } });
+app.get('/api/orders/:orderId/status', optionalAuth, async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const order = await pool.query(
+      `SELECT o.status, o.code_verified, u_rider.name as rider_name, u_rider.phone as rider_phone 
+       FROM orders o 
+       LEFT JOIN users u_rider ON o.rider_id = u_rider.id 
+       WHERE o.id = $1`,
+      [orderId]
+    );
+    if (!order.rows[0]) return res.status(404).json({ error: 'Order not found' });
+    res.json(order.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 app.get('/api/orders/:orderId/location', optionalAuth, async (req, res) => { try { const { orderId } = req.params; const result = await pool.query(`SELECT latitude, longitude, updated_at FROM rider_locations WHERE order_id=$1 ORDER BY updated_at DESC LIMIT 1`, [orderId]); res.json(result.rows[0] || {}); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.get('/api/orders/:orderId/eta', optionalAuth, async (req, res) => {
   try {
@@ -211,7 +226,23 @@ app.get('/api/orders/:orderId/eta', optionalAuth, async (req, res) => {
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-// ========== WEBHOOK (يجب أن يكون قبل requireAuth) ==========
+app.post('/api/orders/:orderId/verify-code', optionalAuth, async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { code } = req.body;
+    if (!code) return res.status(400).json({ error: 'الكود مطلوب' });
+    const order = await pool.query(`SELECT confirmation_code, status FROM orders WHERE id = $1`, [orderId]);
+    if (!order.rows[0]) return res.status(404).json({ error: 'الطلب غير موجود' });
+    if (order.rows[0].status !== 'delivering') return res.status(400).json({ error: 'الطلب ليس قيد التوصيل' });
+    if (order.rows[0].confirmation_code !== code) return res.status(400).json({ error: 'الكود غير صحيح' });
+    await pool.query(`UPDATE orders SET code_verified = true WHERE id = $1`, [orderId]);
+    res.json({ valid: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== WEBHOOK ==========
 app.post('/api/webhook', async (req, res) => {
   try {
     await ensureBotInitialized();
@@ -265,7 +296,7 @@ app.get('/api/me/orders', async (req, res) => { try { const tgUser = req.tgUser;
 app.get('/api/shop/orders', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'shop' || !dbUser?.is_approved) return res.status(403).json({ error: 'Forbidden' }); const shop = await pool.query('SELECT id FROM shops WHERE owner_id=$1',[dbUser.id]); if (!shop.rows[0]) return res.json([]); const shopId = shop.rows[0].id; const { archived } = req.query; let statusCondition = archived === 'true' ? `o.status IN ('completed', 'rejected')` : `o.status IN ('paid', 'preparing', 'ready_for_pickup', 'delivering')`; const orders = await pool.query(`SELECT o.*, u_customer.name as customer_name, u_customer.phone as customer_phone, u_rider.name as rider_name FROM orders o JOIN users u_customer ON o.customer_id = u_customer.id LEFT JOIN users u_rider ON o.rider_id = u_rider.id WHERE o.shop_id = $1 AND ${statusCondition} ORDER BY o.created_at DESC`, [shopId]); res.json(orders.rows); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.post('/api/shop/orders/:orderId/status', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' }); const { status } = req.body; const { orderId } = req.params; await pool.query(`UPDATE orders SET status=$1 WHERE id=$2 AND shop_id=(SELECT id FROM shops WHERE owner_id=$3)`,[status, orderId, dbUser.id]); if (status==='ready_for_pickup') await notifyRiders(orderId); await notifyCustomer(orderId, status); res.json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
 
-// ========== PRODUCT CATEGORIES (خاصة بالمتجر) ==========
+// ========== PRODUCT CATEGORIES ==========
 app.get('/api/shop/product-categories', async (req, res) => {
   try {
     const tgUser = req.tgUser;
@@ -277,72 +308,61 @@ app.get('/api/shop/product-categories', async (req, res) => {
     res.json(categories.rows);
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
-
-app.post('/api/shop/product-categories', async (req, res) => {
-  try {
-    const tgUser = req.tgUser;
-    const dbUser = await getDbUser(tgUser.id);
-    if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' });
-    const { name, display_order } = req.body;
-    if (!name || !name.trim()) return res.status(400).json({ error: 'اسم التصنيف مطلوب' });
-    const shop = await pool.query('SELECT id FROM shops WHERE owner_id=$1', [dbUser.id]);
-    if (!shop.rows[0]) return res.status(404).json({ error: 'المتجر غير موجود' });
-    await pool.query(`INSERT INTO product_categories (shop_id, name, display_order) VALUES ($1, $2, $3)`, [shop.rows[0].id, name.trim(), display_order || 0]);
-    res.status(201).json({ success: true });
-  } catch (error) { res.status(500).json({ error: error.message }); }
-});
-
-app.put('/api/shop/product-categories/:id', async (req, res) => {
-  try {
-    const tgUser = req.tgUser;
-    const dbUser = await getDbUser(tgUser.id);
-    if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' });
-    const { id } = req.params;
-    const { name, display_order } = req.body;
-    const shop = await pool.query('SELECT id FROM shops WHERE owner_id=$1', [dbUser.id]);
-    if (!shop.rows[0]) return res.status(404).json({ error: 'المتجر غير موجود' });
-    const result = await pool.query(`UPDATE product_categories SET name=$1, display_order=$2 WHERE id=$3 AND shop_id=$4`, [name?.trim(), display_order || 0, id, shop.rows[0].id]);
-    if (result.rowCount === 0) return res.status(404).json({ error: 'التصنيف غير موجود' });
-    res.json({ success: true });
-  } catch (error) { res.status(500).json({ error: error.message }); }
-});
-
-app.delete('/api/shop/product-categories/:id', async (req, res) => {
-  try {
-    const tgUser = req.tgUser;
-    const dbUser = await getDbUser(tgUser.id);
-    if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' });
-    const { id } = req.params;
-    const shop = await pool.query('SELECT id FROM shops WHERE owner_id=$1', [dbUser.id]);
-    if (!shop.rows[0]) return res.status(404).json({ error: 'المتجر غير موجود' });
-    await pool.query(`UPDATE products SET category_id = NULL WHERE category_id = $1 AND shop_id = $2`, [id, shop.rows[0].id]);
-    const result = await pool.query(`DELETE FROM product_categories WHERE id=$1 AND shop_id=$2`, [id, shop.rows[0].id]);
-    if (result.rowCount === 0) return res.status(404).json({ error: 'التصنيف غير موجود' });
-    res.json({ success: true });
-  } catch (error) { res.status(500).json({ error: error.message }); }
-});
-
+app.post('/api/shop/product-categories', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' }); const { name, display_order } = req.body; if (!name || !name.trim()) return res.status(400).json({ error: 'اسم التصنيف مطلوب' }); const shop = await pool.query('SELECT id FROM shops WHERE owner_id=$1', [dbUser.id]); if (!shop.rows[0]) return res.status(404).json({ error: 'المتجر غير موجود' }); await pool.query(`INSERT INTO product_categories (shop_id, name, display_order) VALUES ($1, $2, $3)`, [shop.rows[0].id, name.trim(), display_order || 0]); res.status(201).json({ success: true }); } catch (error) { res.status(500).json({ error: error.message }); } });
+app.put('/api/shop/product-categories/:id', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' }); const { id } = req.params; const { name, display_order } = req.body; const shop = await pool.query('SELECT id FROM shops WHERE owner_id=$1', [dbUser.id]); if (!shop.rows[0]) return res.status(404).json({ error: 'المتجر غير موجود' }); const result = await pool.query(`UPDATE product_categories SET name=$1, display_order=$2 WHERE id=$3 AND shop_id=$4`, [name?.trim(), display_order || 0, id, shop.rows[0].id]); if (result.rowCount === 0) return res.status(404).json({ error: 'التصنيف غير موجود' }); res.json({ success: true }); } catch (error) { res.status(500).json({ error: error.message }); } });
+app.delete('/api/shop/product-categories/:id', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' }); const { id } = req.params; const shop = await pool.query('SELECT id FROM shops WHERE owner_id=$1', [dbUser.id]); if (!shop.rows[0]) return res.status(404).json({ error: 'المتجر غير موجود' }); await pool.query(`UPDATE products SET category_id = NULL WHERE category_id = $1 AND shop_id = $2`, [id, shop.rows[0].id]); const result = await pool.query(`DELETE FROM product_categories WHERE id=$1 AND shop_id=$2`, [id, shop.rows[0].id]); if (result.rowCount === 0) return res.status(404).json({ error: 'التصنيف غير موجود' }); res.json({ success: true }); } catch (error) { res.status(500).json({ error: error.message }); } });
 app.get('/api/shop/products', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' }); const products = await pool.query(`SELECT * FROM products WHERE shop_id=(SELECT id FROM shops WHERE owner_id=$1) ORDER BY name`,[dbUser.id]); res.json(products.rows); } catch(error) { res.status(500).json({ error: error.message }); } });
-app.post('/api/shop/products', async (req, res) => { 
-  try { 
-    const tgUser = req.tgUser; 
-    const dbUser = await getDbUser(tgUser.id); 
-    if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' }); 
-    const { name, price, category_id, image, options } = req.body; 
-    const validCategoryId = (category_id && !isNaN(parseInt(category_id))) ? parseInt(category_id) : null;
-    await pool.query(`INSERT INTO products (shop_id, name, price, category_id, image_url, options) VALUES ((SELECT id FROM shops WHERE owner_id=$1), $2, $3, $4, $5, $6)`,[dbUser.id, name, price, validCategoryId, image || null, options || null]); 
-    res.status(201).json({ success: true }); 
-  } catch(error) { console.error('Add product error:', error); res.status(500).json({ error: error.message }); } 
-});
+app.post('/api/shop/products', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' }); const { name, price, category_id, image, options } = req.body; const validCategoryId = (category_id && !isNaN(parseInt(category_id))) ? parseInt(category_id) : null; await pool.query(`INSERT INTO products (shop_id, name, price, category_id, image_url, options) VALUES ((SELECT id FROM shops WHERE owner_id=$1), $2, $3, $4, $5, $6)`,[dbUser.id, name, price, validCategoryId, image || null, options || null]); res.status(201).json({ success: true }); } catch(error) { console.error('Add product error:', error); res.status(500).json({ error: error.message }); } });
 app.get('/api/shop/products/:productId', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' }); const { productId } = req.params; const result = await pool.query(`SELECT * FROM products WHERE id=$1 AND shop_id=(SELECT id FROM shops WHERE owner_id=$2)`,[productId, dbUser.id]); if (!result.rows[0]) return res.status(404).json({ error: 'Not found' }); res.json(result.rows[0]); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.put('/api/shop/products/:productId', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' }); const { productId } = req.params; const { name, price, category_id, image, options } = req.body; await pool.query(`UPDATE products SET name=$1, price=$2, category_id=$3, image_url=$4, options=$5 WHERE id=$6 AND shop_id=(SELECT id FROM shops WHERE owner_id=$7)`,[name, price, category_id || null, image || null, options || null, productId, dbUser.id]); res.json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.delete('/api/shop/products/:productId', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' }); await pool.query(`DELETE FROM products WHERE id=$1 AND shop_id=(SELECT id FROM shops WHERE owner_id=$2)`,[req.params.productId, dbUser.id]); res.json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
 
 // ========== RIDER ==========
 app.get('/api/rider/available-orders', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'rider' || !dbUser?.is_approved) return res.status(403).json({ error: 'Forbidden' }); const orders = await pool.query(`SELECT o.*, s.shop_name, s.address as shop_address, z.zone_name FROM orders o JOIN shops s ON o.shop_id=s.id JOIN delivery_zones z ON o.zone_id=z.id WHERE o.status='ready_for_pickup' AND o.rider_id IS NULL`); res.json(orders.rows); } catch(error) { res.status(500).json({ error: error.message }); } });
-app.post('/api/rider/accept-order', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'rider') return res.status(403).json({ error: 'Forbidden' }); const { order_id } = req.body; const result = await pool.query(`UPDATE orders SET rider_id=$1, status='delivering', rider_accepted_at=NOW() WHERE id=$2 AND rider_id IS NULL AND status='ready_for_pickup'`,[dbUser.id, order_id]); if (result.rowCount===0) return res.status(409).json({ error:'Order already taken' }); await notifyCustomer(order_id, 'delivering'); const shopOwner = await pool.query(`SELECT u.chat_id FROM users u JOIN shops s ON u.id = s.owner_id WHERE s.id = (SELECT shop_id FROM orders WHERE id = $1)`, [order_id]); if (shopOwner.rows[0]?.chat_id) { await bot.api.sendMessage(shopOwner.rows[0].chat_id, `🛵 *السائق ${dbUser.name} قبل طلبك #${order_id}*\nسيقوم بتوصيله قريباً.`, { parse_mode: 'Markdown' }); } await bot.api.sendMessage(dbUser.chat_id, `✅ *تم قبول الطلب #${order_id}*\n\n📍 الرجاء مشاركة موقعك الحي (Live Location) من قائمة المرفقات 📎 لمدة 8 ساعات.`, { parse_mode: 'Markdown' }); res.json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
+app.post('/api/rider/accept-order', async (req, res) => {
+  try {
+    const tgUser = req.tgUser;
+    const dbUser = await getDbUser(tgUser.id);
+    if (dbUser?.role !== 'rider') return res.status(403).json({ error: 'Forbidden' });
+    const { order_id } = req.body;
+    const confirmationCode = Math.floor(1000 + Math.random() * 9000).toString();
+    const result = await pool.query(
+      `UPDATE orders SET rider_id=$1, status='delivering', rider_accepted_at=NOW(), confirmation_code=$2, code_verified=false WHERE id=$3 AND rider_id IS NULL AND status='ready_for_pickup'`,
+      [dbUser.id, confirmationCode, order_id]
+    );
+    if (result.rowCount === 0) return res.status(409).json({ error: 'Order already taken' });
+    await notifyCustomer(order_id, 'delivering');
+    const shopOwner = await pool.query(`SELECT u.chat_id FROM users u JOIN shops s ON u.id = s.owner_id WHERE s.id = (SELECT shop_id FROM orders WHERE id = $1)`, [order_id]);
+    if (shopOwner.rows[0]?.chat_id) {
+      await bot.api.sendMessage(shopOwner.rows[0].chat_id, `🛵 *السائق ${dbUser.name} قبل طلبك #${order_id}*\nسيقوم بتوصيله قريباً.`, { parse_mode: 'Markdown' });
+    }
+    await bot.api.sendMessage(dbUser.chat_id, `✅ *تم قبول الطلب #${order_id}*\n\n🔐 *كود التأكيد:* \`${confirmationCode}\`\n\n📍 الرجاء مشاركة موقعك الحي (Live Location) من قائمة المرفقات 📎 لمدة 8 ساعات.\n\n⚠️ *لا تشارك الكود مع الزبون قبل استلام الطلب.*`, { parse_mode: 'Markdown' });
+    res.json({ success: true, confirmation_code: confirmationCode });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
 app.get('/api/rider/active-order', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'rider' || !dbUser?.is_approved) return res.status(403).json({ error: 'Forbidden' }); const activeOrder = await pool.query(`SELECT o.*, s.shop_name, s.address as shop_address, z.zone_name FROM orders o JOIN shops s ON o.shop_id = s.id JOIN delivery_zones z ON o.zone_id = z.id WHERE o.rider_id = $1 AND o.status = 'delivering' ORDER BY o.created_at DESC LIMIT 1`, [dbUser.id]); res.json(activeOrder.rows[0] || null); } catch(error) { res.status(500).json({ error: error.message }); } });
-app.post('/api/rider/complete-order', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'rider') return res.status(403).json({ error: 'Forbidden' }); const { order_id } = req.body; const order = await pool.query('SELECT * FROM orders WHERE id=$1 AND rider_id=$2 AND status=$3',[order_id, dbUser.id, 'delivering']); if (order.rowCount===0) return res.status(400).json({ error:'Invalid order' }); await pool.query(`UPDATE orders SET status='completed' WHERE id=$1`,[order_id]); const o = order.rows[0]; const platformCommission = PLATFORM_FIXED_FEE; const shopNet = o.subtotal; const riderFee = o.delivery_fee - platformCommission; await pool.query(`UPDATE orders SET platform_commission=$1, shop_net=$2, rider_fee=$3 WHERE id=$4`,[platformCommission, shopNet, riderFee, order_id]); await pool.query(`INSERT INTO financial_transactions (order_id, transaction_type, amount) VALUES ($1,'platform_fee',$2),($1,'shop_payout',$3),($1,'rider_payout',$4)`,[order_id, platformCommission, shopNet, riderFee]); await notifyCustomer(order_id, 'completed'); const shopOwner = await pool.query(`SELECT u.chat_id FROM users u JOIN shops s ON u.id = s.owner_id WHERE s.id = (SELECT shop_id FROM orders WHERE id = $1)`, [order_id]); if (shopOwner.rows[0]?.chat_id) { await bot.api.sendMessage(shopOwner.rows[0].chat_id, `✅ *تم توصيل الطلب #${order_id} بنجاح*\nصافي المبلغ المستحق لك: ${shopNet} ل.س`, { parse_mode: 'Markdown' }); } res.json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
+app.post('/api/rider/complete-order', async (req, res) => {
+  try {
+    const tgUser = req.tgUser;
+    const dbUser = await getDbUser(tgUser.id);
+    if (dbUser?.role !== 'rider') return res.status(403).json({ error: 'Forbidden' });
+    const { order_id } = req.body;
+    const order = await pool.query('SELECT * FROM orders WHERE id=$1 AND rider_id=$2 AND status=$3', [order_id, dbUser.id, 'delivering']);
+    if (order.rowCount === 0) return res.status(400).json({ error: 'Invalid order' });
+    const o = order.rows[0];
+    if (!o.code_verified) return res.status(400).json({ error: 'لم يتم تأكيد الكود من قبل الزبون بعد' });
+    await pool.query(`UPDATE orders SET status='completed' WHERE id=$1`, [order_id]);
+    const platformCommission = PLATFORM_FIXED_FEE;
+    const shopNet = o.subtotal;
+    const riderFee = o.delivery_fee - platformCommission;
+    await pool.query(`UPDATE orders SET platform_commission=$1, shop_net=$2, rider_fee=$3 WHERE id=$4`, [platformCommission, shopNet, riderFee, order_id]);
+    await pool.query(`INSERT INTO financial_transactions (order_id, transaction_type, amount) VALUES ($1,'platform_fee',$2),($1,'shop_payout',$3),($1,'rider_payout',$4)`, [order_id, platformCommission, shopNet, riderFee]);
+    await notifyCustomer(order_id, 'completed');
+    const shopOwner = await pool.query(`SELECT u.chat_id FROM users u JOIN shops s ON u.id = s.owner_id WHERE s.id = (SELECT shop_id FROM orders WHERE id = $1)`, [order_id]);
+    if (shopOwner.rows[0]?.chat_id) { await bot.api.sendMessage(shopOwner.rows[0].chat_id, `✅ *تم توصيل الطلب #${order_id} بنجاح*\nصافي المبلغ المستحق لك: ${shopNet} ل.س`, { parse_mode: 'Markdown' }); }
+    res.json({ success: true });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
 app.post('/api/rider/cancel-order', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'rider') return res.status(403).json({ error: 'Forbidden' }); const { order_id } = req.body; const result = await pool.query(`UPDATE orders SET rider_id = NULL, status = 'ready_for_pickup' WHERE id = $1 AND rider_id = $2 AND status = 'delivering'`, [order_id, dbUser.id]); if (result.rowCount === 0) return res.status(400).json({ error: 'Order not found or not yours' }); await notifyCustomer(order_id, 'ready_for_pickup'); res.json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
 
 // ========== ADMIN ==========

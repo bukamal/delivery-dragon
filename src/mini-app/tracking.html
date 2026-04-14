@@ -23,6 +23,9 @@
     .btn-outline { background: transparent; border: 1px solid #e67e22; color: #e67e22; }
     .rider-info { background: var(--tg-theme-bg-color, #f8f9fa); padding: 16px; border-radius: 20px; margin: 16px 0; display: flex; align-items: center; gap: 16px; }
     .eta-badge { background: #e67e22; color: white; padding: 8px 16px; border-radius: 40px; text-align: center; font-weight: 500; }
+    .code-section { margin-top: 20px; padding: 16px; background: var(--tg-theme-bg-color, #f8f9fa); border-radius: 20px; }
+    .code-input { width: 100%; padding: 16px; border-radius: 16px; border: 1px solid #ccc; text-align: center; font-size: 1.8rem; letter-spacing: 12px; }
+    .verified-badge { background: #27ae60; color: white; padding: 8px 16px; border-radius: 30px; text-align: center; }
   </style>
 </head>
 <body>
@@ -52,6 +55,16 @@
   <div id="mapContainer">
     <div id="map"></div>
   </div>
+  
+  <!-- قسم كود التأكيد -->
+  <div id="codeSection" class="code-section" style="display:none;">
+    <label style="display:block; margin-bottom:12px; font-weight:500;">🔐 أدخل كود التأكيد (من السائق)</label>
+    <input type="text" id="confirmCodeInput" class="code-input" placeholder="0000" maxlength="4" inputmode="numeric">
+    <button class="btn" onclick="verifyCode()" style="margin-top:12px;">تحقق من الكود</button>
+    <p id="codeError" style="color:#e74c3c; margin-top:8px;"></p>
+    <div id="codeVerifiedMessage" class="verified-badge" style="display:none;">✅ تم التحقق من الكود - شكراً لثقتك!</div>
+  </div>
+  
   <button class="btn" id="callDriverBtn" style="background:#3498db"><i data-lucide="phone"></i> اتصال بالسائق</button>
 </div>
 <script>
@@ -81,6 +94,8 @@
       const statusRes = await fetch(`${API}/api/orders/${orderId}/status`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
       const statusData = await statusRes.json();
       const status = statusData.status;
+      const codeVerified = statusData.code_verified;
+
       document.getElementById('statusEmoji').innerText = statusEmojis[status] || '⏳';
       document.getElementById('statusMessage').innerText = statusMessages[status] || status;
 
@@ -92,6 +107,19 @@
       if (status === 'completed') document.querySelectorAll('.step').forEach(el => el.classList.add('active'));
 
       if (status === 'delivering') {
+        document.getElementById('codeSection').style.display = 'block';
+        if (codeVerified) {
+          document.getElementById('confirmCodeInput').style.display = 'none';
+          document.querySelector('#codeSection .btn').style.display = 'none';
+          document.getElementById('codeError').style.display = 'none';
+          document.getElementById('codeVerifiedMessage').style.display = 'block';
+        } else {
+          document.getElementById('confirmCodeInput').style.display = 'block';
+          document.querySelector('#codeSection .btn').style.display = 'block';
+          document.getElementById('codeError').style.display = 'block';
+          document.getElementById('codeVerifiedMessage').style.display = 'none';
+        }
+
         const [locationRes, etaRes] = await Promise.all([
           fetch(`${API}/api/orders/${orderId}/location`, { headers: { 'X-Telegram-Init-Data': tg.initData } }),
           fetch(`${API}/api/orders/${orderId}/eta`, { headers: { 'X-Telegram-Init-Data': tg.initData } })
@@ -116,6 +144,7 @@
           document.getElementById('etaDisplay').innerHTML = `⏱️ ${etaData.message || 'جاري حساب الوقت...'}`;
         }
       } else {
+        document.getElementById('codeSection').style.display = 'none';
         document.getElementById('map').innerHTML = '<p style="text-align:center;padding:20px;">🗺️ الخريطة ستظهر عند بدء التوصيل</p>';
         document.getElementById('riderInfo').style.display = 'none';
         document.getElementById('etaDisplay').style.display = 'none';
@@ -124,6 +153,25 @@
       if (typeof lucide !== 'undefined') lucide.createIcons();
     } catch (error) { document.getElementById('statusMessage').innerText = 'تعذر تحديث البيانات'; }
   }
+
+  window.verifyCode = async () => {
+    const code = document.getElementById('confirmCodeInput').value.trim();
+    if (!code) return tg.showAlert('أدخل الكود');
+    if (code.length !== 4) return tg.showAlert('الكود يجب أن يكون 4 أرقام');
+    try {
+      const res = await fetch(`${API}/api/orders/${orderId}/verify-code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData },
+        body: JSON.stringify({ code })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      tg.showAlert('✅ الكود صحيح! شكراً لثقتك.');
+      fetchData(); // تحديث الواجهة
+    } catch (e) {
+      document.getElementById('codeError').innerText = e.message;
+    }
+  };
 
   function startPolling() { fetchData(); updateInterval = setInterval(fetchData, 10000); }
   window.addEventListener('beforeunload', () => { if (updateInterval) clearInterval(updateInterval); });
