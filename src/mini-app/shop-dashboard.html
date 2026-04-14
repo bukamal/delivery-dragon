@@ -169,12 +169,17 @@
     const price = parseFloat(document.getElementById('productPrice').value);
     const category_id = document.getElementById('productCategory').value;
 
+    if (!name || isNaN(price)) {
+      tg.showAlert('يرجى إدخال اسم المنتج وسعر صحيح');
+      return;
+    }
+
     // جمع الخيارات
     const options = [];
     document.querySelectorAll('.option-row').forEach(row => {
-      const name = row.querySelector('.opt-name')?.value.trim();
-      const price = parseFloat(row.querySelector('.opt-price')?.value) || 0;
-      if (name) options.push({ name, price });
+      const optName = row.querySelector('.opt-name')?.value.trim();
+      const optPrice = parseFloat(row.querySelector('.opt-price')?.value) || 0;
+      if (optName) options.push({ name: optName, price: optPrice });
     });
 
     // معالجة الصورة
@@ -182,50 +187,64 @@
     const fileInput = document.getElementById('productImage');
     if (fileInput.files.length > 0) {
       const file = fileInput.files[0];
+      // التحقق من حجم الملف (5 ميجابايت كحد أقصى)
+      if (file.size > 5 * 1024 * 1024) {
+        tg.showAlert('حجم الصورة كبير جداً. الحد الأقصى 5 ميجابايت.');
+        return;
+      }
       const reader = new FileReader();
       reader.onload = async (e) => {
         image = e.target.result;
-        await submitProduct({ name, price, category_id, image, options: options.length ? JSON.stringify(options) : null });
+        await submitProduct({ name, price, category_id: category_id || null, image, options: options.length ? JSON.stringify(options) : null });
       };
       reader.readAsDataURL(file);
       return;
     } else if (editingProduct?.image_url) {
       image = editingProduct.image_url;
     }
-    await submitProduct({ name, price, category_id, image, options: options.length ? JSON.stringify(options) : null });
+    await submitProduct({ name, price, category_id: category_id || null, image, options: options.length ? JSON.stringify(options) : null });
   }
 
   async function submitProduct(data) {
     const id = document.getElementById('productId').value;
     const url = id ? `${API}/api/shop/products/${id}` : `${API}/api/shop/products`;
     const method = id ? 'PUT' : 'POST';
-    const res = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData },
-      body: JSON.stringify(data)
-    });
-    if (res.ok) {
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData },
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'فشل الحفظ');
+      }
       closeProductModal();
       loadProducts();
-    } else {
-      tg.showAlert('فشل الحفظ');
+    } catch (error) {
+      tg.showAlert('❌ ' + error.message);
     }
   }
 
   window.editProduct = async (id) => {
-    // جلب بيانات المنتج (بما في ذلك options و image_url)
     const res = await fetch(`${API}/api/shop/products/${id}`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
     if (res.ok) {
       const product = await res.json();
       openProductModal(product);
+    } else {
+      tg.showAlert('تعذر تحميل بيانات المنتج');
     }
   };
 
   window.deleteProduct = async (id) => {
     tg.showConfirm('حذف المنتج؟', async ok => {
       if (!ok) return;
-      await fetch(`${API}/api/shop/products/${id}`, { method: 'DELETE', headers: { 'X-Telegram-Init-Data': tg.initData } });
-      loadProducts();
+      const res = await fetch(`${API}/api/shop/products/${id}`, { method: 'DELETE', headers: { 'X-Telegram-Init-Data': tg.initData } });
+      if (res.ok) {
+        loadProducts();
+      } else {
+        tg.showAlert('فشل الحذف');
+      }
     });
   };
 
@@ -242,7 +261,7 @@
     }
   };
 
-  // تحميل التصنيفات (للمنتجات)
+  // تحميل التصنيفات
   async function loadCategories() {
     const res = await fetch(`${API}/api/categories`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
     categories = await res.json();
@@ -251,7 +270,7 @@
     categories.forEach(c => sel.add(new Option(c.name, c.id)));
   }
 
-  // باقي دوال الطلبات (كما في النسخة السابقة)
+  // تحميل الطلبات (مختصرة)
   async function loadOrders(archived) {
     const c = document.getElementById(archived ? 'archivePanel' : 'activePanel');
     c.innerHTML = '<div class="skeleton"></div>';
