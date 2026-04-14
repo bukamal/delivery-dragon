@@ -9,7 +9,6 @@ const { Pool } = pkg;
 
 const app = express();
 
-// ========== تحسينات الأمان ==========
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -42,14 +41,12 @@ app.use(cors({
   },
   credentials: true
 }));
-app.use(express.json({ limit: '10mb' })); // زيادة الحد الأقصى لحجم الصور (Base64)
+app.use(express.json({ limit: '10mb' }));
 
-// ========== دوال التحقق من initData ==========
 function verifyInitData(initData) {
   if (!initData) return { valid: false, error: 'Missing init data' };
   try {
-    const botToken = process.env.BOT_TOKEN;
-    validate(initData, botToken);
+    validate(initData, process.env.BOT_TOKEN);
     return { valid: true };
   } catch (e) {
     return { valid: false, error: e.message };
@@ -63,7 +60,6 @@ function extractTgUser(initData) {
   return JSON.parse(userString);
 }
 
-// ========== Middleware للمصادقة ==========
 function requireAuth(req, res, next) {
   const initData = req.headers['x-telegram-init-data'];
   const verification = verifyInitData(initData);
@@ -88,7 +84,6 @@ function optionalAuth(req, res, next) {
   next();
 }
 
-// ========== قاعدة البيانات والبوت ==========
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 const bot = new Bot(process.env.BOT_TOKEN);
 const MINI_APP_URL = process.env.MINI_APP_URL || 'https://delivery-mini-app.manhal-almasriiii199119.workers.dev';
@@ -100,7 +95,6 @@ let botInitialized = false;
 async function ensureBotInitialized() { if (!botInitialized) { await bot.init(); botInitialized = true; console.log('✅ Bot initialized'); } }
 async function getDbUser(telegramId) { const res = await pool.query('SELECT * FROM users WHERE telegram_id = $1', [telegramId.toString()]); return res.rows[0]; }
 
-// ========== دوال الإشعارات ==========
 async function notifyShop(orderId) {
   try {
     const order = await pool.query(`SELECT o.*, u.chat_id as owner_chat_id FROM orders o JOIN shops s ON o.shop_id=s.id JOIN users u ON s.owner_id=u.id WHERE o.id=$1`,[orderId]);
@@ -126,7 +120,6 @@ async function notifyRiders(orderId) {
   } catch(e){ console.error('Notify riders error:',e); }
 }
 
-// ========== أوامر البوت ==========
 bot.command('start', async (ctx) => {
   const telegramId = ctx.from.id; const chatId = ctx.chat.id.toString(); const name = ctx.from.first_name + (ctx.from.last_name ? ' ' + ctx.from.last_name : '');
   await pool.query(`INSERT INTO users (telegram_id, name, role, is_approved, chat_id) VALUES ($1,$2,'customer',true,$3) ON CONFLICT(telegram_id) DO UPDATE SET chat_id=EXCLUDED.chat_id, name=EXCLUDED.name`,[telegramId.toString(), name, chatId]);
@@ -174,7 +167,6 @@ bot.on(':photo', async (ctx) => {
   ctx.reply('✅ تم استلام لقطة الشاشة. سيقوم الأدمن بمراجعة طلبك قريباً.');
 });
 
-// ========== دالة حساب ETA ==========
 async function calculateETA(originLat, originLng, destLat, destLng) {
   try {
     const url = `https://router.project-osrm.org/route/v1/driving/${originLng},${originLat};${destLng},${destLat}?overview=false`;
@@ -189,7 +181,7 @@ async function calculateETA(originLat, originLng, destLat, destLng) {
   }
 }
 
-// ========== المسارات العامة (اختيارية المصادقة) ==========
+// ========== PUBLIC ROUTES ==========
 app.get('/api/categories', optionalAuth, async (req, res) => { const result = await pool.query('SELECT * FROM shop_categories'); res.json(result.rows); });
 app.get('/api/cities', optionalAuth, async (req, res) => { const result = await pool.query('SELECT * FROM cities WHERE is_active = true ORDER BY name'); res.json(result.rows); });
 app.get('/api/zones', optionalAuth, async (req, res) => { const { city_id } = req.query; let query = 'SELECT * FROM delivery_zones WHERE is_active = true'; const params = []; if (city_id) { query += ' AND city_id = $1'; params.push(city_id); } query += ' ORDER BY zone_name'; const result = await pool.query(query, params); res.json(result.rows); });
@@ -211,7 +203,7 @@ app.get('/api/orders/:orderId/eta', optionalAuth, async (req, res) => {
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-// ========== المسارات المحمية (تتطلب مصادقة) ==========
+// ========== PROTECTED ROUTES ==========
 app.use('/api', requireAuth);
 
 app.get('/api/me', async (req, res) => {
@@ -246,56 +238,19 @@ app.get('/api/me/orders', async (req, res) => { try { const tgUser = req.tgUser;
 app.get('/api/shop/orders', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'shop' || !dbUser?.is_approved) return res.status(403).json({ error: 'Forbidden' }); const shop = await pool.query('SELECT id FROM shops WHERE owner_id=$1',[dbUser.id]); if (!shop.rows[0]) return res.json([]); const shopId = shop.rows[0].id; const { archived } = req.query; let statusCondition = archived === 'true' ? `o.status IN ('completed', 'rejected')` : `o.status IN ('paid', 'preparing', 'ready_for_pickup', 'delivering')`; const orders = await pool.query(`SELECT o.*, u_customer.name as customer_name, u_customer.phone as customer_phone, u_rider.name as rider_name FROM orders o JOIN users u_customer ON o.customer_id = u_customer.id LEFT JOIN users u_rider ON o.rider_id = u_rider.id WHERE o.shop_id = $1 AND ${statusCondition} ORDER BY o.created_at DESC`, [shopId]); res.json(orders.rows); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.post('/api/shop/orders/:orderId/status', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' }); const { status } = req.body; const { orderId } = req.params; await pool.query(`UPDATE orders SET status=$1 WHERE id=$2 AND shop_id=(SELECT id FROM shops WHERE owner_id=$3)`,[status, orderId, dbUser.id]); if (status==='ready_for_pickup') await notifyRiders(orderId); await notifyCustomer(orderId, status); res.json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.get('/api/shop/products', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' }); const products = await pool.query(`SELECT * FROM products WHERE shop_id=(SELECT id FROM shops WHERE owner_id=$1) ORDER BY name`,[dbUser.id]); res.json(products.rows); } catch(error) { res.status(500).json({ error: error.message }); } });
-app.post('/api/shop/products', async (req, res) => {
-  try {
-    const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id);
-    if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' });
-    const { name, price, category_id, image, options } = req.body;
-    await pool.query(
-      `INSERT INTO products (shop_id, name, price, category_id, image_url, options)
-       VALUES ((SELECT id FROM shops WHERE owner_id=$1), $2, $3, $4, $5, $6)`,
-      [dbUser.id, name, price, category_id || null, image || null, options || null]
-    );
-    res.status(201).json({ success: true });
-  } catch(error) { res.status(500).json({ error: error.message }); }
-});
-app.get('/api/shop/products/:productId', async (req, res) => {
-  try {
-    const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id);
-    if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' });
-    const { productId } = req.params;
-    const result = await pool.query(
-      `SELECT * FROM products WHERE id=$1 AND shop_id=(SELECT id FROM shops WHERE owner_id=$2)`,
-      [productId, dbUser.id]
-    );
-    if (!result.rows[0]) return res.status(404).json({ error: 'Not found' });
-    res.json(result.rows[0]);
-  } catch(error) { res.status(500).json({ error: error.message }); }
-});
-app.put('/api/shop/products/:productId', async (req, res) => {
-  try {
-    const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id);
-    if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' });
-    const { productId } = req.params;
-    const { name, price, category_id, image, options } = req.body;
-    await pool.query(
-      `UPDATE products SET name=$1, price=$2, category_id=$3, image_url=$4, options=$5
-       WHERE id=$6 AND shop_id=(SELECT id FROM shops WHERE owner_id=$7)`,
-      [name, price, category_id || null, image || null, options || null, productId, dbUser.id]
-    );
-    res.json({ success: true });
-  } catch(error) { res.status(500).json({ error: error.message }); }
-});
+app.post('/api/shop/products', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' }); const { name, price, category_id, image, options } = req.body; await pool.query(`INSERT INTO products (shop_id, name, price, category_id, image_url, options) VALUES ((SELECT id FROM shops WHERE owner_id=$1), $2, $3, $4, $5, $6)`,[dbUser.id, name, price, category_id || null, image || null, options || null]); res.status(201).json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
+app.get('/api/shop/products/:productId', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' }); const { productId } = req.params; const result = await pool.query(`SELECT * FROM products WHERE id=$1 AND shop_id=(SELECT id FROM shops WHERE owner_id=$2)`,[productId, dbUser.id]); if (!result.rows[0]) return res.status(404).json({ error: 'Not found' }); res.json(result.rows[0]); } catch(error) { res.status(500).json({ error: error.message }); } });
+app.put('/api/shop/products/:productId', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' }); const { productId } = req.params; const { name, price, category_id, image, options } = req.body; await pool.query(`UPDATE products SET name=$1, price=$2, category_id=$3, image_url=$4, options=$5 WHERE id=$6 AND shop_id=(SELECT id FROM shops WHERE owner_id=$7)`,[name, price, category_id || null, image || null, options || null, productId, dbUser.id]); res.json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.delete('/api/shop/products/:productId', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' }); await pool.query(`DELETE FROM products WHERE id=$1 AND shop_id=(SELECT id FROM shops WHERE owner_id=$2)`,[req.params.productId, dbUser.id]); res.json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
 
-// ========== السائق ==========
+// ========== RIDER ==========
 app.get('/api/rider/available-orders', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'rider' || !dbUser?.is_approved) return res.status(403).json({ error: 'Forbidden' }); const orders = await pool.query(`SELECT o.*, s.shop_name, s.address as shop_address, z.zone_name FROM orders o JOIN shops s ON o.shop_id=s.id JOIN delivery_zones z ON o.zone_id=z.id WHERE o.status='ready_for_pickup' AND o.rider_id IS NULL`); res.json(orders.rows); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.post('/api/rider/accept-order', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'rider') return res.status(403).json({ error: 'Forbidden' }); const { order_id } = req.body; const result = await pool.query(`UPDATE orders SET rider_id=$1, status='delivering', rider_accepted_at=NOW() WHERE id=$2 AND rider_id IS NULL AND status='ready_for_pickup'`,[dbUser.id, order_id]); if (result.rowCount===0) return res.status(409).json({ error:'Order already taken' }); await notifyCustomer(order_id, 'delivering'); const shopOwner = await pool.query(`SELECT u.chat_id FROM users u JOIN shops s ON u.id = s.owner_id WHERE s.id = (SELECT shop_id FROM orders WHERE id = $1)`, [order_id]); if (shopOwner.rows[0]?.chat_id) { await bot.api.sendMessage(shopOwner.rows[0].chat_id, `🛵 *السائق ${dbUser.name} قبل طلبك #${order_id}*\nسيقوم بتوصيله قريباً.`, { parse_mode: 'Markdown' }); } await bot.api.sendMessage(dbUser.chat_id, `✅ *تم قبول الطلب #${order_id}*\n\n📍 الرجاء مشاركة موقعك الحي (Live Location) من قائمة المرفقات 📎 لمدة 8 ساعات.`, { parse_mode: 'Markdown' }); res.json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.get('/api/rider/active-order', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'rider' || !dbUser?.is_approved) return res.status(403).json({ error: 'Forbidden' }); const activeOrder = await pool.query(`SELECT o.*, s.shop_name, s.address as shop_address, z.zone_name FROM orders o JOIN shops s ON o.shop_id = s.id JOIN delivery_zones z ON o.zone_id = z.id WHERE o.rider_id = $1 AND o.status = 'delivering' ORDER BY o.created_at DESC LIMIT 1`, [dbUser.id]); res.json(activeOrder.rows[0] || null); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.post('/api/rider/complete-order', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'rider') return res.status(403).json({ error: 'Forbidden' }); const { order_id } = req.body; const order = await pool.query('SELECT * FROM orders WHERE id=$1 AND rider_id=$2 AND status=$3',[order_id, dbUser.id, 'delivering']); if (order.rowCount===0) return res.status(400).json({ error:'Invalid order' }); await pool.query(`UPDATE orders SET status='completed' WHERE id=$1`,[order_id]); const o = order.rows[0]; const platformCommission = PLATFORM_FIXED_FEE; const shopNet = o.subtotal; const riderFee = o.delivery_fee - platformCommission; await pool.query(`UPDATE orders SET platform_commission=$1, shop_net=$2, rider_fee=$3 WHERE id=$4`,[platformCommission, shopNet, riderFee, order_id]); await pool.query(`INSERT INTO financial_transactions (order_id, transaction_type, amount) VALUES ($1,'platform_fee',$2),($1,'shop_payout',$3),($1,'rider_payout',$4)`,[order_id, platformCommission, shopNet, riderFee]); await notifyCustomer(order_id, 'completed'); const shopOwner = await pool.query(`SELECT u.chat_id FROM users u JOIN shops s ON u.id = s.owner_id WHERE s.id = (SELECT shop_id FROM orders WHERE id = $1)`, [order_id]); if (shopOwner.rows[0]?.chat_id) { await bot.api.sendMessage(shopOwner.rows[0].chat_id, `✅ *تم توصيل الطلب #${order_id} بنجاح*\nصافي المبلغ المستحق لك: ${shopNet} ل.س`, { parse_mode: 'Markdown' }); } res.json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.post('/api/rider/cancel-order', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'rider') return res.status(403).json({ error: 'Forbidden' }); const { order_id } = req.body; const result = await pool.query(`UPDATE orders SET rider_id = NULL, status = 'ready_for_pickup' WHERE id = $1 AND rider_id = $2 AND status = 'delivering'`, [order_id, dbUser.id]); if (result.rowCount === 0) return res.status(400).json({ error: 'Order not found or not yours' }); await notifyCustomer(order_id, 'ready_for_pickup'); res.json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
 
-// ========== الأدمن ==========
+// ========== ADMIN ==========
 app.get('/api/admin/pending', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' }); const pending = await pool.query(`SELECT id, telegram_id, name, phone, role, created_at FROM users WHERE is_approved=false AND role IN ('shop','rider') ORDER BY created_at DESC`); res.json(pending.rows); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.post('/api/admin/approve', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' }); const { user_id } = req.body; await pool.query(`UPDATE users SET is_approved=true WHERE id=$1`,[user_id]); res.json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.get('/api/admin/orders/pending', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' }); const { page=1, limit=10 } = req.query; const offset = (page-1)*limit; const orders = await pool.query(`SELECT o.*, u.name as customer_name, s.shop_name FROM orders o JOIN users u ON o.customer_id = u.id JOIN shops s ON o.shop_id = s.id WHERE o.status = 'pending' ORDER BY o.created_at DESC LIMIT $1 OFFSET $2`, [limit, offset]); res.json(orders.rows); } catch(error) { res.status(500).json({ error: error.message }); } });
@@ -323,6 +278,13 @@ app.get('/api/admin/ratings', async (req, res) => { try { const tgUser = req.tgU
 app.delete('/api/admin/ratings/:ratingId', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' }); const { ratingId } = req.params; await pool.query('DELETE FROM ratings WHERE id = $1', [ratingId]); res.json({ success: true }); } catch (error) { res.status(500).json({ error: error.message }); } });
 app.post('/api/orders/:orderId/cancel', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); const { orderId } = req.params; const order = await pool.query('SELECT status FROM orders WHERE id=$1 AND customer_id=$2', [orderId, dbUser.id]); if (!order.rows[0]) return res.status(404).json({ error: 'Order not found' }); if (!['verifying', 'pending'].includes(order.rows[0].status)) { return res.status(400).json({ error: 'لا يمكن إلغاء الطلب في هذه المرحلة' }); } await pool.query('UPDATE orders SET status=$1 WHERE id=$2', ['rejected', orderId]); res.json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.get('/api/cron/cleanup-stuck-orders', async (req, res) => { try { const auth = req.headers['authorization']; if (auth !== `Bearer ${CRON_SECRET}`) return res.status(401).json({ error: 'Unauthorized' }); const result = await pool.query(`UPDATE orders SET status = 'paid' WHERE status = 'ready_for_pickup' AND created_at < NOW() - INTERVAL '30 minutes'`); res.json({ success: true, updated: result.rowCount }); } catch(error) { res.status(500).json({ error: error.message }); } });
+
+// ========== SUPPORT CHAT ==========
+app.post('/api/support/messages', requireAuth, async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (!dbUser) return res.status(401).json({ error: 'User not found' }); const { message } = req.body; if (!message || !message.trim()) return res.status(400).json({ error: 'Message required' }); await pool.query(`INSERT INTO support_messages (user_id, message, is_from_admin) VALUES ($1, $2, false)`, [dbUser.id, message.trim()]); res.status(201).json({ success: true }); } catch (error) { res.status(500).json({ error: error.message }); } });
+app.get('/api/support/messages', requireAuth, async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (!dbUser) return res.status(401).json({ error: 'User not found' }); const messages = await pool.query(`SELECT m.*, u.name as user_name, u.role as user_role, a.name as admin_name FROM support_messages m JOIN users u ON m.user_id = u.id LEFT JOIN users a ON m.admin_id = a.id WHERE m.user_id = $1 ORDER BY m.created_at ASC`, [dbUser.id]); res.json(messages.rows); } catch (error) { res.status(500).json({ error: error.message }); } });
+app.get('/api/admin/support/users', requireAuth, async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' }); const users = await pool.query(`SELECT DISTINCT u.id, u.name, u.role, u.phone, (SELECT COUNT(*) FROM support_messages WHERE user_id = u.id AND is_from_admin = false AND is_read = false) as unread_count, (SELECT created_at FROM support_messages WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1) as last_message_time FROM support_messages m JOIN users u ON m.user_id = u.id ORDER BY last_message_time DESC`); res.json(users.rows); } catch (error) { res.status(500).json({ error: error.message }); } });
+app.get('/api/admin/support/messages/:userId', requireAuth, async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' }); const { userId } = req.params; const messages = await pool.query(`SELECT m.*, u.name as user_name, u.role as user_role, a.name as admin_name FROM support_messages m JOIN users u ON m.user_id = u.id LEFT JOIN users a ON m.admin_id = a.id WHERE m.user_id = $1 ORDER BY m.created_at ASC`, [userId]); await pool.query(`UPDATE support_messages SET is_read = true WHERE user_id = $1 AND is_from_admin = false`, [userId]); res.json(messages.rows); } catch (error) { res.status(500).json({ error: error.message }); } });
+app.post('/api/admin/support/messages/:userId', requireAuth, async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' }); const { userId } = req.params; const { message } = req.body; if (!message || !message.trim()) return res.status(400).json({ error: 'Message required' }); await pool.query(`INSERT INTO support_messages (user_id, admin_id, message, is_from_admin) VALUES ($1, $2, $3, true)`, [userId, dbUser.id, message.trim()]); res.status(201).json({ success: true }); } catch (error) { res.status(500).json({ error: error.message }); } });
 
 app.post('/api/webhook', async (req, res) => { try { await ensureBotInitialized(); await bot.handleUpdate(req.body); res.status(200).send('OK'); } catch(err) { console.error('Webhook error:', err); res.status(500).send('Error'); } });
 app.get('/', (req, res) => res.send('🦅 شاهين API is running.'));

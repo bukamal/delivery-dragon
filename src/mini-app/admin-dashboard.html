@@ -50,7 +50,6 @@
     <div class="tab" data-tab="completedOrders">📊 تقارير</div>
   </div>
 
-  <!-- لوحات التبويب -->
   <div id="pendingPanel" class="panel active"></div>
   <div id="ordersPanel" class="panel"></div>
   <div id="shopsPanel" class="panel"></div>
@@ -62,7 +61,6 @@
   <div id="completedOrdersPanel" class="panel"></div>
 </div>
 
-<!-- مودال إضافة/تعديل مدينة -->
 <div id="cityModal" class="modal" style="display:none">
   <div class="modal-content">
     <h3 id="cityModalTitle">إضافة مدينة</h3>
@@ -74,7 +72,6 @@
   </div>
 </div>
 
-<!-- مودال إضافة/تعديل منطقة -->
 <div id="zoneModal" class="modal" style="display:none">
   <div class="modal-content">
     <h3 id="zoneModalTitle">إضافة منطقة</h3>
@@ -92,7 +89,6 @@
   const tg = Telegram.WebApp; tg.ready(); tg.BackButton.show(); tg.BackButton.onClick(() => history.back());
   const API = 'https://delivery-dragon.vercel.app';
 
-  // التبويبات
   const tabs = document.querySelectorAll('.tab');
   tabs.forEach(t => t.onclick = () => {
     tabs.forEach(x => x.classList.remove('active'));
@@ -103,7 +99,6 @@
     if (loaders[t.dataset.tab]) loaders[t.dataset.tab]();
   });
 
-  // دوال التحميل الأساسية
   async function loadPending() {
     const r = await fetch(`${API}/api/admin/pending`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
     const u = await r.json();
@@ -111,6 +106,7 @@
     document.getElementById('pendingPanel').innerHTML = h;
   }
   window.approve = async id => { await fetch(`${API}/api/admin/approve`, { method:'POST', headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData}, body:JSON.stringify({user_id:id}) }); loadPending(); };
+  
   async function loadPendingOrders() {
     const r = await fetch(`${API}/api/admin/orders/pending`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
     const o = await r.json();
@@ -119,6 +115,7 @@
   }
   window.approveOrder = async id => { await fetch(`${API}/api/admin/orders/${id}/approve`, { method:'POST', headers:{'X-Telegram-Init-Data':tg.initData} }); loadPendingOrders(); };
   window.rejectOrder = async id => { await fetch(`${API}/api/admin/orders/${id}/reject`, { method:'POST', headers:{'X-Telegram-Init-Data':tg.initData} }); loadPendingOrders(); };
+  
   async function loadShops() {
     const r = await fetch(`${API}/api/admin/shops`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
     const s = await r.json();
@@ -127,6 +124,7 @@
     h += '</div>'; document.getElementById('shopsPanel').innerHTML = h; if (typeof lucide !== 'undefined') lucide.createIcons();
   }
   window.deleteShop = async id => { tg.showConfirm('⚠️ حذف المتجر سيؤدي إلى حذف جميع منتجاته وطلباته. هل أنت متأكد؟', async c => { if(!c) return; await fetch(`${API}/api/admin/shops/${id}`, { method:'DELETE', headers:{'X-Telegram-Init-Data':tg.initData} }); loadShops(); }); };
+  
   async function loadRiders() {
     const r = await fetch(`${API}/api/admin/riders`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
     const d = await r.json();
@@ -224,7 +222,6 @@
     document.getElementById('completedOrdersPanel').innerHTML = h;
   }
 
-  // التحميل الأولي
   loadPending();
 </script>
 </body>

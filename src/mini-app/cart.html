@@ -14,7 +14,10 @@
     .app-header h1 { font-size: 1.7rem; font-weight: 700; color: #e67e22; margin-right: 12px; }
     .back-btn { background: none; border: none; color: #e67e22; font-size: 1.8rem; cursor: pointer; }
     .container { padding: 20px 16px; max-width: 600px; margin: 0 auto; }
-    .cart-item { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: 20px; padding: 16px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--tg-theme-hint-color, #eee); }
+    .cart-item { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: 20px; padding: 16px; margin-bottom: 12px; display: flex; gap: 12px; border: 1px solid var(--tg-theme-hint-color, #eee); }
+    .cart-item-img { width: 60px; height: 60px; border-radius: 16px; object-fit: cover; background: #f0f0f0; }
+    .cart-item-info { flex: 1; }
+    .cart-item-actions { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
     .qty-btn { background: #e67e22; color: white; border: none; width: 36px; height: 36px; border-radius: 50%; font-size: 20px; cursor: pointer; box-shadow: 0 2px 6px rgba(230,126,34,0.2); }
     .summary { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: 24px; padding: 24px; margin: 24px 0; box-shadow: 0 6px 18px rgba(0,0,0,0.03); }
     select, input { width: 100%; padding: 16px; border-radius: 16px; border: 1px solid #ccc; margin: 12px 0; background: var(--tg-theme-bg-color, #fff); color: inherit; }
@@ -54,24 +57,54 @@
   let cart = JSON.parse(localStorage.getItem('dragon_cart')) || [];
   if (!cart.length) location.href = 'customer-home.html';
   let deliveryFee = 0, currentTotal = 0, currentCityId = null;
-  function render() {
+
+  async function fetchProductImage(productId) {
+    try {
+      const res = await fetch(`${API}/api/shop/products/${productId}`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
+      if (res.ok) {
+        const p = await res.json();
+        return p.image_url;
+      }
+    } catch(e) {}
+    return null;
+  }
+
+  async function render() {
     let html = '', subtotal = 0;
-    cart.forEach((item, idx) => {
+    for (const item of cart) {
       subtotal += item.price * item.quantity;
-      html += `<div class="cart-item"><div><b>${item.name}</b><br>${item.price} ل.س</div><div style="display:flex; gap:12px"><button class="qty-btn" onclick="update(${idx},-1)">−</button><span>${item.quantity}</span><button class="qty-btn" onclick="update(${idx},1)">+</button><button onclick="remove(${idx})"><i data-lucide="trash-2"></i></button></div></div>`;
-    });
+      const imageUrl = item.imageUrl || await fetchProductImage(item.id);
+      item.imageUrl = imageUrl;
+      localStorage.setItem('dragon_cart', JSON.stringify(cart));
+      html += `<div class="cart-item">
+        ${imageUrl ? `<img src="${imageUrl}" class="cart-item-img">` : '<div class="cart-item-img" style="display:flex; align-items:center; justify-content:center; color:#aaa;">📷</div>'}
+        <div class="cart-item-info">
+          <b>${item.name}</b> ${item.optionName ? '(' + item.optionName + ')' : ''}<br>
+          ${item.price} ل.س
+          <div class="cart-item-actions">
+            <button class="qty-btn" onclick="update(${cart.indexOf(item)},-1)">−</button>
+            <span>${item.quantity}</span>
+            <button class="qty-btn" onclick="update(${cart.indexOf(item)},1)">+</button>
+            <button onclick="remove(${cart.indexOf(item)})"><i data-lucide="trash-2"></i></button>
+          </div>
+        </div>
+      </div>`;
+    }
     document.getElementById('itemsContainer').innerHTML = html;
     document.getElementById('subtotal').innerText = subtotal;
     updateTotal(subtotal);
     if (typeof lucide !== 'undefined') lucide.createIcons();
   }
+
   window.update = (i, d) => { if (cart[i].quantity + d > 0) cart[i].quantity += d; else cart.splice(i,1); localStorage.setItem('dragon_cart', JSON.stringify(cart)); render(); };
   window.remove = i => { tg.showConfirm('حذف المنتج؟', ok => { if (ok) { cart.splice(i,1); localStorage.setItem('dragon_cart', JSON.stringify(cart)); render(); } }); };
+
   async function loadCities() {
     const res = await fetch(`${API}/api/cities`); const cities = await res.json();
     const sel = document.getElementById('citySelect'); cities.forEach(c => sel.add(new Option(c.name, c.id)));
     if (cities.length) { sel.value = cities[0].id; currentCityId = cities[0].id; loadZones(currentCityId); }
   }
+
   async function loadZones(cityId) {
     const container = document.getElementById('zoneChips');
     container.innerHTML = '<span>جاري التحميل...</span>';
@@ -91,7 +124,9 @@
       updateTotal(parseFloat(document.getElementById('subtotal').innerText));
     });
   }
+
   function updateTotal(sub) { currentTotal = sub + deliveryFee; document.getElementById('total').innerText = currentTotal; }
+
   document.getElementById('citySelect').onchange = e => { currentCityId = e.target.value; loadZones(currentCityId); };
   document.getElementById('orderBtn').onclick = async () => {
     const addr = document.getElementById('addressInput').value.trim(); if (!addr) return tg.showAlert('أدخل العنوان');
@@ -107,6 +142,7 @@
       document.body.innerHTML = `<div style="text-align:center;padding:40px"><h2>✅ تم إنشاء الطلب #${data.order_id}</h2><p>المبلغ: ${currentTotal} ل.س</p><p>📸 أرسل لقطة الدفع في البوت</p><button class="order-btn" onclick="Telegram.WebApp.close()">فتح البوت</button></div>`;
     } catch(e) { tg.MainButton.hideProgress(); tg.showAlert('❌ ' + e.message); }
   };
+
   render(); loadCities();
 </script>
 </body>
