@@ -20,15 +20,13 @@
     .cart-item-actions { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
     .qty-btn { background: #e67e22; color: white; border: none; width: 36px; height: 36px; border-radius: 50%; font-size: 20px; cursor: pointer; box-shadow: 0 2px 6px rgba(230,126,34,0.2); }
     .summary { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: 24px; padding: 24px; margin: 24px 0; box-shadow: 0 6px 18px rgba(0,0,0,0.03); }
-    select, input { width: 100%; padding: 16px; border-radius: 16px; border: 1px solid #ccc; margin: 12px 0; background: var(--tg-theme-bg-color, #fff); color: inherit; }
-    .zone-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
-    .zone-chip { padding: 10px 16px; border: 1px solid var(--tg-theme-hint-color, #ccc); border-radius: 40px; background: var(--tg-theme-secondary-bg-color, #fff); color: inherit; cursor: pointer; }
-    .zone-chip.active { background: #e67e22; color: #fff; border-color: #e67e22; }
+    input { width: 100%; padding: 16px; border-radius: 16px; border: 1px solid #ccc; margin: 12px 0; background: var(--tg-theme-bg-color, #fff); color: inherit; }
     .order-btn { background: #27ae60; color: white; border: none; padding: 18px; border-radius: 60px; width: 100%; font-size: 1.2rem; font-weight: 700; cursor: pointer; box-shadow: 0 8px 18px rgba(39,174,96,0.2); }
     .order-btn:active { transform: scale(0.97); }
     .skeleton-cart { height: 80px; background: linear-gradient(90deg, #eee 25%, #ddd 50%, #eee 75%); background-size: 200% 100%; animation: loading 1.5s infinite; border-radius: 20px; }
     @keyframes loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
     .locate-btn { background: #3498db; color: white; border: none; padding: 12px 16px; border-radius: 30px; width: 100%; margin: 8px 0; cursor: pointer; }
+    .readonly-field { background: #f0f0f0; color: #666; }
   </style>
 </head>
 <body>
@@ -41,16 +39,13 @@
   <div id="itemsContainer"><div class="skeleton-cart"></div></div>
   <div class="summary">
     <div style="display:flex; justify-content:space-between"><span>المجموع</span><span id="subtotal">0</span> ل.س</div>
-    <select id="citySelect"><option>اختر المدينة</option></select>
-    <label>📍 منطقة التوصيل</label>
-    <div id="zoneChips" class="zone-chips">اختر المدينة أولاً</div>
-    <input type="hidden" id="zoneSelect">
     <div style="display:flex; justify-content:space-between"><span>التوصيل (يحسب آلياً)</span><span id="deliveryFee">0</span> ل.س</div>
     <div style="display:flex; justify-content:space-between; font-weight:700; margin-top:10px"><span>الإجمالي</span><span id="total">0</span> ل.س</div>
     <input type="text" id="addressInput" placeholder="العنوان التفصيلي">
     <button type="button" id="locateBtn" class="locate-btn"><i data-lucide="map-pin"></i> تحديد موقع التسليم (إجباري)</button>
     <input type="hidden" id="deliveryLat">
     <input type="hidden" id="deliveryLng">
+    <input type="text" id="cityDisplay" placeholder="المدينة" readonly class="readonly-field">
     <div id="locationStatus" style="font-size:0.9rem; margin-top:4px; color:#e67e22;"></div>
   </div>
   <button class="order-btn" id="orderBtn"><i data-lucide="check-circle"></i> تأكيد الطلب</button>
@@ -61,7 +56,7 @@
   const API = 'https://delivery-dragon.vercel.app';
   let cart = JSON.parse(localStorage.getItem('dragon_cart')) || [];
   if (!cart.length) location.href = 'customer-home.html';
-  let deliveryFee = 0, currentTotal = 0, currentCityId = null;
+  let deliveryFee = 0, currentTotal = 0;
 
   async function fetchProductImage(productId) {
     try {
@@ -97,55 +92,39 @@
     }
     document.getElementById('itemsContainer').innerHTML = html;
     document.getElementById('subtotal').innerText = subtotal;
-    updateTotal(subtotal);
     if (typeof lucide !== 'undefined') lucide.createIcons();
   }
 
   window.update = (i, d) => { if (cart[i].quantity + d > 0) cart[i].quantity += d; else cart.splice(i,1); localStorage.setItem('dragon_cart', JSON.stringify(cart)); render(); };
   window.remove = i => { tg.showConfirm('حذف المنتج؟', ok => { if (ok) { cart.splice(i,1); localStorage.setItem('dragon_cart', JSON.stringify(cart)); render(); } }); };
 
-  async function loadCities() {
-    const res = await fetch(`${API}/api/cities`); const cities = await res.json();
-    const sel = document.getElementById('citySelect'); cities.forEach(c => sel.add(new Option(c.name, c.id)));
-    if (cities.length) { sel.value = cities[0].id; currentCityId = cities[0].id; loadZones(currentCityId); }
-  }
-
-  async function loadZones(cityId) {
-    const container = document.getElementById('zoneChips');
-    container.innerHTML = '<span>جاري التحميل...</span>';
-    const res = await fetch(`${API}/api/zones?city_id=${cityId}`); const zones = await res.json();
-    if (!zones.length) { container.innerHTML = '<span>لا توجد مناطق</span>'; return; }
-    let html = ''; zones.forEach((z,i) => { html += `<button class="zone-chip ${i===0?'active':''}" data-id="${z.id}" data-fee="${z.base_fee}">${z.zone_name} (${z.base_fee} ل.س)</button>`; });
-    container.innerHTML = html;
-    document.getElementById('zoneSelect').value = zones[0]?.id || '';
-    deliveryFee = zones[0]?.base_fee || 0;
-    document.getElementById('deliveryFee').innerText = deliveryFee;
-    updateTotal(parseFloat(document.getElementById('subtotal').innerText));
-    document.querySelectorAll('.zone-chip').forEach(chip => chip.onclick = () => {
-      document.querySelectorAll('.zone-chip').forEach(c => c.classList.remove('active')); chip.classList.add('active');
-      document.getElementById('zoneSelect').value = chip.dataset.id;
-      deliveryFee = parseFloat(chip.dataset.fee);
-      document.getElementById('deliveryFee').innerText = deliveryFee;
-      updateTotal(parseFloat(document.getElementById('subtotal').innerText));
-    });
-  }
-
-  function updateTotal(sub) { currentTotal = sub + deliveryFee; document.getElementById('total').innerText = currentTotal; }
-
-  document.getElementById('citySelect').onchange = e => { currentCityId = e.target.value; loadZones(currentCityId); };
-
-  // تحديد الموقع إجباري
   document.getElementById('locateBtn').onclick = () => {
     if (!navigator.geolocation) {
       tg.showAlert('متصفحك لا يدعم تحديد الموقع');
       return;
     }
     document.getElementById('locationStatus').innerText = 'جاري تحديد الموقع...';
-    navigator.geolocation.getCurrentPosition(pos => {
-      document.getElementById('deliveryLat').value = pos.coords.latitude;
-      document.getElementById('deliveryLng').value = pos.coords.longitude;
-      document.getElementById('locationStatus').innerHTML = '✅ تم تحديد موقع التسليم بنجاح';
-      tg.showPopup({ title: '✅ تم التحديد', message: 'تم تحديد موقعك الحالي كعنوان للتسليم' });
+    navigator.geolocation.getCurrentPosition(async pos => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      document.getElementById('deliveryLat').value = lat;
+      document.getElementById('deliveryLng').value = lng;
+      document.getElementById('locationStatus').innerHTML = '✅ تم تحديد الموقع، جاري تحديد المدينة...';
+      
+      // استدعاء Nominatim للحصول على اسم المدينة
+      try {
+        const nominatimRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10`);
+        const data = await nominatimRes.json();
+        // استخراج اسم المدينة (قد يكون في address.city أو address.town أو address.village)
+        const city = data.address.city || data.address.town || data.address.village || data.address.state || 'غير معروفة';
+        document.getElementById('cityDisplay').value = city;
+        document.getElementById('locationStatus').innerHTML = `✅ تم تحديد الموقع والمدينة: ${city}`;
+        tg.showPopup({ title: '✅ تم التحديد', message: `تم تحديد موقعك والمدينة: ${city}` });
+      } catch (error) {
+        document.getElementById('cityDisplay').value = 'غير معروفة';
+        document.getElementById('locationStatus').innerHTML = '✅ تم تحديد الموقع، ولكن تعذر تحديد المدينة تلقائياً. يمكنك إدخالها يدوياً.';
+        tg.showAlert('✅ تم تحديد الموقع، ولكن تعذر تحديد المدينة تلقائياً. يمكنك إدخالها يدوياً.');
+      }
     }, err => {
       document.getElementById('locationStatus').innerText = '❌ فشل تحديد الموقع: ' + err.message;
       tg.showAlert('❌ فشل تحديد الموقع. تأكد من صلاحيات GPS.');
@@ -154,15 +133,14 @@
 
   document.getElementById('orderBtn').onclick = async () => {
     const addr = document.getElementById('addressInput').value.trim(); if (!addr) return tg.showAlert('أدخل العنوان');
-    if (!currentCityId) return tg.showAlert('اختر المدينة');
-    const zoneId = document.getElementById('zoneSelect').value;
     const delivery_latitude = document.getElementById('deliveryLat').value;
     const delivery_longitude = document.getElementById('deliveryLng').value;
     if (!delivery_latitude || !delivery_longitude) return tg.showAlert('الرجاء تحديد موقع التسليم (اضغط على الزر أعلاه)');
     const items = cart.map(i => ({ id: i.id, quantity: i.quantity }));
+    const city_name = document.getElementById('cityDisplay').value;
     tg.MainButton.showProgress();
     try {
-      const res = await fetch(`${API}/api/orders`, { method: 'POST', headers: { 'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData }, body: JSON.stringify({ shop_id: cart[0].shopId, items, zone_id: zoneId, address: addr, city_id: currentCityId, delivery_latitude, delivery_longitude }) });
+      const res = await fetch(`${API}/api/orders`, { method: 'POST', headers: { 'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData }, body: JSON.stringify({ shop_id: cart[0].shopId, items, address: addr, delivery_latitude, delivery_longitude, city_name: city_name }) });
       if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'فشل الطلب'); }
       const data = await res.json();
       cart = []; localStorage.removeItem('dragon_cart');
@@ -200,7 +178,7 @@
     } catch(e) { tg.MainButton.hideProgress(); tg.showAlert('❌ ' + e.message); }
   };
 
-  render(); loadCities();
+  render();
 </script>
 </body>
 </html>

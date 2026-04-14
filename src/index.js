@@ -17,7 +17,7 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'", "https://delivery-dragon.vercel.app", "https://delivery-mini-app.manhal-almasriiii199119.workers.dev", "https://router.project-osrm.org"]
+      connectSrc: ["'self'", "https://delivery-dragon.vercel.app", "https://delivery-mini-app.manhal-almasriiii199119.workers.dev", "https://router.project-osrm.org", "https://nominatim.openstreetmap.org"]
     }
   },
   crossOriginEmbedderPolicy: false,
@@ -116,10 +116,10 @@ async function notifyCustomer(orderId, status) {
 }
 async function notifyRiders(orderId) {
   try {
-    const order = await pool.query(`SELECT o.*, s.shop_name, s.address as shop_address, z.zone_name FROM orders o JOIN shops s ON o.shop_id=s.id JOIN delivery_zones z ON o.zone_id=z.id WHERE o.id=$1`,[orderId]);
+    const order = await pool.query(`SELECT o.*, s.shop_name, s.address as shop_address, z.zone_name FROM orders o JOIN shops s ON o.shop_id=s.id LEFT JOIN delivery_zones z ON o.zone_id=z.id WHERE o.id=$1`,[orderId]);
     const o = order.rows[0]; if (!o) return;
     const riders = await pool.query(`SELECT u.chat_id, u.name FROM users u WHERE u.role='rider' AND u.is_approved=true AND u.chat_id IS NOT NULL`);
-    const msg = `🚨 *طلب توصيل جديد!*\n\n🆔 #${orderId}\n🏪 ${o.shop_name} - ${o.shop_address}\n📍 إلى: ${o.zone_name} - ${o.address}\n💵 الأجرة: ${o.delivery_fee} ل.س\n\n_اضغط لفتح لوحة السائق لقبول الطلب._`;
+    const msg = `🚨 *طلب توصيل جديد!*\n\n🆔 #${orderId}\n🏪 ${o.shop_name} - ${o.shop_address}\n📍 إلى: ${o.zone_name || 'غير محدد'} - ${o.address}\n💵 الأجرة: ${o.delivery_fee} ل.س\n\n_اضغط لفتح لوحة السائق لقبول الطلب._`;
     for (const r of riders.rows) { try { await bot.api.sendMessage(r.chat_id, msg, {parse_mode:'Markdown'}); } catch(e){} }
   } catch(e){ console.error('Notify riders error:',e); }
 }
@@ -285,7 +285,7 @@ app.post('/api/orders', async (req, res) => {
   try {
     const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id);
     if (!dbUser) return res.status(401).json({ error: 'User not found' });
-    const { shop_id, items, zone_id, address, city_id, delivery_latitude, delivery_longitude } = req.body;
+    const { shop_id, items, address, city_name, delivery_latitude, delivery_longitude } = req.body;
 
     const shopQuery = await pool.query('SELECT latitude, longitude FROM shops WHERE id = $1', [shop_id]);
     if (!shopQuery.rows[0] || !shopQuery.rows[0].latitude || !shopQuery.rows[0].longitude) {
@@ -302,6 +302,17 @@ app.post('/api/orders', async (req, res) => {
 
     const calculatedDeliveryFee = Math.max(distanceKm * PRICE_PER_KM, 3000);
 
+    let validCityId = null;
+    if (city_name && city_name.trim() !== '' && city_name !== 'غير معروفة') {
+      const cityQuery = await pool.query('SELECT id FROM cities WHERE name = $1', [city_name.trim()]);
+      if (cityQuery.rows[0]) {
+        validCityId = cityQuery.rows[0].id;
+      } else {
+        const newCity = await pool.query('INSERT INTO cities (name) VALUES ($1) RETURNING id', [city_name.trim()]);
+        validCityId = newCity.rows[0].id;
+      }
+    }
+
     const productIds = items.map(i => i.id);
     const productsResult = await pool.query(`SELECT id, name, price FROM products WHERE id = ANY($1::int[]) AND shop_id=$2`,[productIds, shop_id]);
     const productsMap = new Map(productsResult.rows.map(p=>[p.id, p]));
@@ -310,9 +321,9 @@ app.post('/api/orders', async (req, res) => {
     const total = subtotal + calculatedDeliveryFee;
 
     const orderResult = await pool.query(
-      `INSERT INTO orders (customer_id, shop_id, zone_id, items, subtotal, delivery_fee, total_price, address, city_id, delivery_latitude, delivery_longitude, status) 
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'verifying') RETURNING id`,
-      [dbUser.id, shop_id, zone_id, JSON.stringify(frozenItems), subtotal, calculatedDeliveryFee, total, address, city_id, delivery_latitude, delivery_longitude]
+      `INSERT INTO orders (customer_id, shop_id, items, subtotal, delivery_fee, total_price, address, city_id, delivery_latitude, delivery_longitude, status) 
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'verifying') RETURNING id`,
+      [dbUser.id, shop_id, JSON.stringify(frozenItems), subtotal, calculatedDeliveryFee, total, address, validCityId, delivery_latitude, delivery_longitude]
     );
     const orderId = orderResult.rows[0].id;
     if (dbUser.chat_id) await bot.api.sendMessage(dbUser.chat_id, `📸 *تم إنشاء الطلب #${orderId}*\n\nالمبلغ الإجمالي: ${total} ل.س (توصيل: ${calculatedDeliveryFee} ل.س)\n\nالرجاء إرسال لقطة شاشة عملية الدفع الآن (كصورة) لتأكيد الطلب.`, { parse_mode: 'Markdown' });
@@ -382,7 +393,7 @@ app.put('/api/shop/location', async (req, res) => {
 });
 
 // ========== RIDER ==========
-app.get('/api/rider/available-orders', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'rider' || !dbUser?.is_approved) return res.status(403).json({ error: 'Forbidden' }); const orders = await pool.query(`SELECT o.*, s.shop_name, s.address as shop_address, z.zone_name FROM orders o JOIN shops s ON o.shop_id=s.id JOIN delivery_zones z ON o.zone_id=z.id WHERE o.status='ready_for_pickup' AND o.rider_id IS NULL`); res.json(orders.rows); } catch(error) { res.status(500).json({ error: error.message }); } });
+app.get('/api/rider/available-orders', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'rider' || !dbUser?.is_approved) return res.status(403).json({ error: 'Forbidden' }); const orders = await pool.query(`SELECT o.*, s.shop_name, s.address as shop_address FROM orders o JOIN shops s ON o.shop_id=s.id WHERE o.status='ready_for_pickup' AND o.rider_id IS NULL`); res.json(orders.rows); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.post('/api/rider/accept-order', async (req, res) => {
   try {
     const tgUser = req.tgUser;
@@ -404,7 +415,7 @@ app.post('/api/rider/accept-order', async (req, res) => {
     res.json({ success: true, confirmation_code: confirmationCode });
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
-app.get('/api/rider/active-order', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'rider' || !dbUser?.is_approved) return res.status(403).json({ error: 'Forbidden' }); const activeOrder = await pool.query(`SELECT o.*, s.shop_name, s.address as shop_address, z.zone_name FROM orders o JOIN shops s ON o.shop_id = s.id JOIN delivery_zones z ON o.zone_id = z.id WHERE o.rider_id = $1 AND o.status = 'delivering' ORDER BY o.created_at DESC LIMIT 1`, [dbUser.id]); res.json(activeOrder.rows[0] || null); } catch(error) { res.status(500).json({ error: error.message }); } });
+app.get('/api/rider/active-order', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'rider' || !dbUser?.is_approved) return res.status(403).json({ error: 'Forbidden' }); const activeOrder = await pool.query(`SELECT o.*, s.shop_name, s.address as shop_address FROM orders o JOIN shops s ON o.shop_id = s.id WHERE o.rider_id = $1 AND o.status = 'delivering' ORDER BY o.created_at DESC LIMIT 1`, [dbUser.id]); res.json(activeOrder.rows[0] || null); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.post('/api/rider/complete-order', async (req, res) => {
   try {
     const tgUser = req.tgUser;
