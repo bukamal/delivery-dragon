@@ -1,1 +1,279 @@
-<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><title>شاهين | لوحة التاجر</title><script src="https://telegram.org/js/telegram-web-app.js"></script><script src="https://unpkg.com/lucide@latest"></script><link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Tajawal',sans-serif;background:var(--tg-theme-bg-color,#f5f7fb);color:var(--tg-theme-text-color,#1a1a2c);padding:0 0 20px}.app-header{display:flex;align-items:center;padding:16px 20px;background:var(--tg-theme-secondary-bg-color,#fff);border-bottom:1px solid #ddd;position:sticky;top:0;z-index:10}.app-header h1{font-size:1.7rem;color:#e67e22;margin-right:12px}.back-btn{background:0 0;border:none;color:#e67e22;font-size:1.8rem;cursor:pointer}.container{padding:16px;max-width:600px;margin:0 auto}.tabs{display:flex;gap:10px;margin-bottom:20px}.tab{flex:1;padding:14px;background:var(--tg-theme-secondary-bg-color,#fff);border-radius:30px;text-align:center;cursor:pointer;font-weight:500;border:1px solid #ddd}.tab.active{background:#e67e22;color:#fff}.panel{display:none}.panel.active{display:block}.card{background:var(--tg-theme-secondary-bg-color,#fff);border-radius:20px;padding:16px;margin-bottom:16px;box-shadow:0 4px 12px rgba(0,0,0,.02)}.btn{background:#e67e22;color:#fff;border:none;padding:10px 20px;border-radius:30px;cursor:pointer}.btn-danger{background:#e74c3c}select{padding:8px;border-radius:12px;border:1px solid #ccc}.skeleton{height:150px;background:linear-gradient(90deg,#eee 25%,#ddd 50%,#eee 75%);background-size:200% 100%;animation:loading 1.5s infinite;border-radius:20px}@keyframes loading{0%{background-position:200% 0}100%{background-position:-200% 0}}</style></head><body><div class="app-header"><button class="back-btn" onclick="history.back()"><i data-lucide="arrow-right"></i></button><h1>🦅 شاهين</h1></div><div class="container"><h2>🏪 لوحة التحكم</h2><div class="tabs"><div class="tab active" data-tab="active">🟢 النشطة</div><div class="tab" data-tab="products">📦 المنتجات</div><div class="tab" data-tab="archive">📁 الأرشيف</div></div><div id="activePanel" class="panel active"></div><div id="productsPanel" class="panel"><button class="btn" id="addProductBtn" style="width:100%;margin-bottom:16px"><i data-lucide="plus"></i> إضافة منتج</button><div id="productsList"></div></div><div id="archivePanel" class="panel"></div></div><script>const tg=Telegram.WebApp;tg.ready();tg.BackButton.show();tg.BackButton.onClick(()=>history.back());const API='https://delivery-dragon.vercel.app';const tabs=document.querySelectorAll('.tab');tabs.forEach(t=>t.onclick=()=>{tabs.forEach(x=>x.classList.remove('active'));t.classList.add('active');['activePanel','productsPanel','archivePanel'].forEach(p=>document.getElementById(p).classList.remove('active'));document.getElementById(t.dataset.tab+'Panel').classList.add('active');if(t.dataset.tab==='active')loadOrders(false);else if(t.dataset.tab==='archive')loadOrders(true)});function getStatusProgress(s){const steps=['paid','preparing','ready_for_pickup','delivering','completed'];const idx=steps.indexOf(s);const pct=idx>=0?(idx/(steps.length-1))*100:0;const labels={paid:'مدفوع',preparing:'تحضير',ready_for_pickup:'جاهز',delivering:'توصيل',completed:'مكتمل'};return{percent:pct,label:labels[s]||s}}async function loadOrders(archived){const c=document.getElementById(archived?'archivePanel':'activePanel');c.innerHTML='<div class="skeleton"></div>';const r=await fetch(`${API}/api/shop/orders?archived=${archived}`,{headers:{'X-Telegram-Init-Data':tg.initData}});const orders=await r.json();if(!orders.length){c.innerHTML='<div style="text-align:center;padding:40px"><svg width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 4h16v16H4z"/><line x1="8" y1="8" x2="16" y2="16"/><line x1="16" y1="8" x2="8" y2="16"/></svg><h3>لا توجد طلبات</h3></div>';return}c.innerHTML=orders.map(o=>{const{percent,label}=getStatusProgress(o.status);let items=[];try{items=typeof o.items==='string'?JSON.parse(o.items):o.items}catch(e){}const itemsText=items.map(i=>`${i.name} ×${i.quantity}`).join('، ');const statusSelect=archived?'':`<select data-id="${o.id}" class="statusSelect"><option value="preparing" ${o.status==='preparing'?'selected':''}>تحضير</option><option value="ready_for_pickup" ${o.status==='ready_for_pickup'?'selected':''}>جاهز</option></select>`;const riderInfo=o.rider_name?`<br>🛵 السائق: ${o.rider_name}`:'';return`<div class="card"><b>#${o.id}</b> - ${o.customer_name}<br>📞 ${o.customer_phone||''}${riderInfo}<br>📦 ${itemsText}<br>💰 ${o.total_price} ل.س<br>📍 ${o.address}<div style="margin-top:12px"><div style="display:flex;justify-content:space-between;font-size:.8rem"><span>${label}</span><span>${Math.round(percent)}%</span></div><div style="background:var(--tg-theme-hint-color,#ddd);height:6px;border-radius:6px"><div style="width:${percent}%;background:#e67e22;height:6px;border-radius:6px"></div></div></div>${statusSelect}</div>`}).join('');if(!archived){document.querySelectorAll('.statusSelect').forEach(s=>s.onchange=async()=>{await fetch(`${API}/api/shop/orders/${s.dataset.id}/status`,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify({status:s.value})});loadOrders(false)})}}async function loadProducts(){const c=document.getElementById('productsList');c.innerHTML='<div class="skeleton"></div>';const r=await fetch(`${API}/api/shop/products`,{headers:{'X-Telegram-Init-Data':tg.initData}});const prods=await r.json();c.innerHTML=prods.map(p=>`<div class="card"><b>${p.name}</b> - ${p.price} ل.س <button class="btn btn-danger" onclick="deleteProduct(${p.id})"><i data-lucide="trash-2"></i></button></div>`).join('');if(typeof lucide!=='undefined')lucide.createIcons()}window.deleteProduct=async id=>{await fetch(`${API}/api/shop/products/${id}`,{method:'DELETE',headers:{'X-Telegram-Init-Data':tg.initData}});loadProducts()};document.getElementById('addProductBtn').onclick=()=>{const n=prompt('اسم المنتج'),p=prompt('السعر');if(n&&p)fetch(`${API}/api/shop/products`,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify({name:n,price:p})}).then(loadProducts)};loadOrders(false);loadProducts()</script></body></html>
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>شاهين | لوحة التاجر</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Tajawal', sans-serif; background: var(--tg-theme-bg-color, #f5f7fb); color: var(--tg-theme-text-color, #1a1a2c); padding: 0 0 20px; }
+    .app-header { display: flex; align-items: center; padding: 16px 20px; background: var(--tg-theme-secondary-bg-color, #fff); border-bottom: 1px solid #ddd; position: sticky; top:0; z-index:10; }
+    .app-header h1 { font-size:1.7rem; color:#e67e22; margin-right:12px; }
+    .back-btn { background:none; border:none; color:#e67e22; font-size:1.8rem; cursor:pointer; }
+    .container { padding:16px; max-width:600px; margin:0 auto; }
+    .tabs { display:flex; gap:10px; margin-bottom:20px; }
+    .tab { flex:1; padding:14px; background:var(--tg-theme-secondary-bg-color, #fff); border-radius:30px; text-align:center; cursor:pointer; border:1px solid #ddd; }
+    .tab.active { background:#e67e22; color:#fff; }
+    .panel { display:none; }
+    .panel.active { display:block; }
+    .card { background:var(--tg-theme-secondary-bg-color, #fff); border-radius:20px; padding:16px; margin-bottom:16px; box-shadow:0 4px 12px rgba(0,0,0,.02); }
+    .btn { background:#e67e22; color:#fff; border:none; padding:10px 20px; border-radius:30px; cursor:pointer; margin:2px; }
+    .btn-danger { background:#e74c3c; }
+    .btn-outline { background:transparent; border:1px solid #e67e22; color:#e67e22; }
+    .form-group { margin-bottom:16px; }
+    label { display:block; margin-bottom:6px; font-weight:500; }
+    input, select, textarea { width:100%; padding:12px; border-radius:12px; border:1px solid #ccc; background:var(--tg-theme-bg-color, #fff); color:inherit; }
+    .option-row { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+    .image-preview { max-width:150px; max-height:150px; border-radius:12px; margin-top:8px; }
+    .skeleton { height:100px; background:linear-gradient(90deg,#eee 25%,#ddd 50%,#eee 75%); background-size:200% 100%; animation:loading 1.5s infinite; border-radius:20px; }
+    @keyframes loading { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+  </style>
+</head>
+<body>
+<div class="app-header">
+  <button class="back-btn" onclick="history.back()"><i data-lucide="arrow-right"></i></button>
+  <h1>🦅 شاهين</h1>
+</div>
+<div class="container">
+  <h2>🏪 لوحة التحكم</h2>
+  <div class="tabs">
+    <div class="tab active" data-tab="active">🟢 النشطة</div>
+    <div class="tab" data-tab="products">📦 المنتجات</div>
+    <div class="tab" data-tab="archive">📁 الأرشيف</div>
+  </div>
+  <div id="activePanel" class="panel active"></div>
+  <div id="productsPanel" class="panel">
+    <button class="btn" id="addProductBtn" style="width:100%; margin-bottom:16px"><i data-lucide="plus"></i> إضافة منتج</button>
+    <div id="productsList"></div>
+  </div>
+  <div id="archivePanel" class="panel"></div>
+</div>
+
+<!-- مودال إضافة/تعديل منتج -->
+<div id="productModal" style="position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); display:none; align-items:center; justify-content:center; z-index:1000;">
+  <div style="background:var(--tg-theme-secondary-bg-color, #fff); border-radius:28px; padding:24px; width:90%; max-width:500px; max-height:80vh; overflow-y:auto;">
+    <h3 id="modalTitle">إضافة منتج</h3>
+    <input type="hidden" id="productId">
+    <div class="form-group">
+      <label>اسم المنتج</label>
+      <input type="text" id="productName" placeholder="اسم المنتج">
+    </div>
+    <div class="form-group">
+      <label>السعر (ل.س)</label>
+      <input type="number" id="productPrice" placeholder="السعر">
+    </div>
+    <div class="form-group">
+      <label>التصنيف</label>
+      <select id="productCategory"></select>
+    </div>
+    <div class="form-group">
+      <label>صورة المنتج</label>
+      <input type="file" id="productImage" accept="image/*" capture="environment">
+      <img id="imagePreview" class="image-preview" style="display:none;">
+      <button type="button" class="btn-outline" onclick="document.getElementById('productImage').click()" style="width:100%; margin-top:8px;">اختيار صورة</button>
+    </div>
+    <div class="form-group">
+      <label>الخيارات (مثل الحجم)</label>
+      <div id="optionsContainer"></div>
+      <button type="button" class="btn-outline" onclick="addOptionRow()" style="width:100%;">➕ إضافة خيار</button>
+    </div>
+    <button class="btn" onclick="saveProduct()" style="width:100%">حفظ</button>
+    <button class="btn" onclick="closeProductModal()" style="background:#95a5a6; margin-top:8px">إلغاء</button>
+  </div>
+</div>
+
+<script>
+  const tg = Telegram.WebApp; tg.ready(); tg.BackButton.show(); tg.BackButton.onClick(()=>history.back());
+  const API = 'https://delivery-dragon.vercel.app';
+  let currentShopId = null, categories = [], editingProduct = null;
+
+  // التبويبات
+  const tabs = document.querySelectorAll('.tab');
+  tabs.forEach(t => t.onclick = () => {
+    tabs.forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.getElementById(t.dataset.tab + 'Panel').classList.add('active');
+    if(t.dataset.tab === 'active') loadOrders(false);
+    else if(t.dataset.tab === 'archive') loadOrders(true);
+    else if(t.dataset.tab === 'products') loadProducts();
+  });
+
+  // تحميل المنتجات
+  async function loadProducts() {
+    const container = document.getElementById('productsList');
+    container.innerHTML = '<div class="skeleton"></div>';
+    const res = await fetch(`${API}/api/shop/products`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
+    const products = await res.json();
+    container.innerHTML = products.map(p => `
+      <div class="card" style="display:flex; gap:12px;">
+        ${p.image_url ? `<img src="${p.image_url}" style="width:60px; height:60px; border-radius:12px; object-fit:cover;">` : '<div style="width:60px; height:60px; background:#eee; border-radius:12px;"></div>'}
+        <div style="flex:1">
+          <b>${p.name}</b> - ${p.price} ل.س
+          <div style="margin-top:8px">
+            <button class="btn" onclick="editProduct(${p.id})">✏️ تعديل</button>
+            <button class="btn btn-danger" onclick="deleteProduct(${p.id})">🗑️ حذف</button>
+          </div>
+        </div>
+      </div>
+    `).join('') || '<p>لا توجد منتجات</p>';
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
+
+  // إدارة الخيارات الديناميكية
+  function addOptionRow(optName='', optPrice='') {
+    const div = document.createElement('div');
+    div.className = 'option-row';
+    div.innerHTML = `
+      <input type="text" placeholder="اسم الخيار" value="${optName}" class="opt-name" style="flex:2">
+      <input type="number" placeholder="السعر الإضافي" value="${optPrice}" class="opt-price" style="flex:1">
+      <button type="button" class="btn btn-danger" onclick="this.parentElement.remove()">🗑️</button>
+    `;
+    document.getElementById('optionsContainer').appendChild(div);
+  }
+
+  function openProductModal(product=null) {
+    editingProduct = product;
+    document.getElementById('modalTitle').innerText = product ? 'تعديل منتج' : 'إضافة منتج';
+    document.getElementById('productId').value = product?.id || '';
+    document.getElementById('productName').value = product?.name || '';
+    document.getElementById('productPrice').value = product?.price || '';
+    document.getElementById('optionsContainer').innerHTML = '';
+    if (product?.options) {
+      try {
+        const opts = typeof product.options === 'string' ? JSON.parse(product.options) : product.options;
+        if (Array.isArray(opts)) opts.forEach(o => addOptionRow(o.name, o.price));
+      } catch(e) {}
+    }
+    const preview = document.getElementById('imagePreview');
+    if (product?.image_url) {
+      preview.src = product.image_url;
+      preview.style.display = 'block';
+    } else {
+      preview.style.display = 'none';
+    }
+    document.getElementById('productModal').style.display = 'flex';
+  }
+
+  function closeProductModal() {
+    document.getElementById('productModal').style.display = 'none';
+    editingProduct = null;
+  }
+
+  async function saveProduct() {
+    const id = document.getElementById('productId').value;
+    const name = document.getElementById('productName').value.trim();
+    const price = parseFloat(document.getElementById('productPrice').value);
+    const category_id = document.getElementById('productCategory').value;
+
+    // جمع الخيارات
+    const options = [];
+    document.querySelectorAll('.option-row').forEach(row => {
+      const name = row.querySelector('.opt-name')?.value.trim();
+      const price = parseFloat(row.querySelector('.opt-price')?.value) || 0;
+      if (name) options.push({ name, price });
+    });
+
+    // معالجة الصورة
+    let image = null;
+    const fileInput = document.getElementById('productImage');
+    if (fileInput.files.length > 0) {
+      const file = fileInput.files[0];
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        image = e.target.result;
+        await submitProduct({ name, price, category_id, image, options: options.length ? JSON.stringify(options) : null });
+      };
+      reader.readAsDataURL(file);
+      return;
+    } else if (editingProduct?.image_url) {
+      image = editingProduct.image_url;
+    }
+    await submitProduct({ name, price, category_id, image, options: options.length ? JSON.stringify(options) : null });
+  }
+
+  async function submitProduct(data) {
+    const id = document.getElementById('productId').value;
+    const url = id ? `${API}/api/shop/products/${id}` : `${API}/api/shop/products`;
+    const method = id ? 'PUT' : 'POST';
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData },
+      body: JSON.stringify(data)
+    });
+    if (res.ok) {
+      closeProductModal();
+      loadProducts();
+    } else {
+      tg.showAlert('فشل الحفظ');
+    }
+  }
+
+  window.editProduct = async (id) => {
+    // جلب بيانات المنتج (بما في ذلك options و image_url)
+    const res = await fetch(`${API}/api/shop/products/${id}`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
+    if (res.ok) {
+      const product = await res.json();
+      openProductModal(product);
+    }
+  };
+
+  window.deleteProduct = async (id) => {
+    tg.showConfirm('حذف المنتج؟', async ok => {
+      if (!ok) return;
+      await fetch(`${API}/api/shop/products/${id}`, { method: 'DELETE', headers: { 'X-Telegram-Init-Data': tg.initData } });
+      loadProducts();
+    });
+  };
+
+  document.getElementById('addProductBtn').onclick = () => openProductModal();
+  document.getElementById('productImage').onchange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        document.getElementById('imagePreview').src = ev.target.result;
+        document.getElementById('imagePreview').style.display = 'block';
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // تحميل التصنيفات (للمنتجات)
+  async function loadCategories() {
+    const res = await fetch(`${API}/api/categories`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
+    categories = await res.json();
+    const sel = document.getElementById('productCategory');
+    sel.innerHTML = '<option value="">بدون تصنيف</option>';
+    categories.forEach(c => sel.add(new Option(c.name, c.id)));
+  }
+
+  // باقي دوال الطلبات (كما في النسخة السابقة)
+  async function loadOrders(archived) {
+    const c = document.getElementById(archived ? 'archivePanel' : 'activePanel');
+    c.innerHTML = '<div class="skeleton"></div>';
+    const r = await fetch(`${API}/api/shop/orders?archived=${archived}`,{headers:{'X-Telegram-Init-Data':tg.initData}});
+    const orders = await r.json();
+    if(!orders.length) { c.innerHTML='<div style="text-align:center;padding:40px">لا طلبات</div>'; return; }
+    c.innerHTML = orders.map(o => {
+      let items = []; try { items = typeof o.items==='string' ? JSON.parse(o.items) : o.items; } catch(e) {}
+      const itemsText = items.map(i=>`${i.name} ×${i.quantity}`).join('، ');
+      const statusSelect = archived ? '' : `<select data-id="${o.id}" class="statusSelect"><option value="preparing" ${o.status==='preparing'?'selected':''}>تحضير</option><option value="ready_for_pickup" ${o.status==='ready_for_pickup'?'selected':''}>جاهز</option></select>`;
+      return `<div class="card"><b>#${o.id}</b> - ${o.customer_name}<br>📦 ${itemsText}<br>💰 ${o.total_price} ل.س<br>${statusSelect}</div>`;
+    }).join('');
+    if(!archived) document.querySelectorAll('.statusSelect').forEach(s=>s.onchange=async()=>{
+      await fetch(`${API}/api/shop/orders/${s.dataset.id}/status`,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify({status:s.value})});
+      loadOrders(false);
+    });
+  }
+
+  // تهيئة
+  loadCategories();
+  loadOrders(false);
+  loadProducts();
+</script>
+</body>
+</html>
