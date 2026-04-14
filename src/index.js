@@ -351,6 +351,36 @@ app.get('/api/shop/products/:productId', async (req, res) => { try { const tgUse
 app.put('/api/shop/products/:productId', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' }); const { productId } = req.params; const { name, price, category_id, image, options } = req.body; await pool.query(`UPDATE products SET name=$1, price=$2, category_id=$3, image_url=$4, options=$5 WHERE id=$6 AND shop_id=(SELECT id FROM shops WHERE owner_id=$7)`,[name, price, category_id || null, image || null, options || null, productId, dbUser.id]); res.json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.delete('/api/shop/products/:productId', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' }); await pool.query(`DELETE FROM products WHERE id=$1 AND shop_id=(SELECT id FROM shops WHERE owner_id=$2)`,[req.params.productId, dbUser.id]); res.json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
 
+// ========== SHOP PROFILE & LOCATION ==========
+app.get('/api/shop/profile', async (req, res) => {
+  try {
+    const tgUser = req.tgUser;
+    const dbUser = await getDbUser(tgUser.id);
+    if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' });
+    const shop = await pool.query('SELECT * FROM shops WHERE owner_id=$1', [dbUser.id]);
+    res.json(shop.rows[0] || {});
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/shop/location', async (req, res) => {
+  try {
+    const tgUser = req.tgUser;
+    const dbUser = await getDbUser(tgUser.id);
+    if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' });
+    const { latitude, longitude } = req.body;
+    if (!latitude || !longitude) return res.status(400).json({ error: 'الإحداثيات مطلوبة' });
+    await pool.query(
+      `UPDATE shops SET latitude=$1, longitude=$2 WHERE owner_id=$3`,
+      [latitude, longitude, dbUser.id]
+    );
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ========== RIDER ==========
 app.get('/api/rider/available-orders', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'rider' || !dbUser?.is_approved) return res.status(403).json({ error: 'Forbidden' }); const orders = await pool.query(`SELECT o.*, s.shop_name, s.address as shop_address, z.zone_name FROM orders o JOIN shops s ON o.shop_id=s.id JOIN delivery_zones z ON o.zone_id=z.id WHERE o.status='ready_for_pickup' AND o.rider_id IS NULL`); res.json(orders.rows); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.post('/api/rider/accept-order', async (req, res) => {
