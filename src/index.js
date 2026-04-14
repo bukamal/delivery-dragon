@@ -45,6 +45,7 @@ app.use(express.json({ limit: '20mb' }));
 
 const SHAM_CASH_NAME = process.env.SHAM_CASH_NAME || null;
 const SHAM_CASH_WALLET = process.env.SHAM_CASH_WALLET || null;
+const PRICE_PER_KM = parseFloat(process.env.PRICE_PER_KM || '2000');
 
 function verifyInitData(initData) {
   if (!initData) return { valid: false, error: 'Missing init data' };
@@ -175,6 +176,19 @@ bot.on(':photo', async (ctx) => {
   }
 });
 
+async function calculateDistance(originLat, originLng, destLat, destLng) {
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${originLng},${originLat};${destLng},${destLat}?overview=false`;
+    const response = await fetch(url);
+    const data = await response.json();
+    if (data.code !== 'Ok' || !data.routes?.[0]) return null;
+    return data.routes[0].distance / 1000;
+  } catch (error) {
+    console.error('OSRM distance error:', error);
+    return null;
+  }
+}
+
 async function calculateETA(originLat, originLng, destLat, destLng) {
   try {
     const url = `https://router.project-osrm.org/route/v1/driving/${originLng},${originLat};${destLng},${destLat}?overview=false`;
@@ -265,30 +279,50 @@ app.get('/api/me', async (req, res) => {
     res.json(dbUser || { role:'customer' });
   } catch(error) { res.status(500).json({ error: error.message }); }
 });
-app.post('/api/register/shop', async (req, res) => { try { const tgUser = req.tgUser; const { name, shop_name, category_id, phone, address, city_id } = req.body; await pool.query(`INSERT INTO users (telegram_id, name, phone, role, is_approved) VALUES ($1,$2,$3,'shop',false) ON CONFLICT(telegram_id) DO UPDATE SET name=EXCLUDED.name, phone=EXCLUDED.phone, role='shop', is_approved=false`,[tgUser.id.toString(), name, phone]); await pool.query(`INSERT INTO shops (owner_id, shop_name, category_id, phone, address, city_id) VALUES ((SELECT id FROM users WHERE telegram_id=$1),$2,$3,$4,$5,$6)`,[tgUser.id.toString(), shop_name, category_id, phone, address, city_id]); res.status(201).json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
+app.post('/api/register/shop', async (req, res) => { try { const tgUser = req.tgUser; const { name, shop_name, category_id, phone, address, city_id, latitude, longitude } = req.body; await pool.query(`INSERT INTO users (telegram_id, name, phone, role, is_approved) VALUES ($1,$2,$3,'shop',false) ON CONFLICT(telegram_id) DO UPDATE SET name=EXCLUDED.name, phone=EXCLUDED.phone, role='shop', is_approved=false`,[tgUser.id.toString(), name, phone]); await pool.query(`INSERT INTO shops (owner_id, shop_name, category_id, phone, address, city_id, latitude, longitude) VALUES ((SELECT id FROM users WHERE telegram_id=$1),$2,$3,$4,$5,$6,$7,$8)`,[tgUser.id.toString(), shop_name, category_id, phone, address, city_id, latitude, longitude]); res.status(201).json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.post('/api/register/rider', async (req, res) => { try { const tgUser = req.tgUser; const { name, phone, vehicle_type } = req.body; await pool.query(`INSERT INTO users (telegram_id, name, phone, role, is_approved) VALUES ($1,$2,$3,'rider',false) ON CONFLICT(telegram_id) DO UPDATE SET name=EXCLUDED.name, phone=EXCLUDED.phone, role='rider', is_approved=false`,[tgUser.id.toString(), name, phone]); await pool.query(`INSERT INTO rider_details (user_id, vehicle_type) VALUES ((SELECT id FROM users WHERE telegram_id=$1),$2) ON CONFLICT(user_id) DO UPDATE SET vehicle_type=EXCLUDED.vehicle_type`,[tgUser.id.toString(), vehicle_type||'دراجة']); res.status(201).json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.post('/api/orders', async (req, res) => {
   try {
     const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id);
     if (!dbUser) return res.status(401).json({ error: 'User not found' });
     const { shop_id, items, zone_id, address, city_id, delivery_latitude, delivery_longitude } = req.body;
+
+    const shopQuery = await pool.query('SELECT latitude, longitude FROM shops WHERE id = $1', [shop_id]);
+    if (!shopQuery.rows[0] || !shopQuery.rows[0].latitude || !shopQuery.rows[0].longitude) {
+      return res.status(400).json({ error: 'موقع المتجر غير محدد' });
+    }
+    const { latitude: shopLat, longitude: shopLng } = shopQuery.rows[0];
+
+    if (!delivery_latitude || !delivery_longitude) {
+      return res.status(400).json({ error: 'يرجى تحديد موقع التسليم' });
+    }
+
+    const distanceKm = await calculateDistance(shopLat, shopLng, delivery_latitude, delivery_longitude);
+    if (distanceKm === null) return res.status(500).json({ error: 'تعذر حساب المسافة' });
+
+    const calculatedDeliveryFee = Math.max(distanceKm * PRICE_PER_KM, 3000);
+
     const productIds = items.map(i => i.id);
     const productsResult = await pool.query(`SELECT id, name, price FROM products WHERE id = ANY($1::int[]) AND shop_id=$2`,[productIds, shop_id]);
     const productsMap = new Map(productsResult.rows.map(p=>[p.id, p]));
     const frozenItems = items.map(item => { const productId = parseInt(item.id, 10); const p = productsMap.get(productId); if (!p) throw new Error(`المنتج ${item.id} غير موجود`); return { id: p.id, name: p.name, price: p.price, quantity: item.quantity }; });
     const subtotal = frozenItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
-    const zoneResult = await pool.query('SELECT base_fee FROM delivery_zones WHERE id=$1',[zone_id]); if (!zoneResult.rows[0]) throw new Error('Zone not found');
-    const deliveryFee = zoneResult.rows[0].base_fee; const total = subtotal + deliveryFee;
-    const orderResult = await pool.query(`INSERT INTO orders (customer_id, shop_id, zone_id, items, subtotal, delivery_fee, total_price, address, city_id, delivery_latitude, delivery_longitude, status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'verifying') RETURNING id`,[dbUser.id, shop_id, zone_id, JSON.stringify(frozenItems), subtotal, deliveryFee, total, address, city_id, delivery_latitude, delivery_longitude]);
+    const total = subtotal + calculatedDeliveryFee;
+
+    const orderResult = await pool.query(
+      `INSERT INTO orders (customer_id, shop_id, zone_id, items, subtotal, delivery_fee, total_price, address, city_id, delivery_latitude, delivery_longitude, status) 
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'verifying') RETURNING id`,
+      [dbUser.id, shop_id, zone_id, JSON.stringify(frozenItems), subtotal, calculatedDeliveryFee, total, address, city_id, delivery_latitude, delivery_longitude]
+    );
     const orderId = orderResult.rows[0].id;
-    if (dbUser.chat_id) await bot.api.sendMessage(dbUser.chat_id, `📸 *تم إنشاء الطلب #${orderId}*\n\nالمبلغ الإجمالي: ${total} ل.س\n\nالرجاء إرسال لقطة شاشة عملية الدفع الآن (كصورة) لتأكيد الطلب.`, { parse_mode: 'Markdown' });
-    
+    if (dbUser.chat_id) await bot.api.sendMessage(dbUser.chat_id, `📸 *تم إنشاء الطلب #${orderId}*\n\nالمبلغ الإجمالي: ${total} ل.س (توصيل: ${calculatedDeliveryFee} ل.س)\n\nالرجاء إرسال لقطة شاشة عملية الدفع الآن (كصورة) لتأكيد الطلب.`, { parse_mode: 'Markdown' });
+
     const paymentInfo = (SHAM_CASH_NAME && SHAM_CASH_WALLET) ? {
       name: SHAM_CASH_NAME,
       wallet: SHAM_CASH_WALLET,
       instructions: 'يرجى تحويل المبلغ إلى محفظة شام كاش أعلاه، ثم إرسال لقطة شاشة الإشعار في البوت.'
     } : null;
-    
+
     res.status(201).json({ order_id: orderId, total, payment: paymentInfo });
   } catch (error) { console.error('/api/orders error:', error); res.status(500).json({ error: error.message }); }
 });
@@ -354,7 +388,7 @@ app.post('/api/rider/complete-order', async (req, res) => {
     await pool.query(`UPDATE orders SET status='completed' WHERE id=$1`, [order_id]);
     const platformCommission = PLATFORM_FIXED_FEE;
     const shopNet = o.subtotal;
-    const riderFee = o.delivery_fee - platformCommission;
+    const riderFee = Math.max(o.delivery_fee - platformCommission, 0);
     await pool.query(`UPDATE orders SET platform_commission=$1, shop_net=$2, rider_fee=$3 WHERE id=$4`, [platformCommission, shopNet, riderFee, order_id]);
     await pool.query(`INSERT INTO financial_transactions (order_id, transaction_type, amount) VALUES ($1,'platform_fee',$2),($1,'shop_payout',$3),($1,'rider_payout',$4)`, [order_id, platformCommission, shopNet, riderFee]);
     await notifyCustomer(order_id, 'completed');

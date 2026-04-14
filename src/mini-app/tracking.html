@@ -56,7 +56,6 @@
     <div id="map"></div>
   </div>
   
-  <!-- قسم كود التأكيد -->
   <div id="codeSection" class="code-section" style="display:none;">
     <label style="display:block; margin-bottom:12px; font-weight:500;">🔐 أدخل كود التأكيد (من السائق)</label>
     <input type="text" id="confirmCodeInput" class="code-input" placeholder="0000" maxlength="4" inputmode="numeric">
@@ -167,7 +166,7 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       tg.showAlert('✅ الكود صحيح! شكراً لثقتك.');
-      fetchData(); // تحديث الواجهة
+      fetchData();
     } catch (e) {
       document.getElementById('codeError').innerText = e.message;
     }

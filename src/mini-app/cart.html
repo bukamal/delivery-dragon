@@ -28,6 +28,7 @@
     .order-btn:active { transform: scale(0.97); }
     .skeleton-cart { height: 80px; background: linear-gradient(90deg, #eee 25%, #ddd 50%, #eee 75%); background-size: 200% 100%; animation: loading 1.5s infinite; border-radius: 20px; }
     @keyframes loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+    .locate-btn { background: #3498db; color: white; border: none; padding: 12px 16px; border-radius: 30px; width: 100%; margin: 8px 0; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -44,9 +45,13 @@
     <label>📍 منطقة التوصيل</label>
     <div id="zoneChips" class="zone-chips">اختر المدينة أولاً</div>
     <input type="hidden" id="zoneSelect">
-    <div style="display:flex; justify-content:space-between"><span>التوصيل</span><span id="deliveryFee">0</span> ل.س</div>
+    <div style="display:flex; justify-content:space-between"><span>التوصيل (يحسب آلياً)</span><span id="deliveryFee">0</span> ل.س</div>
     <div style="display:flex; justify-content:space-between; font-weight:700; margin-top:10px"><span>الإجمالي</span><span id="total">0</span> ل.س</div>
     <input type="text" id="addressInput" placeholder="العنوان التفصيلي">
+    <button type="button" id="locateBtn" class="locate-btn"><i data-lucide="map-pin"></i> تحديد موقع التسليم (إجباري)</button>
+    <input type="hidden" id="deliveryLat">
+    <input type="hidden" id="deliveryLng">
+    <div id="locationStatus" style="font-size:0.9rem; margin-top:4px; color:#e67e22;"></div>
   </div>
   <button class="order-btn" id="orderBtn"><i data-lucide="check-circle"></i> تأكيد الطلب</button>
 </div>
@@ -128,14 +133,36 @@
   function updateTotal(sub) { currentTotal = sub + deliveryFee; document.getElementById('total').innerText = currentTotal; }
 
   document.getElementById('citySelect').onchange = e => { currentCityId = e.target.value; loadZones(currentCityId); };
+
+  // تحديد الموقع إجباري
+  document.getElementById('locateBtn').onclick = () => {
+    if (!navigator.geolocation) {
+      tg.showAlert('متصفحك لا يدعم تحديد الموقع');
+      return;
+    }
+    document.getElementById('locationStatus').innerText = 'جاري تحديد الموقع...';
+    navigator.geolocation.getCurrentPosition(pos => {
+      document.getElementById('deliveryLat').value = pos.coords.latitude;
+      document.getElementById('deliveryLng').value = pos.coords.longitude;
+      document.getElementById('locationStatus').innerHTML = '✅ تم تحديد موقع التسليم بنجاح';
+      tg.showPopup({ title: '✅ تم التحديد', message: 'تم تحديد موقعك الحالي كعنوان للتسليم' });
+    }, err => {
+      document.getElementById('locationStatus').innerText = '❌ فشل تحديد الموقع: ' + err.message;
+      tg.showAlert('❌ فشل تحديد الموقع. تأكد من صلاحيات GPS.');
+    });
+  };
+
   document.getElementById('orderBtn').onclick = async () => {
     const addr = document.getElementById('addressInput').value.trim(); if (!addr) return tg.showAlert('أدخل العنوان');
     if (!currentCityId) return tg.showAlert('اختر المدينة');
     const zoneId = document.getElementById('zoneSelect').value;
+    const delivery_latitude = document.getElementById('deliveryLat').value;
+    const delivery_longitude = document.getElementById('deliveryLng').value;
+    if (!delivery_latitude || !delivery_longitude) return tg.showAlert('الرجاء تحديد موقع التسليم (اضغط على الزر أعلاه)');
     const items = cart.map(i => ({ id: i.id, quantity: i.quantity }));
     tg.MainButton.showProgress();
     try {
-      const res = await fetch(`${API}/api/orders`, { method: 'POST', headers: { 'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData }, body: JSON.stringify({ shop_id: cart[0].shopId, items, zone_id: zoneId, address: addr, city_id: currentCityId }) });
+      const res = await fetch(`${API}/api/orders`, { method: 'POST', headers: { 'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData }, body: JSON.stringify({ shop_id: cart[0].shopId, items, zone_id: zoneId, address: addr, city_id: currentCityId, delivery_latitude, delivery_longitude }) });
       if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'فشل الطلب'); }
       const data = await res.json();
       cart = []; localStorage.removeItem('dragon_cart');

@@ -63,78 +63,30 @@
         html += `<div class="category">📌 ${cat}</div>`;
         data.categories[cat].forEach(p => {
           const imgHtml = p.image_url ? `<img src="${p.image_url}" class="product-img">` : '<div class="product-img" style="display:flex; align-items:center; justify-content:center; color:#aaa;">📷</div>';
-          let optionsHtml = '';
-          let optionsData = null;
-          if (p.options) {
-            try {
-              optionsData = typeof p.options === 'string' ? JSON.parse(p.options) : p.options;
-              if (Array.isArray(optionsData) && optionsData.length) {
-                optionsHtml = `<select class="option-select" data-id="${p.id}">`;
-                optionsData.forEach((opt, idx) => optionsHtml += `<option value="${opt.name}" data-price="${opt.price||0}" ${idx===0?'selected':''}>${opt.name} (+${opt.price||0} ل.س)</option>`);
-                optionsHtml += `</select>`;
-              }
-            } catch(e) {}
-          }
-          html += `<div class="product-item">
-            ${imgHtml}
-            <div class="product-info">
-              <b>${p.name}</b>
-              <div class="price">${p.price} ل.س</div>
-              ${optionsHtml}
-            </div>
-            <button class="add-btn" data-id="${p.id}" data-name="${p.name}" data-price="${p.price}" data-options='${JSON.stringify(optionsData)}'>➕ أضف</button>
-          </div>`;
+          let optionsHtml = '', optionsData = null;
+          if (p.options) { try { optionsData = typeof p.options === 'string' ? JSON.parse(p.options) : p.options; if (Array.isArray(optionsData) && optionsData.length) { optionsHtml = `<select class="option-select" data-id="${p.id}">`; optionsData.forEach((opt, idx) => optionsHtml += `<option value="${opt.name}" data-price="${opt.price||0}" ${idx===0?'selected':''}>${opt.name} (+${opt.price||0} ل.س)</option>`); optionsHtml += `</select>`; } } catch(e) {} }
+          html += `<div class="product-item">${imgHtml}<div class="product-info"><b>${p.name}</b><div class="price">${p.price} ل.س</div>${optionsHtml}</div><button class="add-btn" data-id="${p.id}" data-name="${p.name}" data-price="${p.price}" data-options='${JSON.stringify(optionsData)}'>➕ أضف</button></div>`;
         });
       }
       container.innerHTML = html || '<div class="empty-state">لا توجد منتجات</div>';
       if (typeof lucide !== 'undefined') lucide.createIcons();
 
-      document.querySelectorAll('.add-btn').forEach(btn => {
-        btn.onclick = () => {
-          const productId = btn.dataset.id;
-          const productName = btn.dataset.name;
-          const basePrice = parseFloat(btn.dataset.price);
-          let selectedOption = null, extraPrice = 0;
-          const selectEl = document.querySelector(`.option-select[data-id="${productId}"]`);
-          if (selectEl) {
-            const selectedOpt = selectEl.options[selectEl.selectedIndex];
-            selectedOption = selectedOpt.value;
-            extraPrice = parseFloat(selectedOpt.dataset.price) || 0;
-          }
-          const finalPrice = basePrice + extraPrice;
-          
-          const existing = cart.find(i => i.id === productId && i.shopId === shopId && i.option === selectedOption);
-          if (existing) existing.quantity++;
-          else {
-            if (cart.length && cart[0].shopId !== shopId) {
-              tg.showConfirm('السلة تحتوي منتجات من متجر آخر. هل تريد استبدال السلة؟', ok => { if(ok) { cart = []; addItem(); } });
-              return;
-            }
-            addItem();
-          }
-          function addItem() {
-            cart.push({ id: productId, name: productName, price: finalPrice, shopId, shopName, quantity: 1, option: selectedOption, optionName: selectedOption });
-            localStorage.setItem('dragon_cart', JSON.stringify(cart));
-            tg.HapticFeedback.impactOccurred('light');
-            tg.showPopup({ title: '✅ تمت الإضافة', message: `${productName} ${selectedOption ? '('+selectedOption+')' : ''} في السلة` });
-          }
-          localStorage.setItem('dragon_cart', JSON.stringify(cart));
-        };
-      });
+      document.querySelectorAll('.add-btn').forEach(btn => { btn.onclick = () => {
+        const productId = btn.dataset.id, productName = btn.dataset.name, basePrice = parseFloat(btn.dataset.price);
+        let selectedOption = null, extraPrice = 0;
+        const selectEl = document.querySelector(`.option-select[data-id="${productId}"]`);
+        if (selectEl) { const selectedOpt = selectEl.options[selectEl.selectedIndex]; selectedOption = selectedOpt.value; extraPrice = parseFloat(selectedOpt.dataset.price) || 0; }
+        const finalPrice = basePrice + extraPrice;
+        const existing = cart.find(i => i.id === productId && i.shopId === shopId && i.option === selectedOption);
+        if (existing) existing.quantity++;
+        else { if (cart.length && cart[0].shopId !== shopId) { tg.showConfirm('السلة تحتوي منتجات من متجر آخر. هل تريد استبدال السلة؟', ok => { if(ok) { cart = []; addItem(); } }); return; } addItem(); }
+        function addItem() { cart.push({ id: productId, name: productName, price: finalPrice, shopId, shopName, quantity: 1, option: selectedOption, optionName: selectedOption }); localStorage.setItem('dragon_cart', JSON.stringify(cart)); tg.HapticFeedback.impactOccurred('light'); tg.showPopup({ title: '✅ تمت الإضافة', message: `${productName} ${selectedOption ? '('+selectedOption+')' : ''} في السلة` }); }
+        localStorage.setItem('dragon_cart', JSON.stringify(cart));
+      }; });
     } catch(e) { container.innerHTML = `<div class="empty-state">⚠️ ${e.message}</div>`; }
   }
 
-  async function loadRating() {
-    try {
-      const res = await fetch(`${API}/api/shops/${shopId}/ratings`);
-      const data = await res.json();
-      if (data.count > 0) {
-        const stars = '★'.repeat(Math.round(data.average)) + '☆'.repeat(5 - Math.round(data.average));
-        document.getElementById('shopRating').innerHTML = `${stars} (${data.count})`;
-      }
-    } catch(e) {}
-  }
-
+  async function loadRating() { try { const res = await fetch(`${API}/api/shops/${shopId}/ratings`); const data = await res.json(); if (data.count > 0) { const stars = '★'.repeat(Math.round(data.average)) + '☆'.repeat(5 - Math.round(data.average)); document.getElementById('shopRating').innerHTML = `${stars} (${data.count})`; } } catch(e) {} }
   loadMenu(); loadRating();
 </script>
 </body>
