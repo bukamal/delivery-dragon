@@ -1,1 +1,95 @@
-<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><title>شاهين | استكشف المتاجر</title><script src="https://telegram.org/js/telegram-web-app.js"></script><script src="https://unpkg.com/lucide@latest"></script><link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Tajawal',sans-serif;background:var(--tg-theme-bg-color,#f5f7fb);color:var(--tg-theme-text-color,#1a1a2c);padding:0 0 85px}.app-header{display:flex;align-items:center;padding:16px 20px;background:var(--tg-theme-secondary-bg-color,#fff);border-bottom:1px solid var(--tg-theme-hint-color,rgba(0,0,0,.05));position:sticky;top:0;z-index:10}.app-header h1{font-size:1.7rem;font-weight:700;color:#e67e22;margin-right:12px}.back-btn{background:0 0;border:none;color:#e67e22;font-size:1.8rem;cursor:pointer;padding:0 8px}.container{padding:16px;max-width:600px;margin:0 auto}.city-chip{background:var(--tg-theme-secondary-bg-color,#fff);border-radius:40px;padding:6px 6px 6px 20px;margin-bottom:20px;border:1px solid var(--tg-theme-hint-color,#ddd);display:flex;align-items:center}.city-chip select{flex:1;padding:10px 0;border:none;background:0 0;color:inherit;font-family:inherit;outline:0}.search-box{background:var(--tg-theme-secondary-bg-color,#fff);border-radius:40px;padding:8px 20px;margin-bottom:24px;display:flex;align-items:center;border:1px solid var(--tg-theme-hint-color,#ddd)}.search-box input{flex:1;border:none;background:0 0;outline:0;font-family:inherit;padding:12px 0}.shop-grid{display:grid;gap:16px}.shop-card{background:var(--tg-theme-secondary-bg-color,#fff);border-radius:24px;padding:16px;box-shadow:0 6px 16px rgba(0,0,0,.02);display:flex;align-items:center;gap:16px;cursor:pointer;transition:.2s;border:1px solid var(--tg-theme-hint-color,rgba(0,0,0,.03))}.shop-card:active{transform:scale(.98);background:var(--tg-theme-secondary-bg-color,#f8f9fa)}.shop-icon{font-size:44px;background:var(--tg-theme-bg-color,#f0f2f5);width:70px;height:70px;border-radius:20px;display:flex;align-items:center;justify-content:center}.shop-info h3{font-size:1.2rem;margin-bottom:4px}.shop-info p{color:var(--tg-theme-hint-color,#7f8c8d);font-size:.9rem;display:flex;align-items:center;gap:6px}.cart-bar{position:fixed;bottom:0;left:0;right:0;background:var(--tg-theme-secondary-bg-color,#1a1a2c);color:#fff;padding:12px 24px;display:flex;justify-content:space-between;align-items:center;backdrop-filter:blur(10px);border-top:1px solid rgba(255,255,255,.1)}.cart-btn{background:#e67e22;border:none;color:#fff;padding:12px 32px;border-radius:60px;font-weight:700;cursor:pointer}.skeleton-shop{height:100px;background:linear-gradient(90deg,#eee 25%,#ddd 50%,#eee 75%);background-size:200% 100%;animation:loading 1.5s infinite;border-radius:24px}@keyframes loading{0%{background-position:200% 0}100%{background-position:-200% 0}}</style></head><body><div class="app-header"><button class="back-btn" id="backBtn"><i data-lucide="arrow-right"></i></button><h1>🦅 شاهين</h1></div><div class="container"><div class="city-chip"><select id="citySelect"><option value="">اختر المدينة...</option></select></div><div class="search-box"><i data-lucide="search"></i><input type="text" id="searchInput" placeholder="ابحث عن متجر..."></div><div class="shop-grid" id="shopsContainer"><div class="skeleton-shop"></div><div class="skeleton-shop"></div><div class="skeleton-shop"></div></div></div><div class="cart-bar"><span><i data-lucide="shopping-cart"></i> السلة (<span id="cartCount">0</span>)</span><button class="cart-btn" id="viewCartBtn">عرض السلة</button></div><script>const tg=Telegram.WebApp;tg.ready();tg.expand();tg.BackButton.show();tg.BackButton.onClick(()=>history.back());document.getElementById('backBtn').onclick=()=>history.back();const API='https://delivery-dragon.vercel.app';let shops=[],cart=JSON.parse(localStorage.getItem('dragon_cart'))||[],cityId=null;function updateCartCount(){document.getElementById('cartCount').innerText=cart.reduce((s,i)=>s+i.quantity,0)}async function loadCities(){const r=await fetch(`${API}/api/cities`);const cities=await r.json();const s=document.getElementById('citySelect');cities.forEach(c=>s.add(new Option(c.name,c.id)));if(cities.length){s.value=cities[0].id;cityId=cities[0].id;loadShops()}}async function loadShops(){if(!cityId)return;const c=document.getElementById('shopsContainer');c.innerHTML='<div class="skeleton-shop"></div><div class="skeleton-shop"></div><div class="skeleton-shop"></div>';try{const r=await fetch(`${API}/api/shops?city_id=${cityId}`);shops=await r.json();renderShops(shops)}catch(e){c.innerHTML='<div class="empty-state">⚠️ '+e.message+'</div>'}}function renderShops(list){const c=document.getElementById('shopsContainer');if(!list.length){c.innerHTML='<div style="text-align:center;padding:40px"><svg width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="margin:0 auto;opacity:.5"><path d="M3 9h18v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z"/><path d="M3 9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2"/><line x1="9" y1="13" x2="15" y2="13"/></svg><h3>لا توجد متاجر</h3><p>نعمل على إضافة المزيد قريباً.</p></div>';return}c.innerHTML=list.map(s=>`<div class="shop-card" onclick="location.href='shop-menu.html?id=${s.id}&name=${encodeURIComponent(s.shop_name)}'"><div class="shop-icon">${s.icon||'🏪'}</div><div class="shop-info"><h3>${s.shop_name}</h3><p><i data-lucide="map-pin"></i> ${s.address||''}</p></div></div>`).join('');if(typeof lucide!=='undefined')lucide.createIcons()}document.getElementById('citySelect').onchange=e=>{cityId=e.target.value;loadShops()};document.getElementById('searchInput').oninput=e=>{renderShops(shops.filter(s=>s.shop_name.includes(e.target.value)))};document.getElementById('viewCartBtn').onclick=()=>location.href='cart.html';loadCities();updateCartCount()</script></body></html>
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>شاهين | استكشف المتاجر</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Tajawal', sans-serif; background: var(--tg-theme-bg-color, #f5f7fb); color: var(--tg-theme-text-color, #1a1a2c); padding: 0 0 85px; }
+    .app-header { display: flex; align-items: center; padding: 16px 20px; background: var(--tg-theme-secondary-bg-color, #fff); border-bottom: 1px solid var(--tg-theme-hint-color, rgba(0,0,0,.05)); position: sticky; top: 0; z-index: 10; }
+    .app-header h1 { font-size: 1.7rem; font-weight: 700; color: #e67e22; margin-right: 12px; }
+    .back-btn { background: none; border: none; color: #e67e22; font-size: 1.8rem; cursor: pointer; padding: 0 8px; }
+    .container { padding: 16px; max-width: 600px; margin: 0 auto; }
+    .city-chip { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: 40px; padding: 6px 6px 6px 20px; margin-bottom: 20px; border: 1px solid var(--tg-theme-hint-color, #ddd); display: flex; align-items: center; }
+    .city-chip select { flex: 1; padding: 10px 0; border: none; background: transparent; color: inherit; font-family: inherit; outline: none; }
+    .search-box { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: 40px; padding: 8px 20px; margin-bottom: 24px; display: flex; align-items: center; border: 1px solid var(--tg-theme-hint-color, #ddd); }
+    .search-box input { flex: 1; border: none; background: transparent; outline: none; font-family: inherit; padding: 12px 0; }
+    .shop-grid { display: grid; gap: 16px; }
+    .shop-card { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: 24px; padding: 16px; box-shadow: 0 6px 16px rgba(0,0,0,.02); display: flex; align-items: center; gap: 16px; cursor: pointer; transition: 0.2s; border: 1px solid var(--tg-theme-hint-color, rgba(0,0,0,.03)); }
+    .shop-card:active { transform: scale(0.98); background: var(--tg-theme-secondary-bg-color, #f8f9fa); }
+    .shop-icon { font-size: 44px; background: var(--tg-theme-bg-color, #f0f2f5); width: 70px; height: 70px; border-radius: 20px; display: flex; align-items: center; justify-content: center; }
+    .shop-info h3 { font-size: 1.2rem; margin-bottom: 4px; }
+    .shop-info p { color: var(--tg-theme-hint-color, #7f8c8d); font-size: 0.9rem; display: flex; align-items: center; gap: 6px; }
+    .cart-bar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--tg-theme-secondary-bg-color, #1a1a2c); color: white; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; backdrop-filter: blur(10px); border-top: 1px solid rgba(255,255,255,0.1); }
+    .cart-btn { background: #e67e22; border: none; color: white; padding: 12px 32px; border-radius: 60px; font-weight: 700; cursor: pointer; }
+    .skeleton-shop { height: 100px; background: linear-gradient(90deg, #eee 25%, #ddd 50%, #eee 75%); background-size: 200% 100%; animation: loading 1.5s infinite; border-radius: 24px; }
+    @keyframes loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+    .empty-state { text-align: center; padding: 40px; color: var(--tg-theme-hint-color); }
+  </style>
+</head>
+<body>
+<div class="app-header">
+  <button class="back-btn" id="backBtn"><i data-lucide="arrow-right"></i></button>
+  <h1>🦅 شاهين</h1>
+</div>
+<div class="container">
+  <div class="city-chip">
+    <select id="citySelect"><option value="">اختر المدينة...</option></select>
+  </div>
+  <div class="search-box">
+    <i data-lucide="search"></i>
+    <input type="text" id="searchInput" placeholder="ابحث عن متجر...">
+  </div>
+  <div class="shop-grid" id="shopsContainer">
+    <div class="skeleton-shop"></div><div class="skeleton-shop"></div><div class="skeleton-shop"></div>
+  </div>
+</div>
+<div class="cart-bar">
+  <span><i data-lucide="shopping-cart"></i> السلة (<span id="cartCount">0</span>)</span>
+  <button class="cart-btn" id="viewCartBtn">عرض السلة</button>
+</div>
+<script>
+  const tg = window.Telegram.WebApp; tg.ready(); tg.expand();
+  tg.BackButton.show(); tg.BackButton.onClick(() => window.history.back());
+  document.getElementById('backBtn').onclick = () => window.history.back();
+  const API = 'https://delivery-dragon.vercel.app';
+  let shops = [], cart = JSON.parse(localStorage.getItem('dragon_cart')) || [], currentCityId = null;
+  function updateCartCount() { document.getElementById('cartCount').innerText = cart.reduce((s,i) => s + i.quantity, 0); }
+  async function loadCities() {
+    const res = await fetch(`${API}/api/cities`);
+    const cities = await res.json();
+    const sel = document.getElementById('citySelect');
+    cities.forEach(c => sel.add(new Option(c.name, c.id)));
+    if (cities.length) { sel.value = cities[0].id; currentCityId = cities[0].id; loadShops(); }
+  }
+  async function loadShops() {
+    if (!currentCityId) return;
+    const container = document.getElementById('shopsContainer');
+    container.innerHTML = '<div class="skeleton-shop"></div><div class="skeleton-shop"></div><div class="skeleton-shop"></div>';
+    try {
+      const res = await fetch(`${API}/api/shops?city_id=${currentCityId}`);
+      shops = await res.json();
+      renderShops(shops);
+    } catch(e) { container.innerHTML = `<div class="empty-state">⚠️ ${e.message}</div>`; }
+  }
+  function renderShops(list) {
+    const container = document.getElementById('shopsContainer');
+    if (!list.length) { container.innerHTML = '<div class="empty-state">😕 لا توجد متاجر في هذه المدينة</div>'; return; }
+    container.innerHTML = list.map(s => `
+      <div class="shop-card" onclick="location.href='shop-menu.html?id=${s.id}&name=${encodeURIComponent(s.shop_name)}'">
+        <div class="shop-icon">${s.icon || '🏪'}</div>
+        <div class="shop-info"><h3>${s.shop_name}</h3><p>📍 ${s.address || ''}</p></div>
+      </div>`).join('');
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
+  document.getElementById('citySelect').onchange = e => { currentCityId = e.target.value; loadShops(); };
+  document.getElementById('searchInput').oninput = e => { renderShops(shops.filter(s => s.shop_name.includes(e.target.value))); };
+  document.getElementById('viewCartBtn').onclick = () => location.href = 'cart.html';
+  loadCities(); updateCartCount();
+</script>
+</body>
+</html>

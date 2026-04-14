@@ -1,1 +1,113 @@
-<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><title>شاهين | السلة</title><script src="https://telegram.org/js/telegram-web-app.js"></script><script src="https://unpkg.com/lucide@latest"></script><link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Tajawal',sans-serif;background:var(--tg-theme-bg-color,#f5f7fb);color:var(--tg-theme-text-color,#1a1a2c);padding:0 0 30px}.app-header{display:flex;align-items:center;padding:16px 20px;background:var(--tg-theme-secondary-bg-color,#fff);border-bottom:1px solid var(--tg-theme-hint-color,#ddd);position:sticky;top:0;z-index:10}.app-header h1{font-size:1.7rem;font-weight:700;color:#e67e22;margin-right:12px}.back-btn{background:0 0;border:none;color:#e67e22;font-size:1.8rem;cursor:pointer}.container{padding:20px 16px;max-width:600px;margin:0 auto}.cart-item{background:var(--tg-theme-secondary-bg-color,#fff);border-radius:20px;padding:16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;border:1px solid var(--tg-theme-hint-color,#eee)}.qty-btn{background:#e67e22;color:#fff;border:none;width:36px;height:36px;border-radius:50%;font-size:20px;cursor:pointer;box-shadow:0 2px 6px rgba(230,126,34,.2)}.summary{background:var(--tg-theme-secondary-bg-color,#fff);border-radius:24px;padding:24px;margin:24px 0;box-shadow:0 6px 18px rgba(0,0,0,.03)}select,input{width:100%;padding:16px;border-radius:16px;border:1px solid #ccc;margin:12px 0;background:var(--tg-theme-bg-color,#fff);color:inherit}.zone-chips{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}.zone-chip{padding:10px 16px;border:1px solid var(--tg-theme-hint-color,#ccc);border-radius:40px;background:var(--tg-theme-secondary-bg-color,#fff);color:inherit;cursor:pointer}.zone-chip.active{background:#e67e22;color:#fff;border-color:#e67e22}.order-btn{background:#27ae60;color:#fff;border:none;padding:18px;border-radius:60px;width:100%;font-size:1.2rem;font-weight:700;cursor:pointer;box-shadow:0 8px 18px rgba(39,174,96,.2)}.order-btn:active{transform:scale(.97)}.skeleton-cart{height:80px;background:linear-gradient(90deg,#eee 25%,#ddd 50%,#eee 75%);background-size:200% 100%;animation:loading 1.5s infinite;border-radius:20px}@keyframes loading{0%{background-position:200% 0}100%{background-position:-200% 0}}</style></head><body><div class="app-header"><button class="back-btn" id="backBtn"><i data-lucide="arrow-right"></i></button><h1>🦅 شاهين</h1></div><div class="container"><h2><i data-lucide="shopping-cart"></i> سلة المشتريات</h2><div id="itemsContainer"><div class="skeleton-cart"></div></div><div class="summary"><div style="display:flex;justify-content:space-between"><span>المجموع</span><span id="subtotal">0</span> ل.س</div><select id="citySelect"><option>اختر المدينة</option></select><label>📍 منطقة التوصيل</label><div id="zoneChips" class="zone-chips">اختر المدينة أولاً</div><input type="hidden" id="zoneSelect"><div style="display:flex;justify-content:space-between"><span>التوصيل</span><span id="deliveryFee">0</span> ل.س</div><div style="display:flex;justify-content:space-between;font-weight:700;margin-top:10px"><span>الإجمالي</span><span id="total">0</span> ل.س</div><input type="text" id="addressInput" placeholder="العنوان التفصيلي"></div><button class="order-btn" id="orderBtn"><i data-lucide="check-circle"></i> تأكيد الطلب</button></div><script>const tg=Telegram.WebApp;tg.ready();tg.BackButton.show();tg.BackButton.onClick(()=>history.back());document.getElementById('backBtn').onclick=()=>history.back();const API='https://delivery-dragon.vercel.app';let cart=JSON.parse(localStorage.getItem('dragon_cart'))||[];if(!cart.length)location.href='customer-home.html';let deliveryFee=0,currentTotal=0,cityId=null;function render(){let h='',sub=0;cart.forEach((i,idx)=>{sub+=i.price*i.quantity;h+=`<div class="cart-item"><div><b>${i.name}</b><br>${i.price} ل.س</div><div style="display:flex;gap:12px"><button class="qty-btn" onclick="update(${idx},-1)">−</button><span>${i.quantity}</span><button class="qty-btn" onclick="update(${idx},1)">+</button><button onclick="remove(${idx})"><i data-lucide="trash-2"></i></button></div></div>`});document.getElementById('itemsContainer').innerHTML=h;document.getElementById('subtotal').innerText=sub;updateTotal(sub);if(typeof lucide!=='undefined')lucide.createIcons()}window.update=(i,d)=>{if(cart[i].quantity+d>0)cart[i].quantity+=d;else cart.splice(i,1);localStorage.setItem('dragon_cart',JSON.stringify(cart));render()};window.remove=i=>{tg.showConfirm('حذف المنتج؟',ok=>{if(ok){cart.splice(i,1);localStorage.setItem('dragon_cart',JSON.stringify(cart));render()}})};async function loadCities(){const r=await fetch(`${API}/api/cities`);const cities=await r.json();const s=document.getElementById('citySelect');cities.forEach(c=>s.add(new Option(c.name,c.id)));if(cities.length){s.value=cities[0].id;cityId=cities[0].id;loadZones(cityId)}}async function loadZones(id){const c=document.getElementById('zoneChips');c.innerHTML='<span>جاري التحميل...</span>';const r=await fetch(`${API}/api/zones?city_id=${id}`);const zones=await r.json();if(!zones.length){c.innerHTML='<span>لا توجد مناطق</span>';return}let h='';zones.forEach((z,i)=>{h+=`<button class="zone-chip ${i===0?'active':''}" data-id="${z.id}" data-fee="${z.base_fee}">${z.zone_name} (${z.base_fee} ل.س)</button>`});c.innerHTML=h;document.getElementById('zoneSelect').value=zones[0]?.id||'';deliveryFee=zones[0]?.base_fee||0;document.getElementById('deliveryFee').innerText=deliveryFee;updateTotal(parseFloat(document.getElementById('subtotal').innerText));document.querySelectorAll('.zone-chip').forEach(chip=>chip.onclick=()=>{document.querySelectorAll('.zone-chip').forEach(c=>c.classList.remove('active'));chip.classList.add('active');document.getElementById('zoneSelect').value=chip.dataset.id;deliveryFee=parseFloat(chip.dataset.fee);document.getElementById('deliveryFee').innerText=deliveryFee;updateTotal(parseFloat(document.getElementById('subtotal').innerText))})}function updateTotal(sub){currentTotal=sub+deliveryFee;document.getElementById('total').innerText=currentTotal}document.getElementById('citySelect').onchange=e=>{cityId=e.target.value;loadZones(cityId)};document.getElementById('orderBtn').onclick=async()=>{const addr=document.getElementById('addressInput').value.trim();if(!addr)return tg.showAlert('أدخل العنوان');if(!cityId)return tg.showAlert('اختر مدينة');const zone=document.getElementById('zoneSelect').value;const items=cart.map(i=>({id:i.id,quantity:i.quantity}));tg.MainButton.showProgress();try{const r=await fetch(`${API}/api/orders`,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify({shop_id:cart[0].shopId,items,zone_id:zone,address:addr,city_id:cityId})});if(!r.ok)throw new Error((await r.json()).error);const d=await r.json();cart=[];localStorage.removeItem('dragon_cart');document.body.innerHTML=`<div style="text-align:center;padding:40px"><h2>✅ تم الطلب #${d.order_id}</h2><p>${currentTotal} ل.س</p><p>📸 أرسل لقطة الدفع في البوت</p><button class="order-btn" onclick="Telegram.WebApp.close()">فتح البوت</button></div>`}catch(e){tg.MainButton.hideProgress();tg.showAlert('❌ '+e.message)}};render();loadCities()</script></body></html>
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>شاهين | السلة</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Tajawal', sans-serif; background: var(--tg-theme-bg-color, #f5f7fb); color: var(--tg-theme-text-color, #1a1a2c); padding: 0 0 30px; }
+    .app-header { display: flex; align-items: center; padding: 16px 20px; background: var(--tg-theme-secondary-bg-color, #fff); border-bottom: 1px solid var(--tg-theme-hint-color, #ddd); position: sticky; top: 0; z-index: 10; }
+    .app-header h1 { font-size: 1.7rem; font-weight: 700; color: #e67e22; margin-right: 12px; }
+    .back-btn { background: none; border: none; color: #e67e22; font-size: 1.8rem; cursor: pointer; }
+    .container { padding: 20px 16px; max-width: 600px; margin: 0 auto; }
+    .cart-item { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: 20px; padding: 16px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--tg-theme-hint-color, #eee); }
+    .qty-btn { background: #e67e22; color: white; border: none; width: 36px; height: 36px; border-radius: 50%; font-size: 20px; cursor: pointer; box-shadow: 0 2px 6px rgba(230,126,34,0.2); }
+    .summary { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: 24px; padding: 24px; margin: 24px 0; box-shadow: 0 6px 18px rgba(0,0,0,0.03); }
+    select, input { width: 100%; padding: 16px; border-radius: 16px; border: 1px solid #ccc; margin: 12px 0; background: var(--tg-theme-bg-color, #fff); color: inherit; }
+    .zone-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+    .zone-chip { padding: 10px 16px; border: 1px solid var(--tg-theme-hint-color, #ccc); border-radius: 40px; background: var(--tg-theme-secondary-bg-color, #fff); color: inherit; cursor: pointer; }
+    .zone-chip.active { background: #e67e22; color: #fff; border-color: #e67e22; }
+    .order-btn { background: #27ae60; color: white; border: none; padding: 18px; border-radius: 60px; width: 100%; font-size: 1.2rem; font-weight: 700; cursor: pointer; box-shadow: 0 8px 18px rgba(39,174,96,0.2); }
+    .order-btn:active { transform: scale(0.97); }
+    .skeleton-cart { height: 80px; background: linear-gradient(90deg, #eee 25%, #ddd 50%, #eee 75%); background-size: 200% 100%; animation: loading 1.5s infinite; border-radius: 20px; }
+    @keyframes loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  </style>
+</head>
+<body>
+<div class="app-header">
+  <button class="back-btn" id="backBtn"><i data-lucide="arrow-right"></i></button>
+  <h1>🦅 شاهين</h1>
+</div>
+<div class="container">
+  <h2 style="margin-bottom: 16px;"><i data-lucide="shopping-cart"></i> سلة المشتريات</h2>
+  <div id="itemsContainer"><div class="skeleton-cart"></div></div>
+  <div class="summary">
+    <div style="display:flex; justify-content:space-between"><span>المجموع</span><span id="subtotal">0</span> ل.س</div>
+    <select id="citySelect"><option>اختر المدينة</option></select>
+    <label>📍 منطقة التوصيل</label>
+    <div id="zoneChips" class="zone-chips">اختر المدينة أولاً</div>
+    <input type="hidden" id="zoneSelect">
+    <div style="display:flex; justify-content:space-between"><span>التوصيل</span><span id="deliveryFee">0</span> ل.س</div>
+    <div style="display:flex; justify-content:space-between; font-weight:700; margin-top:10px"><span>الإجمالي</span><span id="total">0</span> ل.س</div>
+    <input type="text" id="addressInput" placeholder="العنوان التفصيلي">
+  </div>
+  <button class="order-btn" id="orderBtn"><i data-lucide="check-circle"></i> تأكيد الطلب</button>
+</div>
+<script>
+  const tg = window.Telegram.WebApp; tg.ready(); tg.BackButton.show(); tg.BackButton.onClick(() => history.back());
+  document.getElementById('backBtn').onclick = () => history.back();
+  const API = 'https://delivery-dragon.vercel.app';
+  let cart = JSON.parse(localStorage.getItem('dragon_cart')) || [];
+  if (!cart.length) location.href = 'customer-home.html';
+  let deliveryFee = 0, currentTotal = 0, currentCityId = null;
+  function render() {
+    let html = '', subtotal = 0;
+    cart.forEach((item, idx) => {
+      subtotal += item.price * item.quantity;
+      html += `<div class="cart-item"><div><b>${item.name}</b><br>${item.price} ل.س</div><div style="display:flex; gap:12px"><button class="qty-btn" onclick="update(${idx},-1)">−</button><span>${item.quantity}</span><button class="qty-btn" onclick="update(${idx},1)">+</button><button onclick="remove(${idx})"><i data-lucide="trash-2"></i></button></div></div>`;
+    });
+    document.getElementById('itemsContainer').innerHTML = html;
+    document.getElementById('subtotal').innerText = subtotal;
+    updateTotal(subtotal);
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
+  window.update = (i, d) => { if (cart[i].quantity + d > 0) cart[i].quantity += d; else cart.splice(i,1); localStorage.setItem('dragon_cart', JSON.stringify(cart)); render(); };
+  window.remove = i => { tg.showConfirm('حذف المنتج؟', ok => { if (ok) { cart.splice(i,1); localStorage.setItem('dragon_cart', JSON.stringify(cart)); render(); } }); };
+  async function loadCities() {
+    const res = await fetch(`${API}/api/cities`); const cities = await res.json();
+    const sel = document.getElementById('citySelect'); cities.forEach(c => sel.add(new Option(c.name, c.id)));
+    if (cities.length) { sel.value = cities[0].id; currentCityId = cities[0].id; loadZones(currentCityId); }
+  }
+  async function loadZones(cityId) {
+    const container = document.getElementById('zoneChips');
+    container.innerHTML = '<span>جاري التحميل...</span>';
+    const res = await fetch(`${API}/api/zones?city_id=${cityId}`); const zones = await res.json();
+    if (!zones.length) { container.innerHTML = '<span>لا توجد مناطق</span>'; return; }
+    let html = ''; zones.forEach((z,i) => { html += `<button class="zone-chip ${i===0?'active':''}" data-id="${z.id}" data-fee="${z.base_fee}">${z.zone_name} (${z.base_fee} ل.س)</button>`; });
+    container.innerHTML = html;
+    document.getElementById('zoneSelect').value = zones[0]?.id || '';
+    deliveryFee = zones[0]?.base_fee || 0;
+    document.getElementById('deliveryFee').innerText = deliveryFee;
+    updateTotal(parseFloat(document.getElementById('subtotal').innerText));
+    document.querySelectorAll('.zone-chip').forEach(chip => chip.onclick = () => {
+      document.querySelectorAll('.zone-chip').forEach(c => c.classList.remove('active')); chip.classList.add('active');
+      document.getElementById('zoneSelect').value = chip.dataset.id;
+      deliveryFee = parseFloat(chip.dataset.fee);
+      document.getElementById('deliveryFee').innerText = deliveryFee;
+      updateTotal(parseFloat(document.getElementById('subtotal').innerText));
+    });
+  }
+  function updateTotal(sub) { currentTotal = sub + deliveryFee; document.getElementById('total').innerText = currentTotal; }
+  document.getElementById('citySelect').onchange = e => { currentCityId = e.target.value; loadZones(currentCityId); };
+  document.getElementById('orderBtn').onclick = async () => {
+    const addr = document.getElementById('addressInput').value.trim(); if (!addr) return tg.showAlert('أدخل العنوان');
+    if (!currentCityId) return tg.showAlert('اختر المدينة');
+    const zoneId = document.getElementById('zoneSelect').value;
+    const items = cart.map(i => ({ id: i.id, quantity: i.quantity }));
+    tg.MainButton.showProgress();
+    try {
+      const res = await fetch(`${API}/api/orders`, { method: 'POST', headers: { 'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData }, body: JSON.stringify({ shop_id: cart[0].shopId, items, zone_id: zoneId, address: addr, city_id: currentCityId }) });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'فشل الطلب'); }
+      const data = await res.json();
+      cart = []; localStorage.removeItem('dragon_cart');
+      document.body.innerHTML = `<div style="text-align:center;padding:40px"><h2>✅ تم إنشاء الطلب #${data.order_id}</h2><p>المبلغ: ${currentTotal} ل.س</p><p>📸 أرسل لقطة الدفع في البوت</p><button class="order-btn" onclick="Telegram.WebApp.close()">فتح البوت</button></div>`;
+    } catch(e) { tg.MainButton.hideProgress(); tg.showAlert('❌ ' + e.message); }
+  };
+  render(); loadCities();
+</script>
+</body>
+</html>
