@@ -161,19 +161,32 @@ app.get('/api/admin/finance', async (req, res) => { try { const initData = req.h
 app.get('/api/admin/shops', async (req, res) => { try { const initData = req.headers['x-telegram-init-data']; if (!initData) return res.status(401).json({ error: 'Unauthorized' }); const urlParams = new URLSearchParams(initData); const userString = urlParams.get('user'); if (!userString) return res.status(401).json({ error: 'Unauthorized' }); const tgUser = JSON.parse(userString); const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' }); const shops = await pool.query(`SELECT s.*, u.name as owner_name, u.phone as owner_phone, c.name as category_name, ct.name as city_name FROM shops s JOIN users u ON s.owner_id=u.id LEFT JOIN shop_categories c ON s.category_id=c.id LEFT JOIN cities ct ON s.city_id=ct.id ORDER BY s.created_at DESC`); res.json(shops.rows); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.put('/api/admin/shops/:shopId', async (req, res) => { try { const initData = req.headers['x-telegram-init-data']; if (!initData) return res.status(401).json({ error: 'Unauthorized' }); const urlParams = new URLSearchParams(initData); const userString = urlParams.get('user'); if (!userString) return res.status(401).json({ error: 'Unauthorized' }); const tgUser = JSON.parse(userString); const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' }); const { shopId } = req.params; const { shop_name, phone, address, is_open, category_id, city_id } = req.body; await pool.query(`UPDATE shops SET shop_name=$1, phone=$2, address=$3, is_open=$4, category_id=$5, city_id=$6 WHERE id=$7`,[shop_name, phone, address, is_open, category_id, city_id, shopId]); res.json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.delete('/api/admin/shops/:shopId', async (req, res) => {
+  const client = await pool.connect();
   try {
     const initData = req.headers['x-telegram-init-data']; if (!initData) return res.status(401).json({ error: 'Unauthorized' });
     const urlParams = new URLSearchParams(initData); const userString = urlParams.get('user'); if (!userString) return res.status(401).json({ error: 'Unauthorized' });
     const tgUser = JSON.parse(userString); const dbUser = await getDbUser(tgUser.id);
     if (dbUser?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
     const { shopId } = req.params;
-    const shop = await pool.query('SELECT owner_id FROM shops WHERE id = $1', [shopId]);
-    if (!shop.rows[0]) return res.status(404).json({ error: 'Shop not found' });
+
+    await client.query('BEGIN');
+    const shop = await client.query('SELECT owner_id FROM shops WHERE id = $1', [shopId]);
+    if (!shop.rows[0]) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'المتجر غير موجود' }); }
     const ownerId = shop.rows[0].owner_id;
-    await pool.query('DELETE FROM shops WHERE id = $1', [shopId]);
-    await pool.query(`UPDATE users SET role = 'customer', is_approved = true WHERE id = $1`, [ownerId]);
+
+    await client.query('DELETE FROM products WHERE shop_id = $1', [shopId]);
+    await client.query('DELETE FROM product_categories WHERE shop_id = $1', [shopId]);
+    await client.query('DELETE FROM orders WHERE shop_id = $1', [shopId]);
+    await client.query('DELETE FROM shops WHERE id = $1', [shopId]);
+    await client.query(`UPDATE users SET role = 'customer', is_approved = true WHERE id = $1`, [ownerId]);
+
+    await client.query('COMMIT');
     res.json({ success: true });
-  } catch(error) { console.error('Delete shop error:', error); res.status(500).json({ error: error.message }); }
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Delete shop error:', error);
+    res.status(500).json({ error: error.message || 'فشل حذف المتجر' });
+  } finally { client.release(); }
 });
 app.get('/api/admin/riders', async (req, res) => { try { const initData = req.headers['x-telegram-init-data']; if (!initData) return res.status(401).json({ error: 'Unauthorized' }); const urlParams = new URLSearchParams(initData); const userString = urlParams.get('user'); if (!userString) return res.status(401).json({ error: 'Unauthorized' }); const tgUser = JSON.parse(userString); const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' }); const riders = await pool.query(`SELECT u.id, u.telegram_id, u.name, u.phone, u.is_approved, rd.vehicle_type, rd.vehicle_number FROM users u LEFT JOIN rider_details rd ON u.id=rd.user_id WHERE u.role='rider' ORDER BY u.created_at DESC`); res.json(riders.rows); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.put('/api/admin/riders/:userId', async (req, res) => { try { const initData = req.headers['x-telegram-init-data']; if (!initData) return res.status(401).json({ error: 'Unauthorized' }); const urlParams = new URLSearchParams(initData); const userString = urlParams.get('user'); if (!userString) return res.status(401).json({ error: 'Unauthorized' }); const tgUser = JSON.parse(userString); const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' }); const { userId } = req.params; const { name, phone, is_approved, vehicle_type, vehicle_number } = req.body; await pool.query(`UPDATE users SET name=$1, phone=$2, is_approved=$3 WHERE id=$4`,[name, phone, is_approved, userId]); await pool.query(`UPDATE rider_details SET vehicle_type=$1, vehicle_number=$2 WHERE user_id=$3`,[vehicle_type, vehicle_number, userId]); res.json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
