@@ -43,6 +43,10 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '10mb' }));
 
+// ========== متغيرات البيئة للمحفظة ==========
+const SHAM_CASH_NAME = process.env.SHAM_CASH_NAME || null;
+const SHAM_CASH_WALLET = process.env.SHAM_CASH_WALLET || null;
+
 function verifyInitData(initData) {
   if (!initData) return { valid: false, error: 'Missing init data' };
   try {
@@ -231,7 +235,15 @@ app.post('/api/orders', async (req, res) => {
     const orderResult = await pool.query(`INSERT INTO orders (customer_id, shop_id, zone_id, items, subtotal, delivery_fee, total_price, address, city_id, delivery_latitude, delivery_longitude, status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'verifying') RETURNING id`,[dbUser.id, shop_id, zone_id, JSON.stringify(frozenItems), subtotal, deliveryFee, total, address, city_id, delivery_latitude, delivery_longitude]);
     const orderId = orderResult.rows[0].id;
     if (dbUser.chat_id) await bot.api.sendMessage(dbUser.chat_id, `📸 *تم إنشاء الطلب #${orderId}*\n\nالمبلغ الإجمالي: ${total} ل.س\n\nالرجاء إرسال لقطة شاشة عملية الدفع الآن (كصورة) لتأكيد الطلب.`, { parse_mode: 'Markdown' });
-    res.status(201).json({ order_id: orderId, total });
+    
+    // تضمين معلومات الدفع في الاستجابة
+    const paymentInfo = (SHAM_CASH_NAME && SHAM_CASH_WALLET) ? {
+      name: SHAM_CASH_NAME,
+      wallet: SHAM_CASH_WALLET,
+      instructions: 'يرجى تحويل المبلغ إلى محفظة شام كاش أعلاه، ثم إرسال لقطة شاشة الإشعار في البوت.'
+    } : null;
+    
+    res.status(201).json({ order_id: orderId, total, payment: paymentInfo });
   } catch (error) { console.error('/api/orders error:', error); res.status(500).json({ error: error.message }); }
 });
 app.get('/api/me/orders', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); const orders = await pool.query(`SELECT o.*, s.shop_name FROM orders o JOIN shops s ON o.shop_id=s.id WHERE o.customer_id=$1 ORDER BY o.created_at DESC`,[dbUser.id]); res.json(orders.rows); } catch(error) { res.status(500).json({ error: error.message }); } });

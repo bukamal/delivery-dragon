@@ -139,7 +139,37 @@
       if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'فشل الطلب'); }
       const data = await res.json();
       cart = []; localStorage.removeItem('dragon_cart');
-      document.body.innerHTML = `<div style="text-align:center;padding:40px"><h2>✅ تم إنشاء الطلب #${data.order_id}</h2><p>المبلغ: ${currentTotal} ل.س</p><p>📸 أرسل لقطة الدفع في البوت</p><button class="order-btn" onclick="Telegram.WebApp.close()">فتح البوت</button></div>`;
+      
+      let paymentHtml = '';
+      if (data.payment && data.payment.name && data.payment.wallet) {
+        paymentHtml = `
+          <div style="background:#f8f9fa; border-radius:20px; padding:20px; margin:20px 0; text-align:left; direction:ltr;">
+            <p><strong>اسم المستلم:</strong> ${data.payment.name}</p>
+            <p><strong>رقم المحفظة:</strong> <span id="walletNumber">${data.payment.wallet}</span> 
+              <button onclick="copyWallet()" style="background:#e67e22; color:white; border:none; padding:6px 12px; border-radius:20px; cursor:pointer; margin-right:10px;">📋 نسخ</button>
+            </p>
+            <p style="color:#e67e22;">${data.payment.instructions}</p>
+          </div>
+        `;
+      }
+      
+      document.body.innerHTML = `
+        <div style="text-align:center;padding:40px">
+          <h2>✅ تم إنشاء الطلب #${data.order_id}</h2>
+          <p>المبلغ الإجمالي: ${currentTotal} ل.س</p>
+          ${paymentHtml}
+          <p>📸 بعد الدفع، أرسل لقطة شاشة الإشعار في البوت</p>
+          <button class="order-btn" onclick="Telegram.WebApp.close()">فتح البوت</button>
+        </div>
+      `;
+      window.copyWallet = function() {
+        const wallet = document.getElementById('walletNumber').innerText;
+        navigator.clipboard?.writeText(wallet).then(() => {
+          tg.showPopup({ title: '✅ تم النسخ', message: 'رقم المحفظة جاهز للصق' });
+        }).catch(() => {
+          tg.showAlert('تعذر النسخ، يرجى النسخ يدوياً');
+        });
+      };
     } catch(e) { tg.MainButton.hideProgress(); tg.showAlert('❌ ' + e.message); }
   };
 
