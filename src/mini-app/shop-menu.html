@@ -16,16 +16,14 @@
     .container { padding: 16px; max-width: 600px; margin: 0 auto; }
     .shop-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
     .shop-header h2 { font-size: 1.8rem; }
-    .rating { background: var(--tg-theme-secondary-bg-color, #fff); padding: 6px 16px; border-radius: 40px; font-size: 1rem; box-shadow: 0 2px 6px rgba(0,0,0,0.02); }
+    .rating { background: var(--tg-theme-secondary-bg-color, #fff); padding: 6px 16px; border-radius: 40px; font-size: 1rem; }
     .category { margin: 28px 0 16px; font-weight: 700; color: var(--tg-theme-hint-color, #7f8c8d); font-size: 1.2rem; }
-    .product-item { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: 20px; padding: 16px; margin-bottom: 12px; display: flex; align-items: center; gap: 12px; border: 1px solid var(--tg-theme-hint-color, rgba(0,0,0,0.03)); box-shadow: 0 4px 10px rgba(0,0,0,0.02); }
+    .product-item { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: 20px; padding: 16px; margin-bottom: 12px; display: flex; align-items: center; gap: 12px; border: 1px solid rgba(0,0,0,0.03); box-shadow: 0 4px 10px rgba(0,0,0,0.02); }
     .product-img { width: 70px; height: 70px; border-radius: 16px; object-fit: cover; background: #f0f0f0; }
     .product-info { flex: 1; }
-    .product-info b { display: block; margin-bottom: 4px; }
     .price { font-weight: 700; color: #e67e22; font-size: 1.1rem; }
-    .add-btn { background: #e67e22; color: white; border: none; border-radius: 40px; padding: 10px 22px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 10px rgba(230,126,34,0.15); white-space: nowrap; }
-    .add-btn:active { transform: scale(0.96); }
-    .option-select { margin-top: 8px; padding: 6px 10px; border-radius: 12px; border: 1px solid #ccc; background: var(--tg-theme-bg-color, #fff); color: inherit; width: 100%; }
+    .add-btn { background: #e67e22; color: white; border: none; border-radius: 40px; padding: 10px 22px; font-weight: 700; cursor: pointer; }
+    .option-select { margin-top: 8px; padding: 6px; border-radius: 12px; border: 1px solid #ccc; width: 100%; }
     .skeleton-item { height: 90px; background: linear-gradient(90deg, #eee 25%, #ddd 50%, #eee 75%); background-size: 200% 100%; animation: loading 1.5s infinite; border-radius: 20px; margin-bottom: 12px; }
     @keyframes loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
     .empty-state { text-align: center; padding: 40px; color: var(--tg-theme-hint-color); }
@@ -64,103 +62,66 @@
       for (let cat in data.categories) {
         html += `<div class="category">📌 ${cat}</div>`;
         data.categories[cat].forEach(p => {
-          // صورة المنتج (إن وجدت)
-          const imgHtml = p.image_url ? `<img src="${p.image_url}" class="product-img" alt="${p.name}">` : `<div class="product-img" style="display:flex; align-items:center; justify-content:center; color:#aaa;">📷</div>`;
-          
-          // بناء خيارات المنتج (JSONB) إن وجدت
+          const imgHtml = p.image_url ? `<img src="${p.image_url}" class="product-img">` : '<div class="product-img" style="display:flex; align-items:center; justify-content:center; color:#aaa;">📷</div>';
           let optionsHtml = '';
           let optionsData = null;
           if (p.options) {
             try {
               optionsData = typeof p.options === 'string' ? JSON.parse(p.options) : p.options;
-              if (Array.isArray(optionsData) && optionsData.length > 0) {
+              if (Array.isArray(optionsData) && optionsData.length) {
                 optionsHtml = `<select class="option-select" data-id="${p.id}">`;
-                optionsData.forEach((opt, idx) => {
-                  optionsHtml += `<option value="${opt.name}" data-price="${opt.price || 0}" ${idx === 0 ? 'selected' : ''}>${opt.name} (+${opt.price || 0} ل.س)</option>`;
-                });
+                optionsData.forEach((opt, idx) => optionsHtml += `<option value="${opt.name}" data-price="${opt.price||0}" ${idx===0?'selected':''}>${opt.name} (+${opt.price||0} ل.س)</option>`);
                 optionsHtml += `</select>`;
               }
-            } catch(e) { console.warn('Options parse error', e); }
+            } catch(e) {}
           }
-
-          html += `
-            <div class="product-item">
-              ${imgHtml}
-              <div class="product-info">
-                <b>${p.name}</b>
-                <div class="price">${p.price} ل.س</div>
-                ${optionsHtml}
-              </div>
-              <button class="add-btn" data-id="${p.id}" data-name="${p.name}" data-price="${p.price}" data-options='${JSON.stringify(optionsData)}'><i data-lucide="plus"></i> أضف</button>
+          html += `<div class="product-item">
+            ${imgHtml}
+            <div class="product-info">
+              <b>${p.name}</b>
+              <div class="price">${p.price} ل.س</div>
+              ${optionsHtml}
             </div>
-          `;
+            <button class="add-btn" data-id="${p.id}" data-name="${p.name}" data-price="${p.price}" data-options='${JSON.stringify(optionsData)}'>➕ أضف</button>
+          </div>`;
         });
       }
-      container.innerHTML = html || '<div class="empty-state">لا توجد منتجات حالياً</div>';
+      container.innerHTML = html || '<div class="empty-state">لا توجد منتجات</div>';
       if (typeof lucide !== 'undefined') lucide.createIcons();
 
-      // ربط أحداث أزرار الإضافة
       document.querySelectorAll('.add-btn').forEach(btn => {
         btn.onclick = () => {
           const productId = btn.dataset.id;
           const productName = btn.dataset.name;
           const basePrice = parseFloat(btn.dataset.price);
-          
-          // الحصول على الخيار المحدد وسعره الإضافي
-          let selectedOption = null;
-          let extraPrice = 0;
+          let selectedOption = null, extraPrice = 0;
           const selectEl = document.querySelector(`.option-select[data-id="${productId}"]`);
           if (selectEl) {
             const selectedOpt = selectEl.options[selectEl.selectedIndex];
             selectedOption = selectedOpt.value;
             extraPrice = parseFloat(selectedOpt.dataset.price) || 0;
           }
-
           const finalPrice = basePrice + extraPrice;
           
-          // البحث عن منتج مطابق في السلة (نفس المعرف ونفس الخيار)
           const existing = cart.find(i => i.id === productId && i.shopId === shopId && i.option === selectedOption);
-          if (existing) {
-            existing.quantity++;
-          } else {
-            // إذا كانت السلة تحتوي على منتجات من متجر آخر، نسأل المستخدم
-            if (cart.length > 0 && cart[0].shopId !== shopId) {
-              tg.showConfirm('السلة تحتوي منتجات من متجر آخر. هل تريد استبدال السلة؟', (ok) => {
-                if (ok) {
-                  cart = [];
-                  addToCart();
-                }
-              });
+          if (existing) existing.quantity++;
+          else {
+            if (cart.length && cart[0].shopId !== shopId) {
+              tg.showConfirm('السلة تحتوي منتجات من متجر آخر. هل تريد استبدال السلة؟', ok => { if(ok) { cart = []; addItem(); } });
               return;
             }
-            addToCart();
+            addItem();
           }
-
-          function addToCart() {
-            cart.push({
-              id: productId,
-              name: productName,
-              price: finalPrice,
-              shopId: shopId,
-              shopName: shopName,
-              quantity: 1,
-              option: selectedOption,
-              optionName: selectedOption
-            });
+          function addItem() {
+            cart.push({ id: productId, name: productName, price: finalPrice, shopId, shopName, quantity: 1, option: selectedOption, optionName: selectedOption });
             localStorage.setItem('dragon_cart', JSON.stringify(cart));
             tg.HapticFeedback.impactOccurred('light');
             tg.showPopup({ title: '✅ تمت الإضافة', message: `${productName} ${selectedOption ? '('+selectedOption+')' : ''} في السلة` });
           }
-
           localStorage.setItem('dragon_cart', JSON.stringify(cart));
-          tg.HapticFeedback.impactOccurred('light');
-          tg.showPopup({ title: '✅ تمت الإضافة', message: `${productName} ${selectedOption ? '('+selectedOption+')' : ''} في السلة` });
         };
       });
-
-    } catch(e) {
-      container.innerHTML = `<div class="empty-state">⚠️ ${e.message}</div>`;
-    }
+    } catch(e) { container.innerHTML = `<div class="empty-state">⚠️ ${e.message}</div>`; }
   }
 
   async function loadRating() {
@@ -174,8 +135,7 @@
     } catch(e) {}
   }
 
-  loadMenu();
-  loadRating();
+  loadMenu(); loadRating();
 </script>
 </body>
 </html>

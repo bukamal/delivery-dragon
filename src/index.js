@@ -41,9 +41,8 @@ app.use(cors({
   },
   credentials: true
 }));
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '20mb' }));
 
-// ========== متغيرات البيئة للمحفظة ==========
 const SHAM_CASH_NAME = process.env.SHAM_CASH_NAME || null;
 const SHAM_CASH_WALLET = process.env.SHAM_CASH_WALLET || null;
 
@@ -236,7 +235,6 @@ app.post('/api/orders', async (req, res) => {
     const orderId = orderResult.rows[0].id;
     if (dbUser.chat_id) await bot.api.sendMessage(dbUser.chat_id, `📸 *تم إنشاء الطلب #${orderId}*\n\nالمبلغ الإجمالي: ${total} ل.س\n\nالرجاء إرسال لقطة شاشة عملية الدفع الآن (كصورة) لتأكيد الطلب.`, { parse_mode: 'Markdown' });
     
-    // تضمين معلومات الدفع في الاستجابة
     const paymentInfo = (SHAM_CASH_NAME && SHAM_CASH_WALLET) ? {
       name: SHAM_CASH_NAME,
       wallet: SHAM_CASH_WALLET,
@@ -249,8 +247,76 @@ app.post('/api/orders', async (req, res) => {
 app.get('/api/me/orders', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); const orders = await pool.query(`SELECT o.*, s.shop_name FROM orders o JOIN shops s ON o.shop_id=s.id WHERE o.customer_id=$1 ORDER BY o.created_at DESC`,[dbUser.id]); res.json(orders.rows); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.get('/api/shop/orders', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'shop' || !dbUser?.is_approved) return res.status(403).json({ error: 'Forbidden' }); const shop = await pool.query('SELECT id FROM shops WHERE owner_id=$1',[dbUser.id]); if (!shop.rows[0]) return res.json([]); const shopId = shop.rows[0].id; const { archived } = req.query; let statusCondition = archived === 'true' ? `o.status IN ('completed', 'rejected')` : `o.status IN ('paid', 'preparing', 'ready_for_pickup', 'delivering')`; const orders = await pool.query(`SELECT o.*, u_customer.name as customer_name, u_customer.phone as customer_phone, u_rider.name as rider_name FROM orders o JOIN users u_customer ON o.customer_id = u_customer.id LEFT JOIN users u_rider ON o.rider_id = u_rider.id WHERE o.shop_id = $1 AND ${statusCondition} ORDER BY o.created_at DESC`, [shopId]); res.json(orders.rows); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.post('/api/shop/orders/:orderId/status', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' }); const { status } = req.body; const { orderId } = req.params; await pool.query(`UPDATE orders SET status=$1 WHERE id=$2 AND shop_id=(SELECT id FROM shops WHERE owner_id=$3)`,[status, orderId, dbUser.id]); if (status==='ready_for_pickup') await notifyRiders(orderId); await notifyCustomer(orderId, status); res.json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
+
+// ========== PRODUCT CATEGORIES (خاصة بالمتجر) ==========
+app.get('/api/shop/product-categories', async (req, res) => {
+  try {
+    const tgUser = req.tgUser;
+    const dbUser = await getDbUser(tgUser.id);
+    if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' });
+    const shop = await pool.query('SELECT id FROM shops WHERE owner_id=$1', [dbUser.id]);
+    if (!shop.rows[0]) return res.json([]);
+    const categories = await pool.query(`SELECT * FROM product_categories WHERE shop_id=$1 ORDER BY display_order, name`, [shop.rows[0].id]);
+    res.json(categories.rows);
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+app.post('/api/shop/product-categories', async (req, res) => {
+  try {
+    const tgUser = req.tgUser;
+    const dbUser = await getDbUser(tgUser.id);
+    if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' });
+    const { name, display_order } = req.body;
+    if (!name || !name.trim()) return res.status(400).json({ error: 'اسم التصنيف مطلوب' });
+    const shop = await pool.query('SELECT id FROM shops WHERE owner_id=$1', [dbUser.id]);
+    if (!shop.rows[0]) return res.status(404).json({ error: 'المتجر غير موجود' });
+    await pool.query(`INSERT INTO product_categories (shop_id, name, display_order) VALUES ($1, $2, $3)`, [shop.rows[0].id, name.trim(), display_order || 0]);
+    res.status(201).json({ success: true });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+app.put('/api/shop/product-categories/:id', async (req, res) => {
+  try {
+    const tgUser = req.tgUser;
+    const dbUser = await getDbUser(tgUser.id);
+    if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' });
+    const { id } = req.params;
+    const { name, display_order } = req.body;
+    const shop = await pool.query('SELECT id FROM shops WHERE owner_id=$1', [dbUser.id]);
+    if (!shop.rows[0]) return res.status(404).json({ error: 'المتجر غير موجود' });
+    const result = await pool.query(`UPDATE product_categories SET name=$1, display_order=$2 WHERE id=$3 AND shop_id=$4`, [name?.trim(), display_order || 0, id, shop.rows[0].id]);
+    if (result.rowCount === 0) return res.status(404).json({ error: 'التصنيف غير موجود' });
+    res.json({ success: true });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+app.delete('/api/shop/product-categories/:id', async (req, res) => {
+  try {
+    const tgUser = req.tgUser;
+    const dbUser = await getDbUser(tgUser.id);
+    if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' });
+    const { id } = req.params;
+    const shop = await pool.query('SELECT id FROM shops WHERE owner_id=$1', [dbUser.id]);
+    if (!shop.rows[0]) return res.status(404).json({ error: 'المتجر غير موجود' });
+    await pool.query(`UPDATE products SET category_id = NULL WHERE category_id = $1 AND shop_id = $2`, [id, shop.rows[0].id]);
+    const result = await pool.query(`DELETE FROM product_categories WHERE id=$1 AND shop_id=$2`, [id, shop.rows[0].id]);
+    if (result.rowCount === 0) return res.status(404).json({ error: 'التصنيف غير موجود' });
+    res.json({ success: true });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
 app.get('/api/shop/products', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' }); const products = await pool.query(`SELECT * FROM products WHERE shop_id=(SELECT id FROM shops WHERE owner_id=$1) ORDER BY name`,[dbUser.id]); res.json(products.rows); } catch(error) { res.status(500).json({ error: error.message }); } });
-app.post('/api/shop/products', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' }); const { name, price, category_id, image, options } = req.body; await pool.query(`INSERT INTO products (shop_id, name, price, category_id, image_url, options) VALUES ((SELECT id FROM shops WHERE owner_id=$1), $2, $3, $4, $5, $6)`,[dbUser.id, name, price, category_id || null, image || null, options || null]); res.status(201).json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
+app.post('/api/shop/products', async (req, res) => { 
+  try { 
+    const tgUser = req.tgUser; 
+    const dbUser = await getDbUser(tgUser.id); 
+    if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' }); 
+    const { name, price, category_id, image, options } = req.body; 
+    const validCategoryId = (category_id && !isNaN(parseInt(category_id))) ? parseInt(category_id) : null;
+    await pool.query(`INSERT INTO products (shop_id, name, price, category_id, image_url, options) VALUES ((SELECT id FROM shops WHERE owner_id=$1), $2, $3, $4, $5, $6)`,[dbUser.id, name, price, validCategoryId, image || null, options || null]); 
+    res.status(201).json({ success: true }); 
+  } catch(error) { console.error('Add product error:', error); res.status(500).json({ error: error.message }); } 
+});
 app.get('/api/shop/products/:productId', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' }); const { productId } = req.params; const result = await pool.query(`SELECT * FROM products WHERE id=$1 AND shop_id=(SELECT id FROM shops WHERE owner_id=$2)`,[productId, dbUser.id]); if (!result.rows[0]) return res.status(404).json({ error: 'Not found' }); res.json(result.rows[0]); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.put('/api/shop/products/:productId', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' }); const { productId } = req.params; const { name, price, category_id, image, options } = req.body; await pool.query(`UPDATE products SET name=$1, price=$2, category_id=$3, image_url=$4, options=$5 WHERE id=$6 AND shop_id=(SELECT id FROM shops WHERE owner_id=$7)`,[name, price, category_id || null, image || null, options || null, productId, dbUser.id]); res.json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.delete('/api/shop/products/:productId', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' }); await pool.query(`DELETE FROM products WHERE id=$1 AND shop_id=(SELECT id FROM shops WHERE owner_id=$2)`,[req.params.productId, dbUser.id]); res.json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });

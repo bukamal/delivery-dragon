@@ -14,8 +14,8 @@
     .app-header h1 { font-size:1.7rem; color:#e67e22; margin-right:12px; }
     .back-btn { background:none; border:none; color:#e67e22; font-size:1.8rem; cursor:pointer; }
     .container { padding:16px; max-width:600px; margin:0 auto; }
-    .tabs { display:flex; gap:10px; margin-bottom:20px; }
-    .tab { flex:1; padding:14px; background:var(--tg-theme-secondary-bg-color, #fff); border-radius:30px; text-align:center; cursor:pointer; border:1px solid #ddd; }
+    .tabs { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:20px; }
+    .tab { flex:1 0 auto; padding:10px 12px; background:var(--tg-theme-secondary-bg-color, #fff); border-radius:30px; text-align:center; cursor:pointer; border:1px solid #ddd; font-size:0.9rem; }
     .tab.active { background:#e67e22; color:#fff; }
     .panel { display:none; }
     .panel.active { display:block; }
@@ -42,12 +42,17 @@
   <div class="tabs">
     <div class="tab active" data-tab="active">🟢 النشطة</div>
     <div class="tab" data-tab="products">📦 المنتجات</div>
+    <div class="tab" data-tab="categories">📂 التصنيفات</div>
     <div class="tab" data-tab="archive">📁 الأرشيف</div>
   </div>
   <div id="activePanel" class="panel active"></div>
   <div id="productsPanel" class="panel">
     <button class="btn" id="addProductBtn" style="width:100%; margin-bottom:16px"><i data-lucide="plus"></i> إضافة منتج</button>
     <div id="productsList"></div>
+  </div>
+  <div id="categoriesPanel" class="panel">
+    <button class="btn" id="addCategoryBtn" style="width:100%; margin-bottom:16px"><i data-lucide="folder-plus"></i> إضافة تصنيف</button>
+    <div id="categoriesList"></div>
   </div>
   <div id="archivePanel" class="panel"></div>
 </div>
@@ -85,10 +90,28 @@
   </div>
 </div>
 
+<!-- مودال إضافة/تعديل تصنيف -->
+<div id="categoryModal" style="position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); display:none; align-items:center; justify-content:center; z-index:1000;">
+  <div style="background:var(--tg-theme-secondary-bg-color, #fff); border-radius:28px; padding:24px; width:90%; max-width:400px;">
+    <h3 id="categoryModalTitle">إضافة تصنيف</h3>
+    <input type="hidden" id="categoryId">
+    <div class="form-group">
+      <label>اسم التصنيف</label>
+      <input type="text" id="categoryName" placeholder="مثال: مقبلات">
+    </div>
+    <div class="form-group">
+      <label>ترتيب العرض</label>
+      <input type="number" id="categoryOrder" placeholder="0" value="0">
+    </div>
+    <button class="btn" onclick="saveCategory()" style="width:100%">حفظ</button>
+    <button class="btn" onclick="closeCategoryModal()" style="background:#95a5a6; margin-top:8px">إلغاء</button>
+  </div>
+</div>
+
 <script>
   const tg = Telegram.WebApp; tg.ready(); tg.BackButton.show(); tg.BackButton.onClick(()=>history.back());
   const API = 'https://delivery-dragon.vercel.app';
-  let currentShopId = null, categories = [], editingProduct = null;
+  let categories = [], productCategories = [], editingProduct = null;
 
   // التبويبات
   const tabs = document.querySelectorAll('.tab');
@@ -99,10 +122,11 @@
     document.getElementById(t.dataset.tab + 'Panel').classList.add('active');
     if(t.dataset.tab === 'active') loadOrders(false);
     else if(t.dataset.tab === 'archive') loadOrders(true);
-    else if(t.dataset.tab === 'products') loadProducts();
+    else if(t.dataset.tab === 'products') { loadProducts(); loadProductCategoriesForSelect(); }
+    else if(t.dataset.tab === 'categories') loadCategoriesList();
   });
 
-  // تحميل المنتجات
+  // ========== المنتجات ==========
   async function loadProducts() {
     const container = document.getElementById('productsList');
     container.innerHTML = '<div class="skeleton"></div>';
@@ -123,7 +147,6 @@
     if (typeof lucide !== 'undefined') lucide.createIcons();
   }
 
-  // إدارة الخيارات الديناميكية
   function addOptionRow(optName='', optPrice='') {
     const div = document.createElement('div');
     div.className = 'option-row';
@@ -155,7 +178,20 @@
     } else {
       preview.style.display = 'none';
     }
+    loadProductCategoriesForSelect(product?.category_id);
     document.getElementById('productModal').style.display = 'flex';
+  }
+
+  async function loadProductCategoriesForSelect(selectedId = null) {
+    const res = await fetch(`${API}/api/shop/product-categories`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
+    productCategories = await res.json();
+    const sel = document.getElementById('productCategory');
+    sel.innerHTML = '<option value="">بدون تصنيف</option>';
+    productCategories.forEach(c => {
+      const option = new Option(c.name, c.id);
+      if (c.id === selectedId) option.selected = true;
+      sel.add(option);
+    });
   }
 
   function closeProductModal() {
@@ -174,7 +210,6 @@
       return;
     }
 
-    // جمع الخيارات
     const options = [];
     document.querySelectorAll('.option-row').forEach(row => {
       const optName = row.querySelector('.opt-name')?.value.trim();
@@ -182,12 +217,10 @@
       if (optName) options.push({ name: optName, price: optPrice });
     });
 
-    // معالجة الصورة
     let image = null;
     const fileInput = document.getElementById('productImage');
     if (fileInput.files.length > 0) {
       const file = fileInput.files[0];
-      // التحقق من حجم الملف (5 ميجابايت كحد أقصى)
       if (file.size > 5 * 1024 * 1024) {
         tg.showAlert('حجم الصورة كبير جداً. الحد الأقصى 5 ميجابايت.');
         return;
@@ -210,67 +243,92 @@
     const url = id ? `${API}/api/shop/products/${id}` : `${API}/api/shop/products`;
     const method = id ? 'PUT' : 'POST';
     try {
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData },
-        body: JSON.stringify(data)
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'فشل الحفظ');
-      }
+      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData }, body: JSON.stringify(data) });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'فشل الحفظ'); }
       closeProductModal();
       loadProducts();
-    } catch (error) {
-      tg.showAlert('❌ ' + error.message);
-    }
+    } catch (error) { tg.showAlert('❌ ' + error.message); }
   }
 
   window.editProduct = async (id) => {
     const res = await fetch(`${API}/api/shop/products/${id}`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
-    if (res.ok) {
-      const product = await res.json();
-      openProductModal(product);
-    } else {
-      tg.showAlert('تعذر تحميل بيانات المنتج');
-    }
+    if (res.ok) { const product = await res.json(); openProductModal(product); }
+    else { tg.showAlert('تعذر تحميل بيانات المنتج'); }
   };
 
   window.deleteProduct = async (id) => {
     tg.showConfirm('حذف المنتج؟', async ok => {
       if (!ok) return;
       const res = await fetch(`${API}/api/shop/products/${id}`, { method: 'DELETE', headers: { 'X-Telegram-Init-Data': tg.initData } });
-      if (res.ok) {
-        loadProducts();
-      } else {
-        tg.showAlert('فشل الحذف');
-      }
+      if (res.ok) loadProducts(); else tg.showAlert('فشل الحذف');
     });
   };
 
+  // ========== التصنيفات ==========
+  async function loadCategoriesList() {
+    const container = document.getElementById('categoriesList');
+    container.innerHTML = '<div class="skeleton"></div>';
+    const res = await fetch(`${API}/api/shop/product-categories`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
+    const cats = await res.json();
+    container.innerHTML = cats.map(c => `
+      <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+        <div><b>${c.name}</b> (ترتيب: ${c.display_order})</div>
+        <div>
+          <button class="btn" onclick="editCategory(${c.id}, '${c.name}', ${c.display_order})">✏️</button>
+          <button class="btn btn-danger" onclick="deleteCategory(${c.id})">🗑️</button>
+        </div>
+      </div>
+    `).join('') || '<p>لا توجد تصنيفات</p>';
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
+
+  function openCategoryModal(id=null, name='', order=0) {
+    document.getElementById('categoryModalTitle').innerText = id ? 'تعديل تصنيف' : 'إضافة تصنيف';
+    document.getElementById('categoryId').value = id || '';
+    document.getElementById('categoryName').value = name;
+    document.getElementById('categoryOrder').value = order;
+    document.getElementById('categoryModal').style.display = 'flex';
+  }
+
+  window.editCategory = (id, name, order) => openCategoryModal(id, name, order);
+  window.closeCategoryModal = () => document.getElementById('categoryModal').style.display = 'none';
+
+  async function saveCategory() {
+    const id = document.getElementById('categoryId').value;
+    const name = document.getElementById('categoryName').value.trim();
+    const display_order = parseInt(document.getElementById('categoryOrder').value) || 0;
+    if (!name) return tg.showAlert('اسم التصنيف مطلوب');
+    const url = id ? `${API}/api/shop/product-categories/${id}` : `${API}/api/shop/product-categories`;
+    const method = id ? 'PUT' : 'POST';
+    try {
+      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData }, body: JSON.stringify({ name, display_order }) });
+      if (!res.ok) throw new Error((await res.json()).error);
+      closeCategoryModal();
+      loadCategoriesList();
+    } catch (e) { tg.showAlert('❌ ' + e.message); }
+  }
+
+  window.deleteCategory = async (id) => {
+    tg.showConfirm('حذف التصنيف؟ (سيتم إزالة التصنيف من المنتجات المرتبطة)', async ok => {
+      if (!ok) return;
+      const res = await fetch(`${API}/api/shop/product-categories/${id}`, { method: 'DELETE', headers: { 'X-Telegram-Init-Data': tg.initData } });
+      if (res.ok) loadCategoriesList(); else tg.showAlert('فشل الحذف');
+    });
+  };
+
+  document.getElementById('addCategoryBtn').onclick = () => openCategoryModal();
   document.getElementById('addProductBtn').onclick = () => openProductModal();
+
   document.getElementById('productImage').onchange = (e) => {
     const file = e.target.files[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = (ev) => {
-        document.getElementById('imagePreview').src = ev.target.result;
-        document.getElementById('imagePreview').style.display = 'block';
-      };
+      reader.onload = (ev) => { document.getElementById('imagePreview').src = ev.target.result; document.getElementById('imagePreview').style.display = 'block'; };
       reader.readAsDataURL(file);
     }
   };
 
-  // تحميل التصنيفات
-  async function loadCategories() {
-    const res = await fetch(`${API}/api/categories`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
-    categories = await res.json();
-    const sel = document.getElementById('productCategory');
-    sel.innerHTML = '<option value="">بدون تصنيف</option>';
-    categories.forEach(c => sel.add(new Option(c.name, c.id)));
-  }
-
-  // تحميل الطلبات (مختصرة)
+  // ========== الطلبات (مختصرة) ==========
   async function loadOrders(archived) {
     const c = document.getElementById(archived ? 'archivePanel' : 'activePanel');
     c.innerHTML = '<div class="skeleton"></div>';
@@ -289,10 +347,7 @@
     });
   }
 
-  // تهيئة
-  loadCategories();
   loadOrders(false);
-  loadProducts();
 </script>
 </body>
 </html>
