@@ -5,16 +5,8 @@ import pkg from 'pg';
 const { Pool } = pkg;
 
 const app = express();
-app.use(cors({
-  origin: [
-    'https://f8d8f121.delivery-mini-app.pages.dev',
-    'https://delivery-mini-app.pages.dev',
-    'https://72cdd4ae.delivery-mini-app.pages.dev',
-    'https://delivery-mini-app.manhal-almasriiii199119.workers.dev',
-    'https://delivery-dragon.vercel.app'
-  ],
-  credentials: true
-}));
+// ========== إعداد CORS طارئ (يسمح للجميع) ==========
+app.use(cors({ origin: '*', credentials: true }));
 app.use(express.json());
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
@@ -30,15 +22,17 @@ async function getDbUser(telegramId) { const res = await pool.query('SELECT * FR
 
 // ========== دوال الإشعارات المتقدمة ==========
 async function shouldSendNotification(userId, type) {
-  const settings = await pool.query('SELECT * FROM user_settings WHERE user_id = $1', [userId]);
-  if (!settings.rows[0]) return true;
-  const s = settings.rows[0];
-  if (type === 'order' && !s.notify_orders) return false;
-  if (s.quiet_hours_start && s.quiet_hours_end) {
-    const now = new Date().toTimeString().slice(0, 5);
-    if (now >= s.quiet_hours_start && now <= s.quiet_hours_end) return false;
-  }
-  return true;
+  try {
+    const settings = await pool.query('SELECT * FROM user_settings WHERE user_id = $1', [userId]);
+    if (!settings.rows[0]) return true;
+    const s = settings.rows[0];
+    if (type === 'order' && !s.notify_orders) return false;
+    if (s.quiet_hours_start && s.quiet_hours_end) {
+      const now = new Date().toTimeString().slice(0, 5);
+      if (now >= s.quiet_hours_start && now <= s.quiet_hours_end) return false;
+    }
+    return true;
+  } catch { return true; }
 }
 
 async function sendNotification(userId, message, options = {}) {
@@ -57,10 +51,7 @@ async function notifyShop(orderId) {
     if (order.rows[0]?.owner_chat_id) {
       await bot.api.sendMessage(order.rows[0].owner_chat_id,
         `🛎 *طلب جديد!*\n\nرقم الطلب: #${orderId}\nالمبلغ: ${order.rows[0].total_price} ل.س\nالعنوان: ${order.rows[0].address}`,
-        {
-          parse_mode: 'Markdown',
-          reply_markup: { inline_keyboard: [[{ text: '📋 عرض الطلب', web_app: { url: `${MINI_APP_URL}/shop-dashboard.html` } }]] }
-        }
+        { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '📋 عرض الطلب', web_app: { url: `${MINI_APP_URL}/shop-dashboard.html` } }]] } }
       );
     }
   } catch(e){ console.error('Notify shop error:',e); }
@@ -98,19 +89,11 @@ async function notifyAdminNewRegistration(type, name, phone, userId) {
   if (!ADMIN_ID) return;
   await bot.api.sendMessage(ADMIN_ID,
     `📝 *طلب تسجيل جديد*\n\n${type === 'shop' ? '🏪 متجر' : '🛵 سائق'}: ${name}\n📞 ${phone}`,
-    {
-      parse_mode: 'Markdown',
-      reply_markup: {
-        inline_keyboard: [[
-          { text: '✅ موافقة', callback_data: `approve_${userId}` },
-          { text: '❌ رفض', callback_data: `reject_${userId}` }
-        ]]
-      }
-    }
+    { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[ { text: '✅ موافقة', callback_data: `approve_${userId}` }, { text: '❌ رفض', callback_data: `reject_${userId}` } ]] } }
   );
 }
 
-// ========== أوامر البوت والإجراءات (Callback Actions) ==========
+// ========== أوامر البوت والإجراءات ==========
 bot.command('start', async (ctx) => {
   const telegramId = ctx.from.id; const chatId = ctx.chat.id.toString(); const name = ctx.from.first_name + (ctx.from.last_name ? ' ' + ctx.from.last_name : '');
   await pool.query(`INSERT INTO users (telegram_id, name, role, is_approved, chat_id) VALUES ($1,$2,'customer',true,$3) ON CONFLICT(telegram_id) DO UPDATE SET chat_id=EXCLUDED.chat_id, name=EXCLUDED.name`,[telegramId.toString(), name, chatId]);
@@ -148,16 +131,12 @@ bot.on(':photo', async (ctx) => {
   const userId = ctx.from.id;
   const dbUser = await getDbUser(userId);
   if (!dbUser) return ctx.reply('❌ لم يتم العثور على حسابك. أرسل /start أولاً.');
-  
-  // معالجة صور الدفع
   const order = await pool.query(`SELECT id, total_price FROM orders WHERE customer_id=$1 AND status='verifying' ORDER BY created_at DESC LIMIT 1`, [dbUser.id]);
   if (order.rows[0]) {
     const orderId = order.rows[0].id;
     const fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
     await pool.query(`UPDATE orders SET screenshot_file_id=$1, status=$2 WHERE id=$3 AND status='verifying'`, [fileId, 'pending', orderId]);
-    if (ADMIN_ID) {
-      await bot.api.sendMessage(ADMIN_ID, `🛡 *طلب جديد للمراجعة*\n\nرقم الطلب: #${orderId}\nالزبون: ${dbUser.name}\nالمبلغ: ${order.rows[0].total_price} ل.س\n\n[اضغط لمراجعة الطلب](${MINI_APP_URL}/admin-dashboard.html)`, { parse_mode: 'Markdown' });
-    }
+    if (ADMIN_ID) await bot.api.sendMessage(ADMIN_ID, `🛡 *طلب جديد للمراجعة*\n\nرقم الطلب: #${orderId}\nالزبون: ${dbUser.name}\nالمبلغ: ${order.rows[0].total_price} ل.س\n\n[اضغط لمراجعة الطلب](${MINI_APP_URL}/admin-dashboard.html)`, { parse_mode: 'Markdown' });
     return ctx.reply('✅ تم استلام لقطة الشاشة. سيقوم الأدمن بمراجعة طلبك قريباً.');
   }
 });
@@ -168,7 +147,6 @@ app.get('/api/categories', async (req, res) => { const result = await pool.query
 app.get('/api/cities', async (req, res) => { const result = await pool.query('SELECT * FROM cities WHERE is_active = true ORDER BY name'); res.json(result.rows); });
 app.get('/api/zones', async (req, res) => { const { city_id } = req.query; let query = 'SELECT * FROM delivery_zones WHERE is_active = true'; const params = []; if (city_id) { query += ' AND city_id = $1'; params.push(city_id); } query += ' ORDER BY zone_name'; const result = await pool.query(query, params); res.json(result.rows); });
 
-// تسجيل متجر (مع الحقول الجديدة)
 app.post('/api/register/shop', async (req, res) => { 
   try { 
     const initData = req.headers['x-telegram-init-data']; if (!initData) return res.status(401).json({ error: 'Unauthorized' }); 
@@ -182,7 +160,6 @@ app.post('/api/register/shop', async (req, res) => {
   } catch(error) { res.status(500).json({ error: error.message }); } 
 });
 
-// تسجيل سائق (مع الحقول الجديدة)
 app.post('/api/register/rider', async (req, res) => { 
   try { 
     const initData = req.headers['x-telegram-init-data']; if (!initData) return res.status(401).json({ error: 'Unauthorized' }); 
@@ -196,7 +173,7 @@ app.post('/api/register/rider', async (req, res) => {
   } catch(error) { res.status(500).json({ error: error.message }); } 
 });
 
-app.get('/api/shops', async (req, res) => { try { const { city_id, page=1, limit=20 } = req.query; const offset = (page-1)*limit; let query = `SELECT s.*, c.name as category_name, c.icon FROM shops s LEFT JOIN shop_categories c ON s.category_id=c.id WHERE s.is_open=true`; const params = []; if (city_id) { query += ' AND s.city_id = $1'; params.push(city_id); } query += ` ORDER BY s.created_at DESC LIMIT $${params.length+1} OFFSET $${params.length+2}`; params.push(limit, offset); const result = await pool.query(query, params); res.json(result.rows); } catch(error) { res.status(500).json({ error: error.message }); } });
+app.get('/api/shops', async (req, res) => { try { const { city_id } = req.query; let query = `SELECT s.*, c.name as category_name, c.icon FROM shops s LEFT JOIN shop_categories c ON s.category_id=c.id WHERE s.is_open=true`; const params = []; if (city_id) { query += ' AND s.city_id = $1'; params.push(city_id); } query += ` ORDER BY s.created_at DESC`; const result = await pool.query(query, params); res.json(result.rows); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.get('/api/shops/:shopId/products', async (req, res) => { try { const { shopId } = req.params; const result = await pool.query(`SELECT p.*, pc.name as category_name FROM products p LEFT JOIN product_categories pc ON p.category_id=pc.id WHERE p.shop_id=$1 AND p.is_available=true ORDER BY pc.display_order, p.name`,[shopId]); const categories = {}; result.rows.forEach(p => { const cat = p.category_name || 'أخرى'; if (!categories[cat]) categories[cat] = []; categories[cat].push(p); }); res.json({ categories }); } catch(error) { res.status(500).json({ error: error.message }); } });
 
 app.post('/api/orders', async (req, res) => {
