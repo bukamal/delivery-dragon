@@ -155,19 +155,56 @@ bot.on('edited_message', async (ctx) => {
     await pool.query(`UPDATE rider_details SET current_lat=$1, current_lng=$2 WHERE user_id=$3`,[latitude, longitude, dbUser.id]);
   }
 });
+
+// ===== معالجة الصور (لقطات الدفع) - نسخة محسّنة =====
 bot.on(':photo', async (ctx) => {
   const userId = ctx.from.id;
-  const dbUser = await getDbUser(userId);
-  if (!dbUser) return ctx.reply('❌ لم يتم العثور على حسابك. أرسل /start أولاً.');
-  const order = await pool.query(`SELECT id, total_price FROM orders WHERE customer_id=$1 AND status='verifying' ORDER BY created_at DESC LIMIT 1`, [dbUser.id]);
-  if (!order.rows[0]) return ctx.reply('❌ لا يوجد طلب معلق بانتظار الدفع. قم بإنشاء طلب أولاً من التطبيق.');
-  const orderId = order.rows[0].id;
-  const fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
-  await pool.query(`UPDATE orders SET screenshot_file_id=$1, status=$2 WHERE id=$3 AND status='verifying'`, [fileId, 'pending', orderId]);
-  if (ADMIN_ID) {
-    await bot.api.sendMessage(ADMIN_ID, `🛡 *طلب جديد للمراجعة*\n\nرقم الطلب: #${orderId}\nالزبون: ${dbUser.name || ctx.from.first_name}\nالمبلغ: ${order.rows[0].total_price} ل.س\n\n[اضغط لمراجعة الطلب](${MINI_APP_URL}/admin-dashboard.html)`, { parse_mode: 'Markdown' });
+  try {
+    const dbUser = await getDbUser(userId);
+    if (!dbUser) {
+      return ctx.reply('❌ لم يتم العثور على حسابك. أرسل /start أولاً.');
+    }
+
+    const orderQuery = await pool.query(
+      `SELECT id, total_price FROM orders WHERE customer_id=$1 AND status='verifying' ORDER BY created_at DESC LIMIT 1`,
+      [dbUser.id]
+    );
+    if (!orderQuery.rows[0]) {
+      return ctx.reply('❌ لا يوجد طلب معلق بانتظار الدفع. قم بإنشاء طلب أولاً من التطبيق.');
+    }
+
+    const orderId = orderQuery.rows[0].id;
+    const fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+
+    const updateResult = await pool.query(
+      `UPDATE orders SET screenshot_file_id=$1, status=$2 WHERE id=$3 AND status='verifying'`,
+      [fileId, 'pending', orderId]
+    );
+
+    if (updateResult.rowCount === 0) {
+      console.error(`❌ فشل تحديث الطلب #${orderId} - ربما تغيرت حالته`);
+      return ctx.reply('⚠️ حدث خطأ أثناء تحديث الطلب. يرجى التواصل مع الدعم.');
+    }
+
+    console.log(`✅ الطلب #${orderId} تم تحديثه إلى pending`);
+
+    if (ADMIN_ID) {
+      try {
+        await bot.api.sendMessage(
+          ADMIN_ID,
+          `🛡 *طلب جديد للمراجعة*\n\nرقم الطلب: #${orderId}\nالزبون: ${dbUser.name || ctx.from.first_name}\nالمبلغ: ${orderQuery.rows[0].total_price} ل.س\n\n[اضغط لمراجعة الطلب](${MINI_APP_URL}/admin-dashboard.html)`,
+          { parse_mode: 'Markdown' }
+        );
+      } catch (adminErr) {
+        console.error('❌ فشل إرسال إشعار للأدمن:', adminErr);
+      }
+    }
+
+    ctx.reply('✅ تم استلام لقطة الشاشة. سيقوم الأدمن بمراجعة طلبك قريباً.');
+  } catch (error) {
+    console.error('❌ خطأ في معالجة الصورة:', error);
+    ctx.reply('❌ حدث خطأ غير متوقع. يرجى المحاولة لاحقاً أو التواصل مع الدعم.');
   }
-  ctx.reply('✅ تم استلام لقطة الشاشة. سيقوم الأدمن بمراجعة طلبك قريباً.');
 });
 
 async function calculateETA(originLat, originLng, destLat, destLng) {
