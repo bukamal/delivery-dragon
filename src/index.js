@@ -155,55 +155,23 @@ bot.on('edited_message', async (ctx) => {
     await pool.query(`UPDATE rider_details SET current_lat=$1, current_lng=$2 WHERE user_id=$3`,[latitude, longitude, dbUser.id]);
   }
 });
-
-// ===== معالجة الصور (لقطات الدفع) - نسخة محسّنة =====
 bot.on(':photo', async (ctx) => {
   const userId = ctx.from.id;
   try {
     const dbUser = await getDbUser(userId);
-    if (!dbUser) {
-      return ctx.reply('❌ لم يتم العثور على حسابك. أرسل /start أولاً.');
-    }
-
-    const orderQuery = await pool.query(
-      `SELECT id, total_price FROM orders WHERE customer_id=$1 AND status='verifying' ORDER BY created_at DESC LIMIT 1`,
-      [dbUser.id]
-    );
-    if (!orderQuery.rows[0]) {
-      return ctx.reply('❌ لا يوجد طلب معلق بانتظار الدفع. قم بإنشاء طلب أولاً من التطبيق.');
-    }
-
-    const orderId = orderQuery.rows[0].id;
+    if (!dbUser) return ctx.reply('❌ لم يتم العثور على حسابك. أرسل /start أولاً.');
+    const order = await pool.query(`SELECT id, total_price FROM orders WHERE customer_id=$1 AND status='verifying' ORDER BY created_at DESC LIMIT 1`, [dbUser.id]);
+    if (!order.rows[0]) return ctx.reply('❌ لا يوجد طلب معلق بانتظار الدفع. قم بإنشاء طلب أولاً من التطبيق.');
+    const orderId = order.rows[0].id;
     const fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
-
-    const updateResult = await pool.query(
-      `UPDATE orders SET screenshot_file_id=$1, status=$2 WHERE id=$3 AND status='verifying'`,
-      [fileId, 'pending', orderId]
-    );
-
-    if (updateResult.rowCount === 0) {
-      console.error(`❌ فشل تحديث الطلب #${orderId} - ربما تغيرت حالته`);
-      return ctx.reply('⚠️ حدث خطأ أثناء تحديث الطلب. يرجى التواصل مع الدعم.');
-    }
-
-    console.log(`✅ الطلب #${orderId} تم تحديثه إلى pending`);
-
+    await pool.query(`UPDATE orders SET screenshot_file_id=$1, status=$2 WHERE id=$3 AND status='verifying'`, [fileId, 'pending', orderId]);
     if (ADMIN_ID) {
-      try {
-        await bot.api.sendMessage(
-          ADMIN_ID,
-          `🛡 *طلب جديد للمراجعة*\n\nرقم الطلب: #${orderId}\nالزبون: ${dbUser.name || ctx.from.first_name}\nالمبلغ: ${orderQuery.rows[0].total_price} ل.س\n\n[اضغط لمراجعة الطلب](${MINI_APP_URL}/admin-dashboard.html)`,
-          { parse_mode: 'Markdown' }
-        );
-      } catch (adminErr) {
-        console.error('❌ فشل إرسال إشعار للأدمن:', adminErr);
-      }
+      await bot.api.sendMessage(ADMIN_ID, `🛡 *طلب جديد للمراجعة*\n\nرقم الطلب: #${orderId}\nالزبون: ${dbUser.name || ctx.from.first_name}\nالمبلغ: ${order.rows[0].total_price} ل.س\n\n[اضغط لمراجعة الطلب](${MINI_APP_URL}/admin-dashboard.html)`, { parse_mode: 'Markdown' });
     }
-
     ctx.reply('✅ تم استلام لقطة الشاشة. سيقوم الأدمن بمراجعة طلبك قريباً.');
   } catch (error) {
-    console.error('❌ خطأ في معالجة الصورة:', error);
-    ctx.reply('❌ حدث خطأ غير متوقع. يرجى المحاولة لاحقاً أو التواصل مع الدعم.');
+    console.error('Photo error:', error);
+    ctx.reply('❌ حدث خطأ. حاول مرة أخرى.');
   }
 });
 
@@ -241,6 +209,18 @@ app.get('/api/orders/:orderId/eta', optionalAuth, async (req, res) => {
     const { distance, duration } = await calculateETA(rider.rows[0].current_lat, rider.rows[0].current_lng, delivery_latitude, delivery_longitude);
     res.json({ distance_km: distance, eta_minutes: duration });
   } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+// ========== WEBHOOK (يجب أن يكون قبل requireAuth) ==========
+app.post('/api/webhook', async (req, res) => {
+  try {
+    await ensureBotInitialized();
+    await bot.handleUpdate(req.body);
+    res.status(200).send('OK');
+  } catch(err) {
+    console.error('Webhook error:', err);
+    res.status(500).send('Error');
+  }
 });
 
 // ========== PROTECTED ROUTES ==========
@@ -401,6 +381,5 @@ app.get('/api/admin/support/users', requireAuth, async (req, res) => { try { con
 app.get('/api/admin/support/messages/:userId', requireAuth, async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' }); const { userId } = req.params; const messages = await pool.query(`SELECT m.*, u.name as user_name, u.role as user_role, a.name as admin_name FROM support_messages m JOIN users u ON m.user_id = u.id LEFT JOIN users a ON m.admin_id = a.id WHERE m.user_id = $1 ORDER BY m.created_at ASC`, [userId]); await pool.query(`UPDATE support_messages SET is_read = true WHERE user_id = $1 AND is_from_admin = false`, [userId]); res.json(messages.rows); } catch (error) { res.status(500).json({ error: error.message }); } });
 app.post('/api/admin/support/messages/:userId', requireAuth, async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' }); const { userId } = req.params; const { message } = req.body; if (!message || !message.trim()) return res.status(400).json({ error: 'Message required' }); await pool.query(`INSERT INTO support_messages (user_id, admin_id, message, is_from_admin) VALUES ($1, $2, $3, true)`, [userId, dbUser.id, message.trim()]); res.status(201).json({ success: true }); } catch (error) { res.status(500).json({ error: error.message }); } });
 
-app.post('/api/webhook', async (req, res) => { try { await ensureBotInitialized(); await bot.handleUpdate(req.body); res.status(200).send('OK'); } catch(err) { console.error('Webhook error:', err); res.status(500).send('Error'); } });
 app.get('/', (req, res) => res.send('🦅 شاهين API is running.'));
 export default app;
