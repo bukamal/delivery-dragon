@@ -23,7 +23,6 @@
     .btn-outline { background: transparent; border: 1px solid #e67e22; color: #e67e22; }
     .rider-info { background: var(--tg-theme-bg-color, #f8f9fa); padding: 16px; border-radius: 20px; margin: 16px 0; display: flex; align-items: center; gap: 16px; }
     .eta-badge { background: #e67e22; color: white; padding: 8px 16px; border-radius: 40px; text-align: center; font-weight: 500; }
-    .loading { text-align: center; padding: 40px; color: var(--tg-theme-hint-color); }
   </style>
 </head>
 <body>
@@ -57,43 +56,30 @@
 </div>
 <script>
   const tg = Telegram.WebApp;
-  tg.ready();
-  tg.BackButton.show();
-  tg.BackButton.onClick(() => history.back());
+  tg.ready(); tg.BackButton.show(); tg.BackButton.onClick(() => history.back());
 
   const API = 'https://delivery-dragon.vercel.app';
   const orderId = new URLSearchParams(location.search).get('order_id');
   document.getElementById('orderId').innerText = orderId;
 
   let map, marker, riderPhone, updateInterval;
-  const statusEmojis = {
-    paid: '💰', preparing: '👨‍🍳', ready_for_pickup: '📦', delivering: '🛵', completed: '✅', rejected: '❌'
-  };
-  const statusMessages = {
-    paid: 'مدفوع', preparing: 'تحضير', ready_for_pickup: 'جاهز', delivering: 'توصيل', completed: 'مكتمل', rejected: 'ملغي'
-  };
+  const statusEmojis = { paid: '💰', preparing: '👨‍🍳', ready_for_pickup: '📦', delivering: '🛵', completed: '✅', rejected: '❌' };
+  const statusMessages = { paid: 'مدفوع', preparing: 'تحضير', ready_for_pickup: 'جاهز', delivering: 'توصيل', completed: 'مكتمل', rejected: 'ملغي' };
 
   function initMap(lat, lng) {
-    if (map) {
-      map.setView([lat, lng], 15);
-      marker.setLatLng([lat, lng]);
-    } else {
+    if (map) { map.setView([lat, lng], 15); marker.setLatLng([lat, lng]); }
+    else {
       document.getElementById('map').innerHTML = '';
       map = L.map('map').setView([lat, lng], 15);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap'
-      }).addTo(map);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
       marker = L.marker([lat, lng]).addTo(map).bindPopup('📍 موقع السائق').openPopup();
     }
   }
 
   async function fetchData() {
     try {
-      const statusRes = await fetch(`${API}/api/orders/${orderId}/status`, {
-        headers: { 'X-Telegram-Init-Data': tg.initData }
-      });
+      const statusRes = await fetch(`${API}/api/orders/${orderId}/status`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
       const statusData = await statusRes.json();
-
       const status = statusData.status;
       document.getElementById('statusEmoji').innerText = statusEmojis[status] || '⏳';
       document.getElementById('statusMessage').innerText = statusMessages[status] || status;
@@ -106,17 +92,15 @@
       if (status === 'completed') document.querySelectorAll('.step').forEach(el => el.classList.add('active'));
 
       if (status === 'delivering') {
-        const locationRes = await fetch(`${API}/api/orders/${orderId}/location`, {
-          headers: { 'X-Telegram-Init-Data': tg.initData }
-        });
+        const [locationRes, etaRes] = await Promise.all([
+          fetch(`${API}/api/orders/${orderId}/location`, { headers: { 'X-Telegram-Init-Data': tg.initData } }),
+          fetch(`${API}/api/orders/${orderId}/eta`, { headers: { 'X-Telegram-Init-Data': tg.initData } })
+        ]);
         const locationData = await locationRes.json();
+        const etaData = await etaRes.json();
 
-        if (locationData.latitude && locationData.longitude) {
-          initMap(locationData.latitude, locationData.longitude);
-          document.getElementById('map').style.display = 'block';
-        } else {
-          document.getElementById('map').innerHTML = '<p style="text-align:center;padding:20px;">📍 في انتظار مشاركة السائق لموقعه...</p>';
-        }
+        if (locationData.latitude && locationData.longitude) initMap(locationData.latitude, locationData.longitude);
+        else document.getElementById('map').innerHTML = '<p style="text-align:center;padding:20px;">📍 في انتظار مشاركة السائق لموقعه...</p>';
 
         if (statusData.rider_name) {
           document.getElementById('riderInfo').style.display = 'block';
@@ -125,41 +109,26 @@
           riderPhone = statusData.rider_phone;
         }
 
-        const eta = Math.floor(Math.random() * 10) + 5;
         document.getElementById('etaDisplay').style.display = 'block';
-        document.getElementById('etaDisplay').innerHTML = `⏱️ الوقت المقدر للوصول: ${eta}-${eta+5} دقيقة`;
+        if (etaData.eta_minutes) {
+          document.getElementById('etaDisplay').innerHTML = `⏱️ الوقت المقدر: ${etaData.eta_minutes} دقيقة (${Math.round(etaData.distance_km)} كم)`;
+        } else {
+          document.getElementById('etaDisplay').innerHTML = `⏱️ ${etaData.message || 'جاري حساب الوقت...'}`;
+        }
       } else {
         document.getElementById('map').innerHTML = '<p style="text-align:center;padding:20px;">🗺️ الخريطة ستظهر عند بدء التوصيل</p>';
         document.getElementById('riderInfo').style.display = 'none';
         document.getElementById('etaDisplay').style.display = 'none';
         if (map) { map.remove(); map = null; }
       }
-
       if (typeof lucide !== 'undefined') lucide.createIcons();
-    } catch (error) {
-      console.error('Fetch error:', error);
-      document.getElementById('statusMessage').innerText = 'تعذر تحديث البيانات';
-    }
+    } catch (error) { document.getElementById('statusMessage').innerText = 'تعذر تحديث البيانات'; }
   }
 
-  function startPolling() {
-    fetchData();
-    updateInterval = setInterval(fetchData, 10000);
-  }
-
-  window.addEventListener('beforeunload', () => {
-    if (updateInterval) clearInterval(updateInterval);
-  });
-
+  function startPolling() { fetchData(); updateInterval = setInterval(fetchData, 10000); }
+  window.addEventListener('beforeunload', () => { if (updateInterval) clearInterval(updateInterval); });
   document.getElementById('refreshBtn').onclick = fetchData;
-  document.getElementById('callDriverBtn').onclick = () => {
-    if (riderPhone) {
-      tg.openLink(`tel:${riderPhone}`);
-    } else {
-      tg.showAlert('رقم السائق غير متوفر حالياً');
-    }
-  };
-
+  document.getElementById('callDriverBtn').onclick = () => { riderPhone ? tg.openLink(`tel:${riderPhone}`) : tg.showAlert('الرقم غير متوفر'); };
   startPolling();
 </script>
 </body>
