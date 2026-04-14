@@ -1,1 +1,157 @@
-<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><title>شاهين | التوصيل الأسرع</title><script src="https://telegram.org/js/telegram-web-app.js"></script><link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Tajawal',sans-serif;background:var(--tg-theme-bg-color,#f5f7fb);color:var(--tg-theme-text-color,#1a1a2c);padding:0 0 30px}.app-header{display:flex;align-items:center;padding:16px 20px;background:var(--tg-theme-secondary-bg-color,#fff);border-bottom:1px solid var(--tg-theme-hint-color,rgba(0,0,0,.05));position:sticky;top:0;z-index:10}.app-header h1{font-size:1.8rem;font-weight:700;color:#e67e22;margin-right:16px}.back-btn{background:0 0;border:none;color:#e67e22;font-size:1.5rem;cursor:pointer;padding:8px}.container{padding:24px 16px;max-width:500px;margin:0 auto}.card{background:var(--tg-theme-secondary-bg-color,#fff);border-radius:28px;padding:24px;box-shadow:0 10px 30px rgba(0,0,0,.03);border:1px solid var(--tg-theme-hint-color,rgba(0,0,0,.05))}.btn{display:block;width:100%;background:#e67e22;color:#fff;border:none;padding:16px 20px;margin:16px 0;border-radius:60px;font-size:1.1rem;font-weight:600;text-align:center;text-decoration:none;cursor:pointer;box-shadow:0 6px 14px rgba(230,126,34,.2)}.btn-outline{background:0 0;color:var(--tg-theme-text-color,#1a1a2c);border:2px solid #e67e22;box-shadow:none}.skeleton{height:80px;background:linear-gradient(90deg,#eee 25%,#ddd 50%,#eee 75%);background-size:200% 100%;animation:loading 1.5s infinite;border-radius:16px}@keyframes loading{0%{background-position:200% 0}100%{background-position:-200% 0}}</style></head><body><div class="app-header"><button class="back-btn" onclick="history.back()">←</button><h1>🦅 شاهين</h1></div><div class="container"><div class="card" id="dynamic-content"><div class="skeleton" style="height:100px"></div><div class="skeleton" style="margin-top:16px;height:50px"></div></div></div><script>const tg=window.Telegram.WebApp;tg.ready();tg.BackButton.hide();const API='https://delivery-dragon.vercel.app';const c=document.getElementById('dynamic-content');(async()=>{try{const r=await fetch(`${API}/api/me`,{headers:{'X-Telegram-Init-Data':tg.initData}});if(!r.ok)throw new Error('تعذر الاتصال');const u=await r.json();const role=u?.role||'customer',approved=u?.is_approved,name=u?.name||'بطل';let h='';if(role==='admin'){location='admin-dashboard.html'}else if(role==='shop'&&approved){location='shop-dashboard.html'}else if(role==='rider'&&approved){location='rider-dashboard.html'}else if((role==='shop'||role==='rider')&&!approved){h='<div style="text-align:center"><span style="font-size:48px">⏳</span><h2>قيد المراجعة</h2><p>حسابك قيد المراجعة.</p><button class="btn" onclick="Telegram.WebApp.close()">حسنًا</button></div>'}else{h=`<div style="text-align:center"><span style="font-size:48px">👋</span><h2>مرحباً ${name}!</h2></div><a href="customer-home.html" class="btn">🍔 تصفح المطاعم</a><a href="my-orders.html" class="btn btn-outline">📋 طلباتي</a><a href="register-shop.html" class="btn btn-outline">🏪 سجل متجر</a><a href="register-rider.html" class="btn btn-outline">🛵 سجل كسائق</a>`}c.innerHTML=h}catch(e){c.innerHTML=`<div class="card"><p>⚠️ ${e.message}</p><button class="btn" onclick="location.reload()">إعادة المحاولة</button></div>`}})()</script></body></html>
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>شاهين | الوجهة الأسرع</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Tajawal', sans-serif;
+      background: var(--tg-theme-bg-color, #f5f7fb);
+      color: var(--tg-theme-text-color, #1a1a2c);
+      padding: 0 0 20px;
+    }
+    .app-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      background: var(--tg-theme-secondary-bg-color, #ffffff);
+      border-bottom: 1px solid var(--tg-theme-hint-color, rgba(0,0,0,0.05));
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      backdrop-filter: blur(10px);
+    }
+    .app-header h1 {
+      font-size: 1.9rem;
+      font-weight: 700;
+      color: #e67e22;
+      letter-spacing: -0.5px;
+    }
+    .app-header .badge {
+      background: #e67e22;
+      color: white;
+      padding: 4px 12px;
+      border-radius: 30px;
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+    .container {
+      padding: 24px 16px;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+    .card {
+      background: var(--tg-theme-secondary-bg-color, #ffffff);
+      border-radius: 28px;
+      padding: 28px 20px;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.03);
+      border: 1px solid var(--tg-theme-hint-color, rgba(0,0,0,0.05));
+    }
+    .skeleton {
+      background: linear-gradient(90deg, var(--tg-theme-secondary-bg-color, #eee) 25%, #ddd 50%, #eee 75%);
+      background-size: 200% 100%;
+      animation: loading 1.5s infinite;
+      border-radius: 20px;
+      height: 90px;
+    }
+    @keyframes loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+    .btn {
+      display: block;
+      width: 100%;
+      background: #e67e22;
+      color: white;
+      border: none;
+      padding: 18px 20px;
+      margin: 16px 0;
+      border-radius: 60px;
+      font-size: 1.2rem;
+      font-weight: 700;
+      text-align: center;
+      text-decoration: none;
+      transition: 0.2s;
+      box-shadow: 0 8px 18px rgba(230,126,34,0.2);
+      cursor: pointer;
+    }
+    .btn:active { transform: scale(0.97); opacity: 0.9; }
+    .btn-outline {
+      background: transparent;
+      color: var(--tg-theme-text-color, #1a1a2c);
+      border: 2px solid #e67e22;
+      box-shadow: none;
+    }
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+    }
+    .empty-state .emoji { font-size: 64px; margin-bottom: 16px; }
+  </style>
+</head>
+<body>
+<div class="app-header">
+  <h1>🦅 شاهين</h1>
+  <span class="badge">نحن أسرع إليك</span>
+</div>
+<div class="container">
+  <div class="card" id="dynamicContent">
+    <div class="skeleton"></div>
+    <div class="skeleton" style="margin-top: 16px; height: 60px;"></div>
+  </div>
+</div>
+<script>
+  (function() {
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+    tg.expand();
+    tg.BackButton.hide();
+    const API = 'https://delivery-dragon.vercel.app';
+    const container = document.getElementById('dynamicContent');
+
+    async function init() {
+      try {
+        const res = await fetch(`${API}/api/me`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
+        if (!res.ok) throw new Error('تعذر الاتصال بالخادم');
+        const user = await res.json();
+        const role = user?.role || 'customer';
+        const isApproved = user?.is_approved;
+        const name = user?.name || 'بطل';
+
+        let html = '';
+        if (role === 'admin') {
+          window.location.href = 'admin-dashboard.html';
+          return;
+        } else if (role === 'shop' && isApproved) {
+          window.location.href = 'shop-dashboard.html';
+          return;
+        } else if (role === 'rider' && isApproved) {
+          window.location.href = 'rider-dashboard.html';
+          return;
+        } else if ((role === 'shop' || role === 'rider') && !isApproved) {
+          html = `<div class="empty-state"><div class="emoji">⏳</div><h2>قيد المراجعة</h2><p>حسابك قيد المراجعة من قبل الإدارة. سنقوم بإشعارك عند التفعيل.</p><button class="btn" onclick="window.Telegram.WebApp.close()">حسنًا</button></div>`;
+        } else {
+          html = `
+            <div style="text-align: center; margin-bottom: 10px;">
+              <span style="font-size: 56px;">👋</span>
+              <h2 style="margin: 8px 0 4px;">مرحباً ${name}!</h2>
+              <p style="color: var(--tg-theme-hint-color);">ماذا تود أن تفعل اليوم؟</p>
+            </div>
+            <a href="customer-home.html" class="btn">🍔 تصفح المتاجر</a>
+            <a href="my-orders.html" class="btn btn-outline">📋 طلباتي</a>
+            <a href="register-shop.html" class="btn btn-outline">🏪 سجل متجرك</a>
+            <a href="register-rider.html" class="btn btn-outline">🛵 انضم كسائق</a>
+          `;
+        }
+        container.innerHTML = html;
+      } catch (e) {
+        container.innerHTML = `<div class="empty-state"><div class="emoji">⚠️</div><p>${e.message}</p><button class="btn" onclick="location.reload()">إعادة المحاولة</button></div>`;
+      }
+    }
+    init();
+  })();
+</script>
+</body>
+</html>

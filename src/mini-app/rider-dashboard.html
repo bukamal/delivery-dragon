@@ -1,1 +1,79 @@
-<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>لوحة السائق</title><script src="https://telegram.org/js/telegram-web-app.js"></script><link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet"><style>body{font-family:'Tajawal';background:#f5f7fb;padding:16px}.tab{display:flex;gap:10px}.tab-btn{flex:1;padding:12px;background:#ddd;border-radius:30px;text-align:center}.active{background:#e67e22;color:#fff}.card{background:#fff;border-radius:20px;padding:16px;margin-bottom:16px}.btn{background:#e67e22;color:#fff;border:none;padding:10px 20px;border-radius:30px}</style></head><body><h2>🛵 السائق</h2><div class="tab"><div class="tab-btn active" data-tab="available">المتاحة</div><div class="tab-btn" data-tab="active">النشطة</div></div><div id="availablePanel"></div><div id="activePanel" style="display:none"></div><script>const tg=Telegram.WebApp;tg.ready();const API='https://delivery-dragon.vercel.app';const tabs=document.querySelectorAll('.tab-btn');tabs.forEach(t=>t.onclick=()=>{tabs.forEach(x=>x.classList.remove('active'));t.classList.add('active');['availablePanel','activePanel'].forEach(p=>document.getElementById(p).style.display='none');document.getElementById(t.dataset.tab+'Panel').style.display='block';if(t.dataset.tab==='available')loadAvailable();else loadActive()});async function loadAvailable(){const r=await fetch(`${API}/api/rider/available-orders`,{headers:{'X-Telegram-Init-Data':tg.initData}});const orders=await r.json();document.getElementById('availablePanel').innerHTML=orders.map(o=>`<div class="card"><b>#${o.id}</b> - ${o.shop_name}<br>📍 ${o.zone_name} - ${o.address}<br>💰 ${o.delivery_fee} ل.س<br><button class="btn" onclick="accept('${o.id}')">قبول</button></div>`).join('')||'<p>لا طلبات</p>'}window.accept=async id=>{await fetch(`${API}/api/rider/accept-order`,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify({order_id:id})});loadAvailable();loadActive()};async function loadActive(){const r=await fetch(`${API}/api/rider/active-order`,{headers:{'X-Telegram-Init-Data':tg.initData}});const o=await r.json();if(!o){document.getElementById('activePanel').innerHTML='<p>لا طلب نشط</p>';return}document.getElementById('activePanel').innerHTML=`<div class="card"><b>#${o.id}</b> - ${o.shop_name}<br>📍 ${o.address}<br>💰 ${o.delivery_fee} ل.س<br><button class="btn" onclick="complete(${o.id})">✅ تم التوصيل</button><button class="btn" style="background:#e74c3c" onclick="cancel(${o.id})">❌ إلغاء</button></div>`}window.complete=async id=>{await fetch(`${API}/api/rider/complete-order`,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify({order_id:id})});loadActive()};window.cancel=async id=>{await fetch(`${API}/api/rider/cancel-order`,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify({order_id:id})});loadActive();loadAvailable()};loadAvailable();setInterval(()=>{if(document.querySelector('.tab-btn.active').dataset.tab==='available')loadAvailable();else loadActive()},10000)</script></body></html>
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>شاهين | لوحة السائق</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Tajawal', sans-serif; background: var(--tg-theme-bg-color, #f5f7fb); color: var(--tg-theme-text-color, #1a1a2c); padding: 0 0 20px; }
+    .app-header { display: flex; align-items: center; padding: 16px 20px; background: var(--tg-theme-secondary-bg-color, #fff); border-bottom: 1px solid #ddd; position: sticky; top:0; z-index:10; }
+    .app-header h1 { font-size:1.7rem; color:#e67e22; margin-right:12px; }
+    .back-btn { background:none; border:none; color:#e67e22; font-size:1.8rem; cursor:pointer; }
+    .container { padding:16px; max-width:600px; margin:0 auto; }
+    .tabs { display:flex; gap:10px; margin-bottom:20px; }
+    .tab { flex:1; padding:14px; background:var(--tg-theme-secondary-bg-color, #fff); border-radius:30px; text-align:center; cursor:pointer; font-weight:500; border:1px solid #ddd; }
+    .tab.active { background:#e67e22; color:#fff; }
+    .panel { display:none; }
+    .panel.active { display:block; }
+    .card { background:var(--tg-theme-secondary-bg-color, #fff); border-radius:20px; padding:16px; margin-bottom:16px; box-shadow:0 4px 12px rgba(0,0,0,0.02); }
+    .btn { background:#e67e22; color:#fff; border:none; padding:10px 20px; border-radius:30px; cursor:pointer; margin-right:8px; }
+    .btn-danger { background:#e74c3c; }
+    .skeleton { height:120px; background:linear-gradient(90deg, #eee 25%, #ddd 50%, #eee 75%); background-size:200% 100%; animation:loading 1.5s infinite; border-radius:20px; }
+    @keyframes loading { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+  </style>
+</head>
+<body>
+<div class="app-header"><button class="back-btn" onclick="history.back()">←</button><h1>🦅 شاهين</h1></div>
+<div class="container">
+  <h2 style="margin-bottom:16px">🛵 لوحة السائق</h2>
+  <div class="tabs">
+    <div class="tab active" data-tab="available">🟢 المتاحة</div>
+    <div class="tab" data-tab="active">🔵 نشطة</div>
+  </div>
+  <div id="availablePanel" class="panel active"></div>
+  <div id="activePanel" class="panel"></div>
+</div>
+<script>
+  const tg = Telegram.WebApp; tg.ready(); tg.BackButton.show(); tg.BackButton.onClick(()=>history.back());
+  const API = 'https://delivery-dragon.vercel.app';
+  const tabs = document.querySelectorAll('.tab');
+  tabs.forEach(t => t.onclick = () => {
+    tabs.forEach(x => x.classList.remove('active')); t.classList.add('active');
+    ['availablePanel','activePanel'].forEach(p => document.getElementById(p).classList.remove('active'));
+    document.getElementById(t.dataset.tab + 'Panel').classList.add('active');
+    if (t.dataset.tab === 'available') loadAvailable(); else loadActive();
+  });
+  async function loadAvailable() {
+    const c = document.getElementById('availablePanel'); c.innerHTML = '<div class="skeleton"></div>';
+    const res = await fetch(`${API}/api/rider/available-orders`, { headers:{'X-Telegram-Init-Data':tg.initData} });
+    const orders = await res.json();
+    if (!orders.length) { c.innerHTML = '<p>🚀 لا توجد طلبات متاحة</p>'; return; }
+    c.innerHTML = orders.map(o => `<div class="card"><b>#${o.id}</b> - ${o.shop_name}<br>📍 ${o.zone_name} - ${o.address}<br>💰 ${o.delivery_fee} ل.س<br><button class="btn" onclick="accept('${o.id}')">✅ قبول</button></div>`).join('');
+  }
+  window.accept = async id => {
+    await fetch(`${API}/api/rider/accept-order`, { method:'POST', headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData}, body:JSON.stringify({order_id:id}) });
+    loadAvailable(); loadActive();
+  };
+  async function loadActive() {
+    const c = document.getElementById('activePanel'); c.innerHTML = '<div class="skeleton"></div>';
+    const res = await fetch(`${API}/api/rider/active-order`, { headers:{'X-Telegram-Init-Data':tg.initData} });
+    const o = await res.json();
+    if (!o) { c.innerHTML = '<p>لا يوجد طلب نشط</p>'; return; }
+    c.innerHTML = `<div class="card"><b>#${o.id}</b> - ${o.shop_name}<br>📞 ${o.customer_phone||''}<br>📍 ${o.address}<br>💰 ${o.delivery_fee} ل.س<br><button class="btn" onclick="complete(${o.id})">✅ تم التوصيل</button><button class="btn btn-danger" onclick="cancel(${o.id})">❌ إلغاء</button></div>`;
+  }
+  window.complete = async id => {
+    await fetch(`${API}/api/rider/complete-order`, { method:'POST', headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData}, body:JSON.stringify({order_id:id}) });
+    loadActive();
+  };
+  window.cancel = async id => {
+    await fetch(`${API}/api/rider/cancel-order`, { method:'POST', headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData}, body:JSON.stringify({order_id:id}) });
+    loadActive(); loadAvailable();
+  };
+  loadAvailable();
+  setInterval(() => document.querySelector('.tab.active').dataset.tab === 'available' ? loadAvailable() : loadActive(), 10000);
+</script>
+</body>
+</html>
