@@ -41,124 +41,84 @@
   <div class="tabs">
     <div class="tab active" data-tab="available">🟢 المتاحة</div>
     <div class="tab" data-tab="active">🔵 نشطة</div>
+    <div class="tab" data-tab="support">💬 الدعم</div>
   </div>
   <div id="availablePanel" class="panel active"></div>
   <div id="activePanel" class="panel"></div>
+  <div id="supportPanel" class="panel">
+    <div class="card" style="text-align:center; padding:40px;">
+      <i data-lucide="message-circle" style="font-size:48px; color:#e67e22;"></i>
+      <h3 style="margin:16px 0;">الدعم الفني</h3>
+      <p>تواصل مع فريق الدعم للإبلاغ عن مشكلة أو طرح استفسار.</p>
+      <button class="btn" onclick="location.href='support.html'" style="margin-top:20px;">💬 فتح المحادثة</button>
+    </div>
+  </div>
 </div>
 <script>
   const tg = Telegram.WebApp; tg.ready(); tg.BackButton.show(); tg.BackButton.onClick(() => history.back());
   const API = 'https://delivery-dragon.vercel.app';
   const tabs = document.querySelectorAll('.tab');
   tabs.forEach(t => t.onclick = () => {
-    tabs.forEach(x => x.classList.remove('active'));
-    t.classList.add('active');
-    ['availablePanel','activePanel'].forEach(p => document.getElementById(p).classList.remove('active'));
+    tabs.forEach(x => x.classList.remove('active')); t.classList.add('active');
+    ['availablePanel','activePanel','supportPanel'].forEach(p => document.getElementById(p).classList.remove('active'));
     document.getElementById(t.dataset.tab + 'Panel').classList.add('active');
-    if(t.dataset.tab === 'available') loadAvailable(); else loadActive();
+    if(t.dataset.tab === 'available') loadAvailable(); else if(t.dataset.tab === 'active') loadActive();
   });
 
   async function loadAvailable() {
-    const c = document.getElementById('availablePanel');
-    c.innerHTML = '<div class="skeleton"></div>';
+    const c = document.getElementById('availablePanel'); c.innerHTML = '<div class="skeleton"></div>';
     const r = await fetch(`${API}/api/rider/available-orders`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
     const orders = await r.json();
-    if(!orders.length) {
-      c.innerHTML = '<div style="text-align:center;padding:40px"><h3>لا توجد طلبات</h3></div>';
-      return;
-    }
-    c.innerHTML = orders.map(o => `
-      <div class="card">
-        <b>#${o.id}</b> - ${o.shop_name}<br>
-        📍 ${o.zone_name} - ${o.address}<br>
-        💰 ${o.delivery_fee} ل.س<br>
-        <button class="btn" onclick="accept('${o.id}')"><i data-lucide="check"></i> قبول</button>
-      </div>
-    `).join('');
+    if(!orders.length) { c.innerHTML = '<div style="text-align:center;padding:40px"><h3>لا توجد طلبات</h3></div>'; return; }
+    c.innerHTML = orders.map(o => `<div class="card"><b>#${o.id}</b> - ${o.shop_name}<br>📍 ${o.address}<br>💰 ${o.delivery_fee} ل.س<br><button class="btn" onclick="accept('${o.id}')"><i data-lucide="check"></i> قبول</button></div>`).join('');
     if(typeof lucide !== 'undefined') lucide.createIcons();
   }
 
   window.accept = async id => {
-    await fetch(`${API}/api/rider/accept-order`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData },
-      body: JSON.stringify({ order_id: id })
-    });
-    loadAvailable();
-    loadActive();
-    document.querySelector('[data-tab="active"]').click();
+    await fetch(`${API}/api/rider/accept-order`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData }, body: JSON.stringify({ order_id: id }) });
+    loadAvailable(); loadActive(); document.querySelector('[data-tab="active"]').click();
   };
 
   async function loadActive() {
-    const c = document.getElementById('activePanel');
-    c.innerHTML = '<div class="skeleton"></div>';
+    const c = document.getElementById('activePanel'); c.innerHTML = '<div class="skeleton"></div>';
     const r = await fetch(`${API}/api/rider/active-order`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
     const o = await r.json();
-    if(!o) {
-      c.innerHTML = '<div style="text-align:center;padding:40px"><p>لا يوجد طلب نشط</p></div>';
-      return;
-    }
+    if(!o) { c.innerHTML = '<div style="text-align:center;padding:40px"><p>لا يوجد طلب نشط</p></div>'; return; }
 
     const statusRes = await fetch(`${API}/api/orders/${o.id}/status`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
     const statusData = await statusRes.json();
     const isVerified = statusData.code_verified;
 
-    c.innerHTML = `
-      <div class="card">
-        <b>#${o.id}</b> - ${o.shop_name}<br>
-        📞 ${o.customer_phone || ''}<br>
-        📍 ${o.address}<br>
-        💰 ${o.delivery_fee} ل.س
-        <div class="code-box">
-          <div class="label">🔐 كود التأكيد</div>
-          <div class="value">${o.confirmation_code || '----'}</div>
-          ${isVerified ? '<span class="verified-badge">✅ تم التحقق من الكود</span>' : '<span style="color:#e67e22;">⏳ بانتظار إدخال الزبون للكود</span>'}
-        </div>
-        <button class="btn" onclick="complete(${o.id})" ${!isVerified ? 'disabled' : ''}>
-          <i data-lucide="check-circle"></i> تم التوصيل
-        </button>
-        <button class="btn btn-danger" onclick="cancel(${o.id})">
-          <i data-lucide="x"></i> إلغاء
-        </button>
-        ${!isVerified ? '<p style="margin-top:12px;color:#e67e22;">⚠️ لا يمكن إنهاء الطلب حتى يدخل الزبون الكود</p>' : ''}
+    c.innerHTML = `<div class="card">
+      <b>#${o.id}</b> - ${o.shop_name}<br>
+      📞 ${o.customer_phone || ''}<br>📍 ${o.address}<br>💰 ${o.delivery_fee} ل.س
+      <div class="code-box">
+        <div class="label">🔐 كود التأكيد</div>
+        <div class="value">${o.confirmation_code || '----'}</div>
+        ${isVerified ? '<span class="verified-badge">✅ تم التحقق من الكود</span>' : '<span style="color:#e67e22;">⏳ بانتظار إدخال الزبون للكود</span>'}
       </div>
-    `;
+      <button class="btn" onclick="complete(${o.id})" ${!isVerified ? 'disabled' : ''}><i data-lucide="check-circle"></i> تم التوصيل</button>
+      <button class="btn btn-danger" onclick="cancel(${o.id})"><i data-lucide="x"></i> إلغاء</button>
+      ${!isVerified ? '<p style="margin-top:12px;color:#e67e22;">⚠️ لا يمكن إنهاء الطلب حتى يدخل الزبون الكود</p>' : ''}
+    </div>`;
     if(typeof lucide !== 'undefined') lucide.createIcons();
   }
 
   window.complete = async id => {
     try {
-      const res = await fetch(`${API}/api/rider/complete-order`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData },
-        body: JSON.stringify({ order_id: id })
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        tg.showAlert('❌ ' + (err.error || 'فشل الإكمال'));
-        return;
-      }
-      loadActive();
-      document.querySelector('[data-tab="available"]').click();
-    } catch (e) {
-      tg.showAlert('❌ خطأ في الاتصال');
-    }
+      const res = await fetch(`${API}/api/rider/complete-order`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData }, body: JSON.stringify({ order_id: id }) });
+      if (!res.ok) { const err = await res.json(); tg.showAlert('❌ ' + (err.error || 'فشل الإكمال')); return; }
+      loadActive(); document.querySelector('[data-tab="available"]').click();
+    } catch (e) { tg.showAlert('❌ خطأ في الاتصال'); }
   };
 
   window.cancel = async id => {
-    await fetch(`${API}/api/rider/cancel-order`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData },
-      body: JSON.stringify({ order_id: id })
-    });
-    loadActive();
-    loadAvailable();
+    await fetch(`${API}/api/rider/cancel-order`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData }, body: JSON.stringify({ order_id: id }) });
+    loadActive(); loadAvailable();
   };
 
   loadAvailable();
-  setInterval(() => {
-    if (document.querySelector('.tab.active')?.dataset.tab === 'available') loadAvailable();
-    else loadActive();
-  }, 10000);
+  setInterval(() => { if (document.querySelector('.tab.active')?.dataset.tab === 'available') loadAvailable(); else if (document.querySelector('.tab.active')?.dataset.tab === 'active') loadActive(); }, 10000);
 </script>
 </body>
 </html>
