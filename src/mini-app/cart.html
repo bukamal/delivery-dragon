@@ -6,19 +6,25 @@
   <title>شاهين | السلة</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
-  <link rel="stylesheet" href="styles.css?v=2.0.0">
   <style>
-    .cart-item { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: var(--radius-xl); padding: var(--space-4); margin-bottom: var(--space-3); display: flex; gap: var(--space-3); border: 1px solid var(--gray-200); }
-    .cart-item-img { width: 60px; height: 60px; border-radius: var(--radius-lg); object-fit: cover; background: var(--gray-200); }
-    .cart-item-info { flex: 1; }
-    .cart-item-actions { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-2); }
-    .qty-btn { background: var(--primary); color: white; border: none; width: 36px; height: 36px; border-radius: 50%; font-size: 20px; cursor: pointer; box-shadow: var(--shadow-md); }
-    .summary { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: var(--radius-2xl); padding: var(--space-6); margin: var(--space-6) 0; box-shadow: var(--shadow-lg); }
-    .locate-btn { background: var(--info); color: white; border: none; padding: var(--space-3) var(--space-4); border-radius: var(--radius-full); width: 100%; margin: var(--space-2) 0; cursor: pointer; }
-    .readonly-field { background: var(--gray-100); color: var(--gray-600); }
-    .zone-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
-    .zone-chip { padding: 10px 16px; border: 1px solid var(--gray-300); border-radius: 40px; background: var(--tg-theme-secondary-bg-color, #fff); color: inherit; cursor: pointer; }
-    .zone-chip.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    * { margin:0; padding:0; box-sizing:border-box; font-family:'Tajawal', sans-serif; }
+    body { background: var(--tg-theme-bg-color, #f0f2f5); color: var(--tg-theme-text-color, #1e1e2f); padding-bottom:20px; }
+    .app-header { display:flex; align-items:center; padding:16px 20px; background:rgba(255,255,255,0.8); backdrop-filter:blur(12px); border-bottom:1px solid rgba(0,0,0,0.05); position:sticky; top:0; z-index:10; }
+    .app-header h1 { font-size:2rem; font-weight:700; color:#e67e22; margin-right:12px; }
+    .back-btn { background:none; border:none; color:#e67e22; font-size:2rem; cursor:pointer; }
+    .container { padding:16px; max-width:600px; margin:0 auto; }
+    .cart-item { background:rgba(255,255,255,0.7); backdrop-filter:blur(8px); border-radius:20px; padding:16px; margin-bottom:12px; display:flex; gap:12px; border:1px solid rgba(255,255,255,0.5); }
+    .cart-item-img { width:60px; height:60px; border-radius:16px; object-fit:cover; background:#eee; }
+    .cart-item-info { flex:1; }
+    .cart-item-actions { display:flex; align-items:center; gap:12px; margin-top:8px; }
+    .qty-btn { background:#e67e22; color:#fff; border:none; width:36px; height:36px; border-radius:50%; font-size:20px; cursor:pointer; }
+    .summary { background:rgba(255,255,255,0.7); backdrop-filter:blur(8px); border-radius:24px; padding:24px; margin:24px 0; border:1px solid rgba(255,255,255,0.5); }
+    input, select { width:100%; padding:16px; border-radius:16px; border:1px solid rgba(0,0,0,0.1); background:rgba(255,255,255,0.5); margin:12px 0; }
+    .locate-btn { background:#3498db; color:#fff; border:none; padding:16px; border-radius:60px; width:100%; cursor:pointer; }
+    .order-btn { background:#27ae60; color:#fff; border:none; padding:18px; border-radius:60px; width:100%; font-size:1.2rem; font-weight:700; cursor:pointer; }
+    .readonly-field { background:#f5f5f5; color:#666; }
+    .skeleton { height:80px; background:linear-gradient(90deg, #eee 25%, #ddd 50%, #eee 75%); background-size:200% 100%; animation:loading 1.5s infinite; border-radius:20px; }
+    @keyframes loading { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
   </style>
 </head>
 <body>
@@ -27,38 +33,31 @@
   <h1>🦅 شاهين</h1>
 </div>
 <div class="container">
-  <h2 style="margin-bottom: var(--space-4);"><i data-lucide="shopping-cart"></i> سلة المشتريات</h2>
-  <div id="itemsContainer"><div class="skeleton" style="height:80px;"></div></div>
+  <h2 style="margin-bottom:16px;"><i data-lucide="shopping-cart"></i> سلة المشتريات</h2>
+  <div id="itemsContainer"><div class="skeleton"></div></div>
   <div class="summary">
-    <div class="flex-between"><span>المجموع</span><span id="subtotal">0</span> ل.س</div>
-    <select id="citySelect"><option>اختر المدينة</option></select>
-    <label>📍 منطقة التوصيل</label>
-    <div id="zoneChips" class="zone-chips">اختر المدينة أولاً</div>
-    <input type="hidden" id="zoneSelect">
-    <div class="flex-between"><span>التوصيل (يحسب آلياً)</span><span id="deliveryFee">0</span> ل.س</div>
-    <div class="flex-between" style="font-weight:700; margin-top:10px"><span>الإجمالي</span><span id="total">0</span> ل.س</div>
+    <div style="display:flex; justify-content:space-between;"><span>المجموع</span><span id="subtotal">0</span> ل.س</div>
+    <div style="display:flex; justify-content:space-between; margin-top:8px;"><span>التوصيل</span><span id="deliveryFee">0</span> ل.س</div>
+    <div style="display:flex; justify-content:space-between; font-weight:700; margin-top:16px;"><span>الإجمالي</span><span id="total">0</span> ل.س</div>
     <input type="text" id="addressInput" placeholder="العنوان التفصيلي">
     <button type="button" id="locateBtn" class="locate-btn"><i data-lucide="map-pin"></i> تحديد موقع التسليم (إجباري)</button>
-    <input type="hidden" id="deliveryLat">
-    <input type="hidden" id="deliveryLng">
+    <input type="hidden" id="deliveryLat"><input type="hidden" id="deliveryLng">
     <input type="text" id="cityDisplay" placeholder="المدينة" readonly class="readonly-field">
-    <div id="locationStatus" style="font-size:0.9rem; margin-top:4px; color:var(--primary);"></div>
+    <div id="locationStatus" style="font-size:0.9rem; margin-top:4px; color:#e67e22;"></div>
   </div>
-  <button class="btn btn-success btn-block" id="orderBtn"><i data-lucide="check-circle"></i> تأكيد الطلب</button>
+  <button class="order-btn" id="orderBtn"><i data-lucide="check-circle"></i> تأكيد الطلب</button>
 </div>
 <script>
-  const tg = window.Telegram.WebApp; tg.ready(); tg.BackButton.show(); tg.BackButton.onClick(() => history.back());
+  const tg = Telegram.WebApp; tg.ready();
+  if (tg.BackButton) { tg.BackButton.show(); tg.BackButton.onClick(() => history.back()); }
   document.getElementById('backBtn').onclick = () => history.back();
   const API = 'https://delivery-dragon.vercel.app';
   let cart = JSON.parse(localStorage.getItem('dragon_cart')) || [];
   if (!cart.length) location.href = 'customer-home.html';
-  let deliveryFee = 0, currentTotal = 0, currentCityId = null;
+  let deliveryFee = 0, currentTotal = 0;
 
   async function fetchProductImage(productId) {
-    try {
-      const res = await fetch(`${API}/api/shop/products/${productId}`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
-      if (res.ok) { const p = await res.json(); return p.image_url; }
-    } catch(e) {}
+    try { const res = await fetch(`${API}/api/shop/products/${productId}`, { headers: { 'X-Telegram-Init-Data': tg.initData } }); if(res.ok) { const p = await res.json(); return p.image_url; } } catch(e) {}
     return null;
   }
 
@@ -70,73 +69,25 @@
       item.imageUrl = imageUrl;
       localStorage.setItem('dragon_cart', JSON.stringify(cart));
       html += `<div class="cart-item">
-        ${imageUrl ? `<img src="${imageUrl}" class="cart-item-img">` : '<div class="cart-item-img" style="display:flex; align-items:center; justify-content:center; color:#aaa;">📷</div>'}
+        ${imageUrl ? `<img src="${imageUrl}" class="cart-item-img">` : '<div class="cart-item-img" style="display:flex; align-items:center; justify-content:center;">📷</div>'}
         <div class="cart-item-info">
-          <b>${item.name}</b> ${item.optionName ? '(' + item.optionName + ')' : ''}<br>
+          <b>${item.name}</b> ${item.optionName ? '('+item.optionName+')' : ''}<br>
           ${item.price} ل.س
           <div class="cart-item-actions">
-            <button class="qty-btn" onclick="update(${cart.indexOf(item)},-1)">−</button>
-            <span>${item.quantity}</span>
+            <button class="qty-btn" onclick="update(${cart.indexOf(item)},-1)">−</button><span>${item.quantity}</span>
             <button class="qty-btn" onclick="update(${cart.indexOf(item)},1)">+</button>
-            <button class="btn btn-outline" onclick="remove(${cart.indexOf(item)})"><i data-lucide="trash-2"></i></button>
+            <button onclick="remove(${cart.indexOf(item)})"><i data-lucide="trash-2"></i></button>
           </div>
         </div>
       </div>`;
     }
     document.getElementById('itemsContainer').innerHTML = html;
     document.getElementById('subtotal').innerText = subtotal;
-    updateTotal(subtotal);
     if (typeof lucide !== 'undefined') lucide.createIcons();
   }
 
   window.update = (i, d) => { if (cart[i].quantity + d > 0) cart[i].quantity += d; else cart.splice(i,1); localStorage.setItem('dragon_cart', JSON.stringify(cart)); render(); };
-  window.remove = i => { tg.showConfirm('حذف المنتج؟', ok => { if (ok) { cart.splice(i,1); localStorage.setItem('dragon_cart', JSON.stringify(cart)); render(); } }); };
-
-  async function loadCities() {
-    const res = await fetch(`${API}/api/cities`);
-    const cities = await res.json();
-    const sel = document.getElementById('citySelect');
-    cities.forEach(c => sel.add(new Option(c.name, c.id)));
-    if (cities.length) { sel.value = cities[0].id; currentCityId = cities[0].id; loadZones(currentCityId); }
-  }
-
-  async function loadZones(cityId) {
-    const container = document.getElementById('zoneChips');
-    container.innerHTML = '<span>جاري تحميل المناطق...</span>';
-    const res = await fetch(`${API}/api/zones?city_id=${cityId}`);
-    const zones = await res.json();
-    if (!zones.length) {
-      container.innerHTML = '<span>⚠️ لا توجد مناطق محددة لهذه المدينة بعد.</span>';
-      document.getElementById('zoneSelect').value = '';
-      deliveryFee = 0;
-      document.getElementById('deliveryFee').innerText = deliveryFee;
-      updateTotal(parseFloat(document.getElementById('subtotal').innerText));
-      return;
-    }
-    let html = '';
-    zones.forEach((z, i) => {
-      html += `<button class="zone-chip ${i===0?'active':''}" data-id="${z.id}" data-fee="${z.base_fee}">${z.zone_name} (${z.base_fee} ل.س)</button>`;
-    });
-    container.innerHTML = html;
-    document.getElementById('zoneSelect').value = zones[0]?.id || '';
-    deliveryFee = zones[0]?.base_fee || 0;
-    document.getElementById('deliveryFee').innerText = deliveryFee;
-    updateTotal(parseFloat(document.getElementById('subtotal').innerText));
-    document.querySelectorAll('.zone-chip').forEach(chip => {
-      chip.onclick = () => {
-        document.querySelectorAll('.zone-chip').forEach(c => c.classList.remove('active'));
-        chip.classList.add('active');
-        document.getElementById('zoneSelect').value = chip.dataset.id;
-        deliveryFee = parseFloat(chip.dataset.fee);
-        document.getElementById('deliveryFee').innerText = deliveryFee;
-        updateTotal(parseFloat(document.getElementById('subtotal').innerText));
-      };
-    });
-  }
-
-  function updateTotal(sub) { currentTotal = sub + deliveryFee; document.getElementById('total').innerText = currentTotal; }
-
-  document.getElementById('citySelect').onchange = e => { currentCityId = e.target.value; loadZones(currentCityId); };
+  window.remove = i => { tg.showConfirm('حذف المنتج؟', ok => { if(ok) { cart.splice(i,1); localStorage.setItem('dragon_cart', JSON.stringify(cart)); render(); } }); };
 
   document.getElementById('locateBtn').onclick = () => {
     if (!navigator.geolocation) { tg.showAlert('متصفحك لا يدعم تحديد الموقع'); return; }
@@ -152,43 +103,37 @@
         const city = data.address.city || data.address.town || data.address.village || data.address.state || 'غير معروفة';
         document.getElementById('cityDisplay').value = city;
         document.getElementById('locationStatus').innerHTML = `✅ تم تحديد الموقع والمدينة: ${city}`;
-        tg.showPopup({ title: '✅ تم التحديد', message: `تم تحديد موقعك والمدينة: ${city}` });
-      } catch (error) {
-        document.getElementById('cityDisplay').value = 'غير معروفة';
-        document.getElementById('locationStatus').innerHTML = '✅ تم تحديد الموقع، ولكن تعذر تحديد المدينة تلقائياً.';
-      }
+        tg.showPopup({ title:'✅ تم التحديد', message:`تم تحديد موقعك والمدينة: ${city}` });
+      } catch (error) { document.getElementById('cityDisplay').value = 'غير معروفة'; }
     }, err => { document.getElementById('locationStatus').innerText = '❌ فشل تحديد الموقع: ' + err.message; });
   };
 
   document.getElementById('orderBtn').onclick = async () => {
-    const addr = document.getElementById('addressInput').value.trim(); if (!addr) return tg.showAlert('أدخل العنوان');
+    const addr = document.getElementById('addressInput').value.trim(); if(!addr) return tg.showAlert('أدخل العنوان');
     const delivery_latitude = document.getElementById('deliveryLat').value;
     const delivery_longitude = document.getElementById('deliveryLng').value;
-    if (!delivery_latitude || !delivery_longitude) return tg.showAlert('الرجاء تحديد موقع التسليم');
+    if(!delivery_latitude || !delivery_longitude) return tg.showAlert('الرجاء تحديد موقع التسليم');
     const items = cart.map(i => ({ id: i.id, quantity: i.quantity }));
     const city_name = document.getElementById('cityDisplay').value;
-    const zone_id = document.getElementById('zoneSelect').value;
     tg.MainButton.showProgress();
     try {
-      const res = await fetch(`${API}/api/orders`, { method: 'POST', headers: { 'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData }, body: JSON.stringify({ shop_id: cart[0].shopId, items, zone_id: zone_id || null, address: addr, delivery_latitude, delivery_longitude, city_name: city_name }) });
+      const res = await fetch(`${API}/api/orders`, { method:'POST', headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData}, body:JSON.stringify({ shop_id: cart[0].shopId, items, address: addr, delivery_latitude, delivery_longitude, city_name }) });
       if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'فشل الطلب'); }
       const data = await res.json();
       cart = []; localStorage.removeItem('dragon_cart');
-      
       let paymentHtml = '';
-      if (data.payment && data.payment.name && data.payment.wallet) {
-        paymentHtml = `<div style="background:var(--gray-100); border-radius:var(--radius-xl); padding:20px; margin:20px 0; text-align:left; direction:ltr;">
-            <p><strong>اسم المستلم:</strong> ${data.payment.name}</p>
-            <p><strong>رقم المحفظة:</strong> <span id="walletNumber">${data.payment.wallet}</span> <button onclick="copyWallet()" class="btn btn-outline" style="margin-right:10px;">📋 نسخ</button></p>
-            <p style="color:var(--primary);">${data.payment.instructions}</p>
-          </div>`;
+      if (data.payment?.name && data.payment?.wallet) {
+        paymentHtml = `<div style="background:#f8f9fa; border-radius:20px; padding:20px; margin:20px 0; text-align:left; direction:ltr;">
+          <p><strong>اسم المستلم:</strong> ${data.payment.name}</p>
+          <p><strong>رقم المحفظة:</strong> <span id="walletNumber">${data.payment.wallet}</span> <button onclick="copyWallet()" style="background:#e67e22; color:#fff; border:none; padding:6px 12px; border-radius:20px;">📋 نسخ</button></p>
+          <p style="color:#e67e22;">${data.payment.instructions}</p>
+        </div>`;
       }
-      document.body.innerHTML = `<div style="text-align:center;padding:40px"><h2>✅ تم إنشاء الطلب #${data.order_id}</h2><p>المبلغ الإجمالي: ${currentTotal} ل.س</p>${paymentHtml}<p>📸 بعد الدفع، أرسل لقطة شاشة الإشعار في البوت</p><button class="btn btn-block" onclick="Telegram.WebApp.close()">فتح البوت</button></div>`;
-      window.copyWallet = function() { const wallet = document.getElementById('walletNumber').innerText; navigator.clipboard?.writeText(wallet).then(() => tg.showPopup({ title: '✅ تم النسخ', message: 'رقم المحفظة جاهز للصق' })).catch(() => tg.showAlert('تعذر النسخ')); };
+      document.body.innerHTML = `<div style="text-align:center;padding:40px"><h2>✅ تم إنشاء الطلب #${data.order_id}</h2><p>المبلغ: ${currentTotal} ل.س</p>${paymentHtml}<p>📸 أرسل لقطة الدفع في البوت</p><button class="order-btn" onclick="Telegram.WebApp.close()">فتح البوت</button></div>`;
+      window.copyWallet = function() { const wallet = document.getElementById('walletNumber').innerText; navigator.clipboard?.writeText(wallet).then(() => tg.showPopup({ title:'✅ تم النسخ', message:'رقم المحفظة جاهز للصق' })).catch(() => tg.showAlert('تعذر النسخ')); };
     } catch(e) { tg.MainButton.hideProgress(); tg.showAlert('❌ ' + e.message); }
   };
-
-  render(); loadCities();
+  render();
 </script>
 </body>
 </html>

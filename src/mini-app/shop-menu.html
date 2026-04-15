@@ -6,35 +6,44 @@
   <title>شاهين | قائمة الطعام</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
-  <link rel="stylesheet" href="styles.css?v=2.0.0">
   <style>
-    .shop-header { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4); }
-    .shop-header h2 { font-size: var(--text-2xl); }
-    .rating { background: var(--tg-theme-secondary-bg-color, #fff); padding: var(--space-1) var(--space-4); border-radius: var(--radius-full); }
-    .category { margin: var(--space-5) 0 var(--space-3); font-weight: 700; color: var(--gray-600); }
-    .product-grid { display: grid; gap: var(--space-3); }
-    .product-card { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: var(--radius-xl); overflow: hidden; box-shadow: var(--shadow-md); transition: transform 0.2s; }
-    .product-card:active { transform: scale(0.98); }
-    .product-card img { width: 100%; height: 160px; object-fit: cover; }
-    .product-info { padding: var(--space-4); }
-    .price { font-weight: 700; color: var(--primary); font-size: var(--text-lg); }
-    .option-buttons { display: flex; flex-wrap: wrap; gap: var(--space-1); margin: var(--space-2) 0; }
-    .option-btn { background: var(--gray-200); border: none; padding: var(--space-1) var(--space-2); border-radius: var(--radius-full); font-size: var(--text-xs); }
-    .option-btn.active { background: var(--primary); color: white; }
-    .bottom-bar {
-      position: fixed; bottom: 0; left: 0; right: 0; background: var(--tg-theme-secondary-bg-color, #fff);
-      border-top: 1px solid var(--gray-200); padding: var(--space-3) var(--space-5);
-      display: flex; align-items: center; justify-content: space-between; z-index: 20;
-    }
-    .cart-info { display: flex; align-items: center; gap: var(--space-2); }
-    .cart-badge { background: var(--primary); color: white; padding: 2px 8px; border-radius: var(--radius-full); font-size: var(--text-xs); }
-    body { padding-bottom: 80px; }
+    * { margin:0; padding:0; box-sizing:border-box; font-family:'Tajawal', sans-serif; }
+    body { background: var(--tg-theme-bg-color, #f0f2f5); color: var(--tg-theme-text-color, #1e1e2f); padding-bottom:80px; }
+    .app-header { display:flex; align-items:center; padding:16px 20px; background:rgba(255,255,255,0.8); backdrop-filter:blur(12px); border-bottom:1px solid rgba(0,0,0,0.05); position:sticky; top:0; z-index:10; }
+    .app-header h1 { font-size:2rem; font-weight:700; color:#e67e22; margin-right:12px; }
+    .back-btn { background:none; border:none; color:#e67e22; font-size:2rem; cursor:pointer; }
+    .container { padding:16px; max-width:600px; margin:0 auto; }
+    .shop-header { display:flex; align-items:center; gap:12px; margin-bottom:20px; }
+    .shop-header h2 { font-size:1.8rem; font-weight:700; }
+    .rating { background:rgba(255,255,255,0.7); backdrop-filter:blur(4px); padding:6px 16px; border-radius:40px; font-size:1rem; border:1px solid rgba(0,0,0,0.05); }
+    .search-box { background:rgba(255,255,255,0.7); backdrop-filter:blur(8px); border-radius:40px; padding:8px 20px; margin-bottom:20px; display:flex; align-items:center; border:1px solid rgba(0,0,0,0.05); }
+    .search-box input { flex:1; border:none; background:transparent; outline:none; padding:12px 0; }
+    .category { margin:24px 0 16px; font-weight:700; color:#7f8c8d; font-size:1.2rem; }
+    .product-grid { display:grid; gap:16px; }
+    .product-card { background:rgba(255,255,255,0.7); backdrop-filter:blur(12px); border-radius:24px; overflow:hidden; border:1px solid rgba(255,255,255,0.5); box-shadow:0 8px 20px rgba(0,0,0,0.02); transition:0.2s; }
+    .product-card:active { transform:scale(0.98); }
+    .product-card img { width:100%; height:160px; object-fit:cover; }
+    .product-info { padding:16px; }
+    .price { font-weight:700; color:#e67e22; font-size:1.2rem; margin:4px 0; }
+    .option-buttons { display:flex; flex-wrap:wrap; gap:8px; margin:8px 0; }
+    .option-btn { background:rgba(0,0,0,0.03); border:1px solid rgba(0,0,0,0.1); padding:4px 12px; border-radius:40px; font-size:0.8rem; }
+    .option-btn.active { background:#e67e22; color:#fff; border-color:#e67e22; }
+    .add-btn { background:#e67e22; color:#fff; border:none; padding:12px; border-radius:60px; width:100%; font-weight:700; cursor:pointer; }
+    .bottom-bar { position:fixed; bottom:0; left:0; right:0; background:rgba(30,30,47,0.9); backdrop-filter:blur(12px); color:#fff; padding:12px 24px; display:flex; align-items:center; justify-content:space-between; border-top:1px solid rgba(255,255,255,0.1); z-index:15; }
+    .cart-info { display:flex; align-items:center; gap:8px; }
+    .cart-badge { background:#e67e22; color:#fff; padding:2px 8px; border-radius:40px; font-size:0.8rem; }
+    .skeleton { height:200px; background:linear-gradient(90deg, #eee 25%, #ddd 50%, #eee 75%); background-size:200% 100%; animation:loading 1.5s infinite; border-radius:24px; }
+    @keyframes loading { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+    .empty-state { text-align:center; padding:40px; color:#95a5a6; }
   </style>
 </head>
 <body>
+<div class="app-header">
+  <button class="back-btn" onclick="window.history.back()"><i data-lucide="arrow-right"></i></button>
+  <h1>🦅 شاهين</h1>
+</div>
 <div class="container">
   <div class="shop-header">
-    <button class="back-btn" onclick="history.back()"><i data-lucide="arrow-right"></i></button>
     <h2 id="shopName"></h2>
     <div id="shopRating" class="rating">⭐ جديد</div>
   </div>
@@ -42,35 +51,30 @@
     <i data-lucide="search"></i>
     <input type="text" id="searchInput" placeholder="ابحث في القائمة...">
   </div>
-  <div id="menuContainer"><div class="skeleton" style="height:200px;"></div></div>
+  <div id="menuContainer"><div class="skeleton"></div></div>
 </div>
-
 <div class="bottom-bar">
-  <div class="shop-info">
-    <b id="bottomShopName"></b>
-    <div id="bottomShopRating"></div>
-  </div>
+  <div><b id="bottomShopName"></b><br><span id="bottomShopRating"></span></div>
   <div class="cart-info">
     <i data-lucide="shopping-cart"></i>
     <span>السلة</span>
     <span class="cart-badge" id="cartCount">0</span>
-    <button class="btn" id="viewCartBtn">عرض</button>
+    <button class="cart-btn" id="viewCartBtn" style="background:transparent; border:1px solid #e67e22; color:#e67e22; padding:8px 16px; border-radius:40px;">عرض</button>
   </div>
 </div>
-
 <script>
-  const tg = window.Telegram.WebApp; tg.ready(); tg.expand();
-  tg.BackButton.show(); tg.BackButton.onClick(() => history.back());
+  const tg = Telegram.WebApp; tg.ready(); tg.expand();
+  if (tg.BackButton) { tg.BackButton.show(); tg.BackButton.onClick(() => history.back()); }
   const API = 'https://delivery-dragon.vercel.app';
   const params = new URLSearchParams(location.search);
   const shopId = params.get('id'), shopName = decodeURIComponent(params.get('name') || '');
   document.getElementById('shopName').innerText = shopName;
   document.getElementById('bottomShopName').innerText = shopName;
   let cart = JSON.parse(localStorage.getItem('dragon_cart')) || [];
-  
-  function updateCartCount() { document.getElementById('cartCount').innerText = cart.reduce((s,i) => s + i.quantity, 0); }
+
+  function updateCartCount() { document.getElementById('cartCount').innerText = cart.reduce((s,i)=>s+i.quantity,0); }
   document.getElementById('viewCartBtn').onclick = () => location.href = 'cart.html';
-  
+
   async function loadMenu() {
     const container = document.getElementById('menuContainer');
     try {
@@ -80,19 +84,21 @@
       for (let cat in data.categories) {
         html += `<div class="category">📌 ${cat}</div>`;
         data.categories[cat].forEach(p => {
-          const imgHtml = p.image_url ? `<img src="${p.image_url}">` : '<div style="height:160px; background:var(--gray-200); display:flex; align-items:center; justify-content:center;">📷</div>';
+          const imgHtml = p.image_url ? `<img src="${p.image_url}">` : '<div style="height:160px; background:#ddd; display:flex; align-items:center; justify-content:center; color:#666;">📷</div>';
           let optionsHtml = '';
           if (p.options) {
             try {
               const opts = typeof p.options === 'string' ? JSON.parse(p.options) : p.options;
-              if (Array.isArray(opts) && opts.length <= 3) {
-                optionsHtml = '<div class="option-buttons">';
-                opts.forEach(opt => optionsHtml += `<button class="option-btn" data-price="${opt.price}">${opt.name} +${opt.price}</button>`);
-                optionsHtml += '</div>';
-              } else {
-                optionsHtml = `<select class="option-select" data-id="${p.id}">`;
-                opts.forEach(opt => optionsHtml += `<option value="${opt.name}" data-price="${opt.price}">${opt.name} (+${opt.price})</option>`);
-                optionsHtml += '</select>';
+              if (Array.isArray(opts) && opts.length) {
+                if (opts.length <= 3) {
+                  optionsHtml = '<div class="option-buttons">';
+                  opts.forEach(opt => optionsHtml += `<button class="option-btn" data-price="${opt.price}">${opt.name} +${opt.price}</button>`);
+                  optionsHtml += '</div>';
+                } else {
+                  optionsHtml = `<select class="option-select" style="width:100%; padding:8px; border-radius:12px; border:1px solid #ccc; margin:8px 0;">`;
+                  opts.forEach(opt => optionsHtml += `<option value="${opt.name}" data-price="${opt.price}">${opt.name} (+${opt.price})</option>`);
+                  optionsHtml += '</select>';
+                }
               }
             } catch(e) {}
           }
@@ -102,7 +108,7 @@
               <b>${p.name}</b>
               <div class="price">${p.price} ل.س</div>
               ${optionsHtml}
-              <button class="btn btn-block add-btn" data-id="${p.id}" data-name="${p.name}" data-price="${p.price}"><i data-lucide="plus"></i> أضف للسلة</button>
+              <button class="add-btn" data-id="${p.id}" data-name="${p.name}" data-price="${p.price}"><i data-lucide="plus"></i> أضف للسلة</button>
             </div>
           </div>`;
         });
@@ -110,8 +116,7 @@
       html += '</div>';
       container.innerHTML = html || '<div class="empty-state">لا توجد منتجات</div>';
       if (typeof lucide !== 'undefined') lucide.createIcons();
-      
-      // ربط أحداث الإضافة
+
       document.querySelectorAll('.add-btn').forEach(btn => {
         btn.onclick = () => {
           const productId = btn.dataset.id, productName = btn.dataset.name, basePrice = parseFloat(btn.dataset.price);
@@ -132,24 +137,17 @@
             }
             addItem();
           }
-          function addItem() { cart.push({ id: productId, name: productName, price: finalPrice, shopId, shopName, quantity: 1, option: selectedOption }); localStorage.setItem('dragon_cart', JSON.stringify(cart)); updateCartCount(); tg.HapticFeedback.impactOccurred('light'); tg.showPopup({ title: '✅ تمت الإضافة', message: `${productName} في السلة` }); }
+          function addItem() { cart.push({ id: productId, name: productName, price: finalPrice, shopId, shopName, quantity:1, option:selectedOption }); localStorage.setItem('dragon_cart', JSON.stringify(cart)); updateCartCount(); tg.HapticFeedback.impactOccurred('light'); tg.showPopup({ title:'✅ تمت الإضافة', message:`${productName} في السلة` }); }
           localStorage.setItem('dragon_cart', JSON.stringify(cart)); updateCartCount();
         };
       });
-      
-      // تفعيل أزرار الخيارات
+
       document.querySelectorAll('.option-btn').forEach(btn => {
-        btn.onclick = (e) => {
-          e.stopPropagation();
-          const parent = btn.parentNode;
-          parent.querySelectorAll('.option-btn').forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-        };
+        btn.onclick = (e) => { e.stopPropagation(); const parent = btn.parentNode; parent.querySelectorAll('.option-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); };
       });
-      
     } catch(e) { container.innerHTML = `<div class="empty-state">⚠️ ${e.message}</div>`; }
   }
-  
+
   async function loadRating() {
     try {
       const res = await fetch(`${API}/api/shops/${shopId}/ratings`);
@@ -157,20 +155,17 @@
       if (data.count > 0) {
         const stars = '★'.repeat(Math.round(data.average)) + '☆'.repeat(5 - Math.round(data.average));
         document.getElementById('shopRating').innerHTML = `${stars} (${data.count})`;
-        document.getElementById('bottomShopRating').innerHTML = `${stars}`;
+        document.getElementById('bottomShopRating').innerHTML = stars;
       }
     } catch(e) {}
   }
-  
+
   document.getElementById('searchInput').oninput = (e) => {
     const term = e.target.value.toLowerCase();
     document.querySelectorAll('.product-card').forEach(card => card.style.display = card.innerText.toLowerCase().includes(term) ? 'block' : 'none');
-    document.querySelectorAll('.category').forEach(cat => {
-      const next = cat.nextElementSibling;
-      if (next?.classList.contains('product-card')) cat.style.display = next.style.display;
-    });
+    document.querySelectorAll('.category').forEach(cat => { const next = cat.nextElementSibling; if (next?.classList.contains('product-card')) cat.style.display = next.style.display; });
   };
-  
+
   loadMenu(); loadRating(); updateCartCount();
 </script>
 </body>

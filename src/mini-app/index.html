@@ -6,25 +6,43 @@
   <title>شاهين | الوجهة الأسرع</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
-  <link rel="stylesheet" href="styles.css?v=2.0.0">
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; font-family:'Tajawal', sans-serif; }
+    body { background: var(--tg-theme-bg-color, #f0f2f5); color: var(--tg-theme-text-color, #1e1e2f); }
+    .app-header { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; background: rgba(255,255,255,0.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom:1px solid rgba(0,0,0,0.05); position:sticky; top:0; z-index:10; }
+    .app-header h1 { font-size:2rem; font-weight:700; color:#e67e22; letter-spacing:-0.5px; }
+    .badge { background:#e67e22; color:#fff; padding:4px 12px; border-radius:40px; font-size:0.75rem; font-weight:500; }
+    .container { padding:24px 16px; max-width:480px; margin:0 auto; }
+    .hero { text-align:center; margin-bottom:32px; }
+    .hero-emoji { font-size:72px; margin-bottom:8px; filter:drop-shadow(0 8px 12px rgba(230,126,34,0.2)); }
+    .hero h2 { font-size:2rem; font-weight:700; color:#e67e22; margin-bottom:4px; }
+    .hero p { color:#7f8c8d; font-size:1rem; }
+    .btn { display:block; width:100%; background:#e67e22; color:#fff; border:none; padding:18px 20px; margin:12px 0; border-radius:60px; font-size:1.2rem; font-weight:700; text-align:center; text-decoration:none; box-shadow:0 8px 18px rgba(230,126,34,0.2); border:2px solid rgba(255,255,255,0.1); backdrop-filter:blur(4px); transition:0.2s; }
+    .btn-outline { background:transparent; color:var(--tg-theme-text-color, #1e1e2f); border:2px solid #e67e22; box-shadow:none; }
+    .btn:active { transform:scale(0.97); opacity:0.9; }
+    .skeleton { background:linear-gradient(90deg, #eee 25%, #ddd 50%, #eee 75%); background-size:200% 100%; animation:loading 1.5s infinite; border-radius:24px; height:90px; }
+    @keyframes loading { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+    .empty-state { text-align:center; padding:40px 20px; color:#95a5a6; }
+  </style>
 </head>
 <body>
 <div class="app-header">
   <h1>🦅 شاهين</h1>
-  <span class="badge badge-warning">نحن أسرع إليك</span>
+  <span class="badge">نحن أسرع إليك</span>
 </div>
 <div class="container">
-  <div class="card" id="dynamicContent">
-    <div class="skeleton" style="height:90px;"></div>
+  <div id="dynamicContent">
+    <div class="skeleton"></div>
     <div class="skeleton" style="margin-top:16px; height:60px;"></div>
   </div>
 </div>
 <script>
   (function() {
-    const tg = window.Telegram.WebApp;
-    tg.ready(); tg.expand(); tg.BackButton.hide();
+    const tg = Telegram.WebApp; tg.ready(); tg.expand();
+    if (tg.BackButton) tg.BackButton.hide();
     const API = 'https://delivery-dragon.vercel.app';
     const container = document.getElementById('dynamicContent');
+
     async function init() {
       try {
         const res = await fetch(`${API}/api/me`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
@@ -33,36 +51,36 @@
         const role = user?.role || 'customer';
         const isApproved = user?.is_approved;
         const name = user?.name || 'بطل';
-        
-        if (role === 'customer' && !localStorage.getItem('shahin_onboarded')) {
-          window.location.href = 'onboarding.html';
-          return;
-        }
-        
-        let html = '';
+
         if (role === 'admin') { window.location.href = 'admin-dashboard.html'; return; }
         else if (role === 'shop' && isApproved) { window.location.href = 'shop-dashboard.html'; return; }
         else if (role === 'rider' && isApproved) { window.location.href = 'rider-dashboard.html'; return; }
         else if ((role === 'shop' || role === 'rider') && !isApproved) {
-          html = `<div class="empty-state"><div class="emoji" style="font-size:64px;">⏳</div><h2>قيد المراجعة</h2><p>حسابك قيد المراجعة من قبل الإدارة. سنقوم بإشعارك عند التفعيل.</p><button class="btn btn-block" onclick="window.Telegram.WebApp.close()">حسنًا</button></div>`;
-        } else {
-          html = `
-            <div style="text-align: center; margin-bottom: 10px;">
-              <span style="font-size: 56px;">👋</span>
-              <h2 style="margin: 8px 0 4px;">مرحباً ${name}!</h2>
-              <p style="color: var(--gray-600);">ماذا تود أن تفعل اليوم؟</p>
-            </div>
-            <a href="customer-home.html" class="btn btn-block">🍔 تصفح المتاجر</a>
-            <a href="my-orders.html" class="btn btn-outline btn-block">📋 طلباتي</a>
-            <a href="support.html" class="btn btn-outline btn-block">💬 الدعم الفني</a>
-            <a href="register-shop.html" class="btn btn-outline btn-block">🏪 سجل متجرك</a>
-            <a href="register-rider.html" class="btn btn-outline btn-block">🛵 انضم كسائق</a>
-          `;
+          container.innerHTML = `<div class="empty-state"><div style="font-size:64px;">⏳</div><h2>قيد المراجعة</h2><p>حسابك قيد المراجعة من قبل الإدارة.</p><button class="btn" onclick="Telegram.WebApp.close()">حسنًا</button></div>`;
+          return;
         }
-        container.innerHTML = html;
+
+        // تحقق من Onboarding
+        if (role === 'customer' && !localStorage.getItem('shahin_onboarded')) {
+          window.location.href = 'onboarding.html';
+          return;
+        }
+
+        container.innerHTML = `
+          <div class="hero">
+            <div class="hero-emoji">👋</div>
+            <h2>مرحباً ${name}!</h2>
+            <p>ماذا تود أن تفعل اليوم؟</p>
+          </div>
+          <a href="customer-home.html" class="btn">🍔 تصفح المتاجر</a>
+          <a href="my-orders.html" class="btn btn-outline">📋 طلباتي</a>
+          <a href="support.html" class="btn btn-outline">💬 الدعم الفني</a>
+          <a href="register-shop.html" class="btn btn-outline">🏪 سجل متجرك</a>
+          <a href="register-rider.html" class="btn btn-outline">🛵 انضم كسائق</a>
+        `;
         if (typeof lucide !== 'undefined') lucide.createIcons();
       } catch (e) {
-        container.innerHTML = `<div class="empty-state"><div style="font-size:64px;">⚠️</div><p>${e.message}</p><button class="btn btn-block" onclick="location.reload()">إعادة المحاولة</button></div>`;
+        container.innerHTML = `<div class="empty-state"><div style="font-size:64px;">⚠️</div><p>${e.message}</p><button class="btn" onclick="location.reload()">إعادة المحاولة</button></div>`;
       }
     }
     init();

@@ -6,75 +6,99 @@
   <title>شاهين | طلباتي</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
-  <link rel="stylesheet" href="styles.css?v=2.0.0">
   <style>
-    .status { display:inline-block; padding:var(--space-1) var(--space-4); border-radius:var(--radius-full); font-size:var(--text-sm); font-weight:600; }
-    .verifying{background:var(--warning);color:black} .paid{background:var(--info);color:white} .preparing{background:var(--primary);color:white} .ready{background:var(--success);color:white} .delivering{background:#9b59b6;color:white} .completed{background:var(--success);color:white} .rejected{background:var(--danger);color:white}
+    * { margin:0; padding:0; box-sizing:border-box; font-family:'Tajawal', sans-serif; }
+    body { background: var(--tg-theme-bg-color, #f0f2f5); color: var(--tg-theme-text-color, #1e1e2f); padding-bottom:20px; }
+    .app-header { display:flex; align-items:center; padding:16px 20px; background:rgba(255,255,255,0.8); backdrop-filter:blur(12px); border-bottom:1px solid rgba(0,0,0,0.05); position:sticky; top:0; z-index:10; }
+    .app-header h1 { font-size:2rem; font-weight:700; color:#e67e22; margin-right:12px; }
+    .back-btn { background:none; border:none; color:#e67e22; font-size:2rem; cursor:pointer; }
+    .container { padding:16px; max-width:600px; margin:0 auto; }
+    .filter-tabs { display:flex; gap:8px; margin-bottom:20px; }
+    .tab { flex:1; padding:12px; background:rgba(255,255,255,0.5); border-radius:30px; text-align:center; cursor:pointer; border:1px solid rgba(0,0,0,0.05); }
+    .tab.active { background:#e67e22; color:#fff; }
+    .order-card { background:rgba(255,255,255,0.7); backdrop-filter:blur(8px); border-radius:20px; padding:16px; margin-bottom:12px; border:1px solid rgba(255,255,255,0.5); }
+    .status { display:inline-block; padding:4px 12px; border-radius:30px; font-size:0.8rem; }
+    .status-paid{background:#3498db;color:#fff} .status-preparing{background:#e67e22;color:#fff} .status-ready{background:#2ecc71;color:#fff} .status-delivering{background:#9b59b6;color:#fff} .status-completed{background:#27ae60;color:#fff} .status-rejected{background:#e74c3c;color:#fff}
+    .btn { background:#e67e22; color:#fff; border:none; padding:10px 20px; border-radius:30px; cursor:pointer; }
+    .btn-outline { background:transparent; border:1px solid #e67e22; color:#e67e22; }
+    .modal { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:1000; }
+    .modal-content { background:#fff; border-radius:28px; padding:24px; width:90%; max-width:400px; }
     .stars { display:flex; justify-content:center; gap:12px; margin:20px 0; font-size:36px; cursor:pointer; }
-    .star { color:var(--gray-400); transition:0.2s; } .star.active { color:var(--warning); }
-    .pull-indicator { text-align: center; padding: 8px; color: var(--gray-500); font-size: var(--text-sm); }
+    .star { color:#ccc; } .star.active { color:#f1c40f; }
+    .skeleton { height:120px; background:linear-gradient(90deg, #eee 25%, #ddd 50%, #eee 75%); background-size:200% 100%; animation:loading 1.5s infinite; border-radius:20px; }
+    @keyframes loading { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
   </style>
 </head>
-<body class="has-bottom-nav">
+<body>
 <div class="app-header">
+  <button class="back-btn" id="backBtn"><i data-lucide="arrow-right"></i></button>
   <h1>🦅 شاهين</h1>
 </div>
-<div class="container" id="pullContainer">
-  <div class="pull-indicator" id="pullIndicator">↓ اسحب للتحديث</div>
-  <h2 style="margin-bottom:20px;"><i data-lucide="clipboard-list"></i> طلباتي</h2>
-  <div id="ordersContainer"><div class="skeleton" style="height:120px;"></div></div>
+<div class="container">
+  <h2><i data-lucide="clipboard-list"></i> طلباتي</h2>
+  <div class="filter-tabs">
+    <div class="tab active" data-filter="all">الكل</div>
+    <div class="tab" data-filter="active">النشطة</div>
+    <div class="tab" data-filter="completed">المكتملة</div>
+  </div>
+  <div id="ordersContainer"><div class="skeleton"></div></div>
 </div>
-<div id="ratingModal" class="modal" style="display:none"><div class="modal-content"><h3>تقييم #<span id="modalOrderId"></span></h3><p>المطعم</p><div class="stars" id="shopStars"><span class="star" data-rating="1">★</span><span class="star" data-rating="2">★</span><span class="star" data-rating="3">★</span><span class="star" data-rating="4">★</span><span class="star" data-rating="5">★</span></div><p>السائق</p><div class="stars" id="riderStars"><span class="star" data-rating="1">★</span><span class="star" data-rating="2">★</span><span class="star" data-rating="3">★</span><span class="star" data-rating="4">★</span><span class="star" data-rating="5">★</span></div><textarea id="commentInput" placeholder="ملاحظاتك"></textarea><button class="btn btn-block" onclick="submitRating()">إرسال</button><button class="btn btn-block" onclick="closeModal()" style="background:var(--gray-500);margin-top:8px">إلغاء</button></div></div>
-<script src="bottom-nav.js"></script>
+<div id="ratingModal" class="modal" style="display:none"><div class="modal-content"><h3>تقييم #<span id="modalOrderId"></span></h3><p>المطعم</p><div class="stars" id="shopStars"><span class="star" data-rating="1">★</span><span class="star" data-rating="2">★</span><span class="star" data-rating="3">★</span><span class="star" data-rating="4">★</span><span class="star" data-rating="5">★</span></div><p>السائق</p><div class="stars" id="riderStars"><span class="star" data-rating="1">★</span><span class="star" data-rating="2">★</span><span class="star" data-rating="3">★</span><span class="star" data-rating="4">★</span><span class="star" data-rating="5">★</span></div><textarea id="commentInput" placeholder="ملاحظاتك"></textarea><button class="btn" onclick="submitRating()" style="width:100%">إرسال</button><button class="btn" onclick="closeModal()" style="background:#95a5a6; margin-top:8px;">إلغاء</button></div></div>
 <script>
-  const tg = Telegram.WebApp; tg.ready(); tg.expand();
-  const API = 'https://delivery-dragon.vercel.app'; let currentOrderId, shopRating=0, riderRating=0;
-  let touchStartY = 0, pullDistance = 0, isPulling = false;
-  const container = document.getElementById('pullContainer');
-  const indicator = document.getElementById('pullIndicator');
-  
-  function showToast(msg, icon='info') {
-    const toast = document.createElement('div'); toast.className = 'toast';
-    toast.innerHTML = `<i data-lucide="${icon}"></i><span>${msg}</span>`;
-    document.body.appendChild(toast); if (typeof lucide !== 'undefined') lucide.createIcons();
-    setTimeout(() => toast.classList.add('show'), 10);
-    setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 2000);
-  }
-  
-  function getStatusProgress(s){ const steps=['paid','preparing','ready_for_pickup','delivering','completed']; const idx=steps.indexOf(s); const pct=idx>=0?(idx/(steps.length-1))*100:0; const labels={paid:'مدفوع',preparing:'تحضير',ready_for_pickup:'جاهز',delivering:'توصيل',completed:'مكتمل'}; return{percent:pct,label:labels[s]||s}; }
+  const tg = Telegram.WebApp; tg.ready();
+  if (tg.BackButton) { tg.BackButton.show(); tg.BackButton.onClick(() => history.back()); }
+  document.getElementById('backBtn').onclick = () => history.back();
+  const API = 'https://delivery-dragon.vercel.app';
+  let allOrders = [], currentFilter = 'all', currentOrderId, shopRating=0, riderRating=0;
+
   async function load() {
-    const r = await fetch(`${API}/api/me/orders`,{headers:{'X-Telegram-Init-Data':tg.initData}}); const orders = await r.json();
-    const h = orders.map(o=>{ const{percent,label}=getStatusProgress(o.status);
-      return `<div class="card"><div class="flex-between"><b>#${o.id}</b><span class="status ${o.status}">${label}</span></div><div>${o.shop_name}</div><div>💰 ${o.total_price} ل.س</div><div style="margin-top:12px"><div class="flex-between" style="font-size:.8rem"><span>${label}</span><span>${Math.round(percent)}%</span></div><div style="background:var(--gray-300);height:6px;border-radius:6px"><div style="width:${percent}%;background:var(--primary);height:6px;border-radius:6px"></div></div></div><div>${new Date(o.created_at).toLocaleString('ar-SY')}</div>${o.status==='completed'?`<button class="btn btn-outline btn-block" onclick="openModal(${o.id})"><i data-lucide="star"></i> تقييم</button>`:''}${(o.status==='verifying'||o.status==='pending')?`<button class="btn btn-danger btn-block" onclick="cancel(${o.id})"><i data-lucide="x"></i> إلغاء</button>`:''}${o.status==='delivering'?`<button class="btn btn-outline btn-block" onclick="location.href='tracking.html?order_id=${o.id}'"><i data-lucide="map-pin"></i> تتبع</button>`:''}</div>`;
+    const r = await fetch(`${API}/api/me/orders`,{headers:{'X-Telegram-Init-Data':tg.initData}}); allOrders = await r.json();
+    renderOrders();
+  }
+  function renderOrders() {
+    let filtered = allOrders;
+    if (currentFilter === 'active') filtered = allOrders.filter(o => !['completed','rejected'].includes(o.status));
+    else if (currentFilter === 'completed') filtered = allOrders.filter(o => o.status === 'completed');
+    const html = filtered.map(o => {
+      let items = []; try { items = JSON.parse(o.items); } catch(e) {}
+      const itemsText = items.map(i => `${i.name} ×${i.quantity}`).join('، ');
+      return `<div class="order-card">
+        <div style="display:flex; justify-content:space-between;"><b>#${o.id}</b><span class="status status-${o.status}">${o.status}</span></div>
+        <div>${o.shop_name}</div><div>💰 ${o.total_price} ل.س</div><div>${itemsText}</div>
+        <div style="margin-top:12px;">
+          ${o.status==='completed'?`<button class="btn" onclick="reorder(${o.id})">🔄 أعد الطلب</button>`:''}
+          ${o.status==='completed'?`<button class="btn btn-outline" onclick="openModal(${o.id})"><i data-lucide="star"></i> تقييم</button>`:''}
+          ${(o.status==='verifying'||o.status==='pending')?`<button class="btn" onclick="cancel(${o.id})" style="background:#e74c3c;">إلغاء</button>`:''}
+          ${o.status==='delivering'?`<button class="btn btn-outline" onclick="location.href='tracking.html?order_id=${o.id}'">تتبع</button>`:''}
+        </div>
+      </div>`;
     }).join('');
-    document.getElementById('ordersContainer').innerHTML = h || '<div class="empty-state"><h3>لا توجد طلبات</h3><p>ابدأ بتصفح المتاجر</p><button class="btn btn-block" onclick="location.href=\'customer-home.html\'">تصفح المتاجر</button></div>';
+    document.getElementById('ordersContainer').innerHTML = html || '<div style="text-align:center;padding:40px">لا طلبات</div>';
     if (typeof lucide !== 'undefined') lucide.createIcons();
   }
-  window.openModal = id => { currentOrderId=id; shopRating=riderRating=0; document.getElementById('modalOrderId').innerText=id; document.querySelectorAll('#shopStars .star,#riderStars .star').forEach(s=>s.classList.remove('active')); document.getElementById('commentInput').value=''; document.getElementById('ratingModal').style.display='flex'; };
+
+  window.reorder = (id) => {
+    const order = allOrders.find(o => o.id === id);
+    const cart = JSON.parse(order.items).map(i => ({ id: i.id, name: i.name, price: i.price, shopId: order.shop_id, shopName: order.shop_name, quantity: i.quantity }));
+    localStorage.setItem('dragon_cart', JSON.stringify(cart));
+    location.href = 'cart.html';
+  };
+  window.openModal = id => { currentOrderId=id; shopRating=riderRating=0; document.getElementById('modalOrderId').innerText=id; document.querySelectorAll('#shopStars .star,#riderStars .star').forEach(s=>s.classList.remove('active')); document.getElementById('ratingModal').style.display='flex'; };
   document.querySelectorAll('#shopStars .star').forEach(s=>s.onclick=()=>{ shopRating=+s.dataset.rating; document.querySelectorAll('#shopStars .star').forEach((e,i)=>{ if(i<shopRating) e.classList.add('active'); else e.classList.remove('active'); }); });
   document.querySelectorAll('#riderStars .star').forEach(s=>s.onclick=()=>{ riderRating=+s.dataset.rating; document.querySelectorAll('#riderStars .star').forEach((e,i)=>{ if(i<riderRating) e.classList.add('active'); else e.classList.remove('active'); }); });
-  window.submitRating = async () => { if(!shopRating||!riderRating) return tg.showAlert('قيم الطرفين'); const c=document.getElementById('commentInput').value.trim(); await Promise.all([fetch(`${API}/api/orders/${currentOrderId}/rate`,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify({rating:shopRating,comment:c,target:'shop'})}),fetch(`${API}/api/orders/${currentOrderId}/rate`,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify({rating:riderRating,comment:c,target:'rider'})})]); tg.showAlert('شكراً!'); closeModal(); load(); };
-  window.cancel = async id => { tg.showConfirm('إلغاء الطلب؟',async ok=>{ if(ok){ await fetch(`${API}/api/orders/${id}/cancel`,{method:'POST',headers:{'X-Telegram-Init-Data':tg.initData}}); load(); } }); };
+  window.submitRating = async () => {
+    if(!shopRating||!riderRating) return tg.showAlert('قيم الطرفين');
+    const c = document.getElementById('commentInput').value.trim();
+    await Promise.all([fetch(`${API}/api/orders/${currentOrderId}/rate`,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify({rating:shopRating,comment:c,target:'shop'})}),fetch(`${API}/api/orders/${currentOrderId}/rate`,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify({rating:riderRating,comment:c,target:'rider'})})]);
+    tg.showAlert('شكراً!'); closeModal(); load();
+  };
+  window.cancel = async id => { tg.showConfirm('إلغاء الطلب؟',async ok=>{ if(ok) await fetch(`${API}/api/orders/${id}/cancel`,{method:'POST',headers:{'X-Telegram-Init-Data':tg.initData}}); load(); }); };
   window.closeModal = () => document.getElementById('ratingModal').style.display='none';
-  
-  // سحب للتحديث
-  container.addEventListener('touchstart', e => { touchStartY = e.touches[0].clientY; }, { passive: true });
-  container.addEventListener('touchmove', e => {
-    if (window.scrollY > 0) return;
-    const currentY = e.touches[0].clientY;
-    pullDistance = Math.max(0, currentY - touchStartY);
-    if (pullDistance > 20 && !isPulling) { isPulling = true; indicator.style.opacity = '1'; }
-    if (isPulling) {
-      indicator.innerText = pullDistance > 60 ? '✓ حرر للتحديث' : '↓ اسحب للتحديث';
-      e.preventDefault();
-    }
-  }, { passive: false });
-  container.addEventListener('touchend', () => {
-    if (isPulling && pullDistance > 60) { load(); showToast('تم تحديث الطلبات', 'refresh-cw'); }
-    indicator.innerText = '↓ اسحب للتحديث'; indicator.style.opacity = '0.5';
-    isPulling = false; pullDistance = 0;
+
+  document.querySelectorAll('[data-filter]').forEach(btn => btn.onclick = () => {
+    document.querySelectorAll('[data-filter]').forEach(b => b.classList.remove('active')); btn.classList.add('active');
+    currentFilter = btn.dataset.filter; renderOrders();
   });
-  
   load();
 </script>
 </body>

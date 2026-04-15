@@ -6,74 +6,51 @@
   <title>شاهين | مرحباً بك</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
-  <link rel="stylesheet" href="styles.css?v=2.0.0">
   <style>
-    .onboarding-container { display: flex; flex-direction: column; height: 100vh; }
-    .slides { flex: 1; position: relative; }
-    .slide { position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; opacity: 0; transition: opacity 0.3s; }
-    .slide.active { opacity: 1; z-index: 1; }
-    .slide-icon { font-size: 80px; margin-bottom: 20px; }
-    .slide-title { font-size: 24px; font-weight: 700; margin-bottom: 12px; color: var(--primary); }
-    .slide-desc { text-align: center; color: var(--gray-600); margin-bottom: 40px; }
-    .dots { display: flex; justify-content: center; gap: 8px; margin-bottom: 30px; }
-    .dot { width: 8px; height: 8px; border-radius: 4px; background: var(--gray-400); transition: 0.3s; }
-    .dot.active { width: 24px; background: var(--primary); }
-    .onboarding-footer { padding: 20px; }
+    * { margin:0; padding:0; box-sizing:border-box; font-family:'Tajawal', sans-serif; }
+    body { background: var(--tg-theme-bg-color, #f0f2f5); color: var(--tg-theme-text-color, #1e1e2f); }
+    .onboarding-container { display:flex; flex-direction:column; height:100vh; }
+    .slides { flex:1; position:relative; }
+    .slide { position:absolute; top:0; left:0; right:0; bottom:0; display:flex; flex-direction:column; justify-content:center; align-items:center; padding:20px; opacity:0; transition:0.3s; }
+    .slide.active { opacity:1; z-index:1; }
+    .slide-icon { font-size:80px; margin-bottom:20px; }
+    .slide-title { font-size:28px; font-weight:700; margin-bottom:12px; color:#e67e22; }
+    .slide-desc { text-align:center; color:#7f8c8d; margin-bottom:40px; }
+    .dots { display:flex; justify-content:center; gap:8px; margin-bottom:30px; }
+    .dot { width:8px; height:8px; border-radius:4px; background:#ccc; transition:0.3s; }
+    .dot.active { width:24px; background:#e67e22; }
+    .onboarding-footer { padding:20px; }
+    .btn { background:#e67e22; color:#fff; border:none; padding:18px; border-radius:60px; width:100%; font-size:1.2rem; font-weight:700; cursor:pointer; }
+    .btn-outline { background:transparent; border:2px solid #e67e22; color:#e67e22; margin-top:8px; }
   </style>
 </head>
 <body>
 <div class="onboarding-container">
   <div class="slides">
-    <div class="slide active">
-      <div class="slide-icon">🛵</div>
-      <div class="slide-title">توصيل سريع</div>
-      <div class="slide-desc">نوصل طلبك لباب بيتك بأسرع وقت</div>
-    </div>
-    <div class="slide">
-      <div class="slide-icon">🔐</div>
-      <div class="slide-title">كود تأكيد</div>
-      <div class="slide-desc">استلم طلبك بأمان عبر كود التأكيد</div>
-    </div>
-    <div class="slide">
-      <div class="slide-icon">💬</div>
-      <div class="slide-title">دعم فوري</div>
-      <div class="slide-desc">فريق دعم جاهز لمساعدتك على مدار الساعة</div>
-    </div>
+    <div class="slide active"><div class="slide-icon">🛵</div><div class="slide-title">توصيل سريع</div><div class="slide-desc">نوصل طلبك لباب بيتك بأسرع وقت</div></div>
+    <div class="slide"><div class="slide-icon">🔐</div><div class="slide-title">كود تأكيد</div><div class="slide-desc">استلم طلبك بأمان عبر كود التأكيد</div></div>
+    <div class="slide"><div class="slide-icon">💬</div><div class="slide-title">دعم فوري</div><div class="slide-desc">فريق دعم جاهز لمساعدتك على مدار الساعة</div></div>
   </div>
-  <div class="dots">
-    <div class="dot active"></div>
-    <div class="dot"></div>
-    <div class="dot"></div>
-  </div>
+  <div class="dots"><div class="dot active"></div><div class="dot"></div><div class="dot"></div></div>
   <div class="onboarding-footer">
-    <button class="btn btn-block" id="nextBtn">التالي</button>
-    <button class="btn btn-outline btn-block" id="skipBtn" style="margin-top:8px;">تخطي</button>
+    <button class="btn" id="nextBtn">التالي</button>
+    <button class="btn btn-outline" id="skipBtn">تخطي</button>
   </div>
 </div>
 <script>
   const tg = Telegram.WebApp; tg.ready(); tg.expand();
-  const slides = document.querySelectorAll('.slide');
-  const dots = document.querySelectorAll('.dot');
-  const nextBtn = document.getElementById('nextBtn');
-  const skipBtn = document.getElementById('skipBtn');
-  let currentSlide = 0;
-
-  function showSlide(index) {
-    slides.forEach((s, i) => { s.classList.toggle('active', i === index); });
-    dots.forEach((d, i) => { d.classList.toggle('active', i === index); });
-    nextBtn.textContent = index === slides.length - 1 ? 'ابدأ الآن' : 'التالي';
+  const slides = document.querySelectorAll('.slide'), dots = document.querySelectorAll('.dot');
+  let current = 0;
+  function showSlide(i) {
+    slides.forEach((s,idx) => { s.classList.toggle('active', idx===i); dots[idx].classList.toggle('active', idx===i); });
+    document.getElementById('nextBtn').textContent = i===2 ? 'ابدأ الآن' : 'التالي';
   }
-
-  nextBtn.onclick = () => {
-    if (currentSlide < slides.length - 1) { currentSlide++; showSlide(currentSlide); }
-    else { finishOnboarding(); }
+  document.getElementById('nextBtn').onclick = () => {
+    if (current < 2) { current++; showSlide(current); }
+    else { finish(); }
   };
-  skipBtn.onclick = finishOnboarding;
-
-  function finishOnboarding() {
-    localStorage.setItem('shahin_onboarded', 'true');
-    location.href = 'customer-home.html';
-  }
+  document.getElementById('skipBtn').onclick = finish;
+  function finish() { localStorage.setItem('shahin_onboarded', 'true'); location.href = 'customer-home.html'; }
 </script>
 </body>
 </html>
