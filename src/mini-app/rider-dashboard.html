@@ -21,6 +21,7 @@
     .stat-item { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: var(--radius-lg); padding: var(--space-2); text-align: center; }
     .stat-value { font-weight: 700; color: var(--primary); }
     .error-message { background: var(--danger); color: white; padding: 12px; border-radius: 12px; margin: 16px 0; }
+    .order-card { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: var(--radius-xl); padding: var(--space-4); margin-bottom: var(--space-3); box-shadow: var(--shadow-md); }
   </style>
 </head>
 <body>
@@ -138,7 +139,7 @@
       }
       
       const orders = await res.json();
-      console.log('Available orders received:', orders.length);
+      console.log('Available orders received:', orders.length, orders);
       
       if(!orders.length) {
         c.innerHTML = `<div class="empty-state">
@@ -158,10 +159,29 @@
           const dist = calculateDistance(currentPosition.lat, currentPosition.lng, o.shop_lat, o.shop_lng);
           distance = `${dist} كم`; eta = `${Math.round(dist * 3)} دقيقة`;
         }
-        html += `<div class="card">
-          <div class="flex-between"><div class="flex"><img src="${o.shop_image || 'https://via.placeholder.com/40'}" class="shop-thumb"><div><b>${o.shop_name}</b><br><span class="badge">${o.category || 'متجر'}</span></div></div><span class="price">${o.delivery_fee} ل.س</span></div>
-          <div class="flex-between" style="margin-top:8px;"><span><i data-lucide="map-pin"></i> ${distance}</span><span><i data-lucide="clock"></i> ${eta}</span></div>
-          <div class="flex" style="margin-top:12px;"><button class="btn btn-block" onclick="accept('${o.id}')">قبول</button><button class="btn btn-outline btn-block" onclick="rejectOrder('${o.id}')">رفض</button></div>
+        // التعامل مع الحقول المختلفة المحتملة (category / category_name)
+        const categoryName = o.category || o.category_name || 'متجر';
+        const shopImage = o.shop_image || o.image_url || 'https://via.placeholder.com/40';
+        
+        html += `<div class="order-card">
+          <div class="flex-between">
+            <div class="flex">
+              <img src="${shopImage}" style="width:40px; height:40px; border-radius:12px; object-fit:cover;" onerror="this.src='https://via.placeholder.com/40'">
+              <div>
+                <b>${o.shop_name || 'متجر'}</b><br>
+                <span class="badge">${categoryName}</span>
+              </div>
+            </div>
+            <span class="price">${o.delivery_fee || 0} ل.س</span>
+          </div>
+          <div class="flex-between" style="margin-top:8px;">
+            <span><i data-lucide="map-pin"></i> ${distance}</span>
+            <span><i data-lucide="clock"></i> ${eta}</span>
+          </div>
+          <div class="flex" style="margin-top:12px;">
+            <button class="btn btn-block" onclick="accept('${o.id}')">قبول</button>
+            <button class="btn btn-outline btn-block" onclick="rejectOrder('${o.id}')">رفض</button>
+          </div>
         </div>`;
       }
       c.innerHTML = html;
@@ -189,7 +209,7 @@
       const statusData = await statusRes.json();
       const isVerified = statusData.code_verified;
       c.innerHTML = `<div class="card">
-        <div class="flex-between"><b>#${o.id}</b><span class="badge">${o.shop_name}</span></div>
+        <div class="flex-between"><b>#${o.id}</b><span class="badge">${o.shop_name || 'متجر'}</span></div>
         <div class="flex-between"><span>📞 ${o.customer_phone || ''}</span><button class="btn-outline" onclick="tg.openLink('tel:${o.shop_phone}')"><i data-lucide="phone"></i> المتجر</button></div>
         <div class="map-mini" id="miniMap"></div>
         <div class="code-box"><span>🔐 كود التأكيد</span><span class="code-value" id="confirmCode">${o.confirmation_code || '----'}</span><button class="btn-outline" onclick="copyCode()"><i data-lucide="copy"></i></button></div>
