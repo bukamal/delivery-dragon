@@ -493,11 +493,10 @@ app.get('/api/rider/available-orders', async (req, res) => {
     const dbUser = await getDbUser(tgUser.id);
     if (dbUser?.role !== 'rider' || !dbUser?.is_approved) return res.status(403).json({ error: 'Forbidden' });
     
-    // جلب حالة الاتصال، إذا لم تكن موجودة نعتبرها متصل (true)
     const rider = await pool.query('SELECT is_online FROM rider_details WHERE user_id=$1', [dbUser.id]);
-    const isOnline = rider.rows[0]?.is_online ?? true; // افتراضي متصل
+    const isOnline = rider.rows[0]?.is_online ?? true;
     
-    if (!isOnline) return res.json([]); // إذا كان غير متصل عمداً
+    if (!isOnline) return res.json([]);
     
     const orders = await pool.query(
       `SELECT o.*, s.shop_name, s.address as shop_address, s.latitude as shop_lat, s.longitude as shop_lng, c.name as category 

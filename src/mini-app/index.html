@@ -60,7 +60,6 @@
           return;
         }
 
-        // تحقق من Onboarding
         if (role === 'customer' && !localStorage.getItem('shahin_onboarded')) {
           window.location.href = 'onboarding.html';
           return;
