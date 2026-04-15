@@ -6,7 +6,7 @@
     { icon: 'home', label: 'الرئيسية', href: 'customer-home.html' },
     { icon: 'clipboard-list', label: 'طلباتي', href: 'my-orders.html' },
     { icon: 'message-circle', label: 'الدعم', href: 'support.html' },
-    { icon: 'user', label: 'حسابي', href: 'index.html' }
+    { icon: 'user', label: 'حسابي', href: 'profile.html' }
   ];
 
   const nav = document.createElement('div');

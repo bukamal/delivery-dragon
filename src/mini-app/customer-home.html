@@ -8,116 +8,72 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="stylesheet" href="styles.css">
   <style>
-    .city-chip { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: var(--radius-full); padding: var(--space-1) var(--space-1) var(--space-1) var(--space-5); margin-bottom: var(--space-5); border: 1px solid var(--gray-200); display: flex; align-items: center; }
-    .city-chip select { flex: 1; padding: var(--space-2) 0; border: none; background: transparent; color: inherit; font-family: inherit; outline: none; }
-    .search-box { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: var(--radius-full); padding: var(--space-2) var(--space-5); margin-bottom: var(--space-6); display: flex; align-items: center; border: 1px solid var(--gray-200); }
-    .search-box input { flex: 1; border: none; background: transparent; outline: none; font-family: inherit; padding: var(--space-3) 0; margin:0; }
-    .shop-icon { font-size: 44px; background: var(--tg-theme-bg-color, #f0f2f5); width: 70px; height: 70px; border-radius: var(--radius-xl); display: flex; align-items: center; justify-content: center; }
-    .shop-info h3 { font-size: var(--text-lg); margin-bottom: var(--space-1); }
-    .shop-info p { color: var(--gray-600); font-size: var(--text-sm); display: flex; align-items: center; gap: var(--space-1); }
-    .pull-indicator { text-align: center; padding: 8px; color: var(--gray-500); font-size: var(--text-sm); transition: 0.2s; }
+    .filter-chips { display: flex; gap: var(--space-2); overflow-x: auto; padding: var(--space-2) 0; margin-bottom: var(--space-3); }
+    .filter-chip { padding: var(--space-1) var(--space-3); background: var(--tg-theme-secondary-bg-color, #fff); border-radius: var(--radius-full); border: 1px solid var(--gray-200); white-space: nowrap; }
+    .filter-chip.active { background: var(--primary); color: white; }
+    .favorite-btn { background: none; border: none; font-size: 24px; cursor: pointer; margin-left: var(--space-2); }
+    .shop-card { display: flex; align-items: center; gap: var(--space-3); }
   </style>
 </head>
 <body class="has-bottom-nav">
-<div class="app-header">
-  <h1>🦅 شاهين</h1>
-</div>
+<div class="app-header"><h1>🦅 شاهين</h1></div>
 <div class="container" id="pullContainer">
   <div class="pull-indicator" id="pullIndicator">↓ اسحب للتحديث</div>
-  <div class="city-chip">
-    <select id="citySelect"><option value="">اختر المدينة...</option></select>
-  </div>
-  <div class="search-box">
-    <i data-lucide="search"></i>
-    <input type="text" id="searchInput" placeholder="ابحث عن متجر...">
-  </div>
-  <div class="shop-grid" id="shopsContainer">
-    <div class="skeleton" style="height:100px;"></div>
-    <div class="skeleton" style="height:100px;"></div>
-    <div class="skeleton" style="height:100px;"></div>
-  </div>
+  <div class="city-chip"><select id="citySelect"><option>اختر المدينة...</option></select></div>
+  <div class="filter-chips" id="categoryFilter"></div>
+  <div class="search-box"><i data-lucide="search"></i><input type="text" id="searchInput" placeholder="ابحث عن متجر..."></div>
+  <div class="shop-grid" id="shopsContainer"><div class="skeleton" style="height:100px;"></div></div>
 </div>
-<div class="cart-bar">
-  <span><i data-lucide="shopping-cart"></i> السلة (<span id="cartCount">0</span>)</span>
-  <button class="cart-btn" id="viewCartBtn">عرض السلة</button>
-</div>
+<div class="cart-bar"><span><i data-lucide="shopping-cart"></i> السلة (<span id="cartCount">0</span>)</span><button class="cart-btn" id="viewCartBtn">عرض السلة</button></div>
 <script src="bottom-nav.js"></script>
 <script>
-  const tg = window.Telegram.WebApp; tg.ready(); tg.expand();
+  const tg = Telegram.WebApp; tg.ready(); tg.expand();
   const API = 'https://delivery-dragon.vercel.app';
-  let shops = [], cart = JSON.parse(localStorage.getItem('dragon_cart')) || [], currentCityId = null;
-  let searchTimeout, touchStartY = 0, pullDistance = 0, isPulling = false;
-  const container = document.getElementById('pullContainer');
-  const indicator = document.getElementById('pullIndicator');
+  let shops = [], categories = [], cart = JSON.parse(localStorage.getItem('dragon_cart')) || [], currentCityId = null, selectedCategory = null;
+  let favorites = JSON.parse(localStorage.getItem('shahin_favorites')) || [];
   
-  function showToast(msg, icon='info') {
-    const toast = document.createElement('div'); toast.className = 'toast';
-    toast.innerHTML = `<i data-lucide="${icon}"></i><span>${msg}</span>`;
-    document.body.appendChild(toast); if (typeof lucide !== 'undefined') lucide.createIcons();
-    setTimeout(() => toast.classList.add('show'), 10);
-    setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 2000);
+  function updateCartCount() { document.getElementById('cartCount').innerText = cart.reduce((s,i)=>s+i.quantity,0); }
+  async function loadCategories() { const r = await fetch(`${API}/api/categories`); categories = await r.json(); renderCategoryFilters(); }
+  function renderCategoryFilters() {
+    const container = document.getElementById('categoryFilter');
+    container.innerHTML = `<div class="filter-chip ${!selectedCategory?'active':''}" onclick="filterByCategory(null)">الكل</div>`;
+    categories.forEach(c => container.innerHTML += `<div class="filter-chip ${selectedCategory===c.id?'active':''}" onclick="filterByCategory(${c.id})">${c.icon} ${c.name}</div>`);
   }
+  window.filterByCategory = (catId) => { selectedCategory = catId; renderCategoryFilters(); loadShops(); };
   
-  function updateCartCount() { document.getElementById('cartCount').innerText = cart.reduce((s,i) => s + i.quantity, 0); }
   async function loadCities() {
-    const res = await fetch(`${API}/api/cities`);
-    const cities = await res.json();
-    const sel = document.getElementById('citySelect');
-    cities.forEach(c => sel.add(new Option(c.name, c.id)));
+    const res = await fetch(`${API}/api/cities`); const cities = await res.json();
+    const sel = document.getElementById('citySelect'); cities.forEach(c => sel.add(new Option(c.name, c.id)));
     if (cities.length) { sel.value = cities[0].id; currentCityId = cities[0].id; loadShops(); }
   }
   async function loadShops() {
     if (!currentCityId) return;
-    const container = document.getElementById('shopsContainer');
-    container.innerHTML = '<div class="skeleton" style="height:100px;"></div><div class="skeleton" style="height:100px;"></div><div class="skeleton" style="height:100px;"></div>';
-    try {
-      const res = await fetch(`${API}/api/shops?city_id=${currentCityId}`);
-      shops = await res.json();
-      renderShops(shops);
-    } catch(e) { container.innerHTML = `<div class="empty-state">⚠️ ${e.message}</div>`; }
+    const container = document.getElementById('shopsContainer'); container.innerHTML = '<div class="skeleton" style="height:100px;"></div>';
+    let url = `${API}/api/shops?city_id=${currentCityId}`;
+    if (selectedCategory) url += `&category_id=${selectedCategory}`;
+    const res = await fetch(url); shops = await res.json();
+    renderShops(shops);
   }
   function renderShops(list) {
     const container = document.getElementById('shopsContainer');
-    if (!list.length) { container.innerHTML = '<div class="empty-state">😕 لا توجد متاجر في هذه المدينة</div>'; return; }
-    container.innerHTML = list.map(s => `
-      <div class="card flex" style="cursor:pointer;" onclick="location.href='shop-menu.html?id=${s.id}&name=${encodeURIComponent(s.shop_name)}'">
-        <div class="shop-icon">${s.icon || '🏪'}</div>
-        <div class="shop-info"><h3>${s.shop_name}</h3><p>📍 ${s.address || ''}</p></div>
-      </div>`).join('');
+    if (!list.length) { container.innerHTML = '<div class="empty-state">😕 لا توجد متاجر</div>'; return; }
+    container.innerHTML = list.map(s => {
+      const isFav = favorites.includes(s.id);
+      return `<div class="card shop-card" onclick="location.href='shop-menu.html?id=${s.id}&name=${encodeURIComponent(s.shop_name)}'"><div class="shop-icon">${s.icon||'🏪'}</div><div class="shop-info" style="flex:1"><h3>${s.shop_name}</h3><p>📍 ${s.address||''}</p></div><button class="favorite-btn" onclick="event.stopPropagation(); toggleFavorite(${s.id})">${isFav?'❤️':'🤍'}</button></div>`;
+    }).join('');
     if (typeof lucide !== 'undefined') lucide.createIcons();
   }
-  
-  // بحث محسّن (debounced)
-  document.getElementById('searchInput').oninput = e => {
-    clearTimeout(searchTimeout);
-    const query = e.target.value.trim();
-    searchTimeout = setTimeout(() => {
-      if (!query) renderShops(shops);
-      else renderShops(shops.filter(s => s.shop_name.includes(query)));
-    }, 300);
+  window.toggleFavorite = (shopId) => {
+    if (favorites.includes(shopId)) favorites = favorites.filter(id => id !== shopId);
+    else favorites.push(shopId);
+    localStorage.setItem('shahin_favorites', JSON.stringify(favorites));
+    renderShops(shops);
   };
   
-  // سحب للتحديث
-  container.addEventListener('touchstart', e => { touchStartY = e.touches[0].clientY; }, { passive: true });
-  container.addEventListener('touchmove', e => {
-    if (window.scrollY > 0) return;
-    const currentY = e.touches[0].clientY;
-    pullDistance = Math.max(0, currentY - touchStartY);
-    if (pullDistance > 20 && !isPulling) { isPulling = true; indicator.style.opacity = '1'; }
-    if (isPulling) {
-      indicator.innerText = pullDistance > 60 ? '✓ حرر للتحديث' : '↓ اسحب للتحديث';
-      e.preventDefault();
-    }
-  }, { passive: false });
-  container.addEventListener('touchend', () => {
-    if (isPulling && pullDistance > 60) { loadShops(); showToast('تم تحديث المتاجر', 'refresh-cw'); }
-    indicator.innerText = '↓ اسحب للتحديث'; indicator.style.opacity = '0.5';
-    isPulling = false; pullDistance = 0;
-  });
-  
   document.getElementById('citySelect').onchange = e => { currentCityId = e.target.value; loadShops(); };
+  document.getElementById('searchInput').oninput = e => renderShops(shops.filter(s => s.shop_name.includes(e.target.value)));
   document.getElementById('viewCartBtn').onclick = () => location.href = 'cart.html';
-  loadCities(); updateCartCount();
+  loadCategories(); loadCities(); updateCartCount();
 </script>
 </body>
 </html>

@@ -8,80 +8,170 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="stylesheet" href="styles.css">
   <style>
-    .category { margin: var(--space-6) 0 var(--space-4); font-weight: 700; color: var(--gray-600); font-size: var(--text-lg); }
-    .shop-header { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-5); flex-wrap: wrap; }
-    .shop-header h2 { font-size: var(--text-3xl); }
-    .rating { background: var(--tg-theme-secondary-bg-color, #fff); padding: var(--space-1) var(--space-4); border-radius: var(--radius-full); font-size: var(--text-base); }
+    .shop-header { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4); }
+    .shop-header h2 { font-size: var(--text-2xl); }
+    .rating { background: var(--tg-theme-secondary-bg-color, #fff); padding: var(--space-1) var(--space-4); border-radius: var(--radius-full); }
+    .category { margin: var(--space-5) 0 var(--space-3); font-weight: 700; color: var(--gray-600); }
+    .product-grid { display: grid; gap: var(--space-3); }
+    .product-card { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: var(--radius-xl); overflow: hidden; box-shadow: var(--shadow-md); transition: transform 0.2s; }
+    .product-card:active { transform: scale(0.98); }
+    .product-card img { width: 100%; height: 160px; object-fit: cover; }
+    .product-info { padding: var(--space-4); }
+    .price { font-weight: 700; color: var(--primary); font-size: var(--text-lg); }
+    .option-buttons { display: flex; flex-wrap: wrap; gap: var(--space-1); margin: var(--space-2) 0; }
+    .option-btn { background: var(--gray-200); border: none; padding: var(--space-1) var(--space-2); border-radius: var(--radius-full); font-size: var(--text-xs); }
+    .option-btn.active { background: var(--primary); color: white; }
+    .bottom-bar {
+      position: fixed; bottom: 0; left: 0; right: 0; background: var(--tg-theme-secondary-bg-color, #fff);
+      border-top: 1px solid var(--gray-200); padding: var(--space-3) var(--space-5);
+      display: flex; align-items: center; justify-content: space-between; z-index: 20;
+    }
+    .cart-info { display: flex; align-items: center; gap: var(--space-2); }
+    .cart-badge { background: var(--primary); color: white; padding: 2px 8px; border-radius: var(--radius-full); font-size: var(--text-xs); }
+    body { padding-bottom: 80px; }
   </style>
 </head>
 <body>
-<div class="app-header">
-  <button class="back-btn" id="backBtn"><i data-lucide="arrow-right"></i></button>
-  <h1>🦅 شاهين</h1>
-</div>
 <div class="container">
   <div class="shop-header">
+    <button class="back-btn" onclick="history.back()"><i data-lucide="arrow-right"></i></button>
     <h2 id="shopName"></h2>
     <div id="shopRating" class="rating">⭐ جديد</div>
   </div>
-  <div id="menuContainer">
-    <div class="skeleton" style="height:90px;"></div>
-    <div class="skeleton" style="height:90px;"></div>
+  <div class="search-box">
+    <i data-lucide="search"></i>
+    <input type="text" id="searchInput" placeholder="ابحث في القائمة...">
+  </div>
+  <div id="menuContainer"><div class="skeleton" style="height:200px;"></div></div>
+</div>
+
+<div class="bottom-bar">
+  <div class="shop-info">
+    <b id="bottomShopName"></b>
+    <div id="bottomShopRating"></div>
+  </div>
+  <div class="cart-info">
+    <i data-lucide="shopping-cart"></i>
+    <span>السلة</span>
+    <span class="cart-badge" id="cartCount">0</span>
+    <button class="btn" id="viewCartBtn">عرض</button>
   </div>
 </div>
+
 <script>
   const tg = window.Telegram.WebApp; tg.ready(); tg.expand();
   tg.BackButton.show(); tg.BackButton.onClick(() => history.back());
-  document.getElementById('backBtn').onclick = () => history.back();
   const API = 'https://delivery-dragon.vercel.app';
   const params = new URLSearchParams(location.search);
   const shopId = params.get('id'), shopName = decodeURIComponent(params.get('name') || '');
   document.getElementById('shopName').innerText = shopName;
+  document.getElementById('bottomShopName').innerText = shopName;
   let cart = JSON.parse(localStorage.getItem('dragon_cart')) || [];
-
+  
+  function updateCartCount() { document.getElementById('cartCount').innerText = cart.reduce((s,i) => s + i.quantity, 0); }
+  document.getElementById('viewCartBtn').onclick = () => location.href = 'cart.html';
+  
   async function loadMenu() {
     const container = document.getElementById('menuContainer');
     try {
       const res = await fetch(`${API}/api/shops/${shopId}/products`);
       const data = await res.json();
-      let html = '';
+      let html = '<div class="product-grid">';
       for (let cat in data.categories) {
         html += `<div class="category">📌 ${cat}</div>`;
         data.categories[cat].forEach(p => {
-          const imgHtml = p.image_url ? `<img src="${p.image_url}" class="product-img">` : '<div class="product-img" style="display:flex; align-items:center; justify-content:center; color:#aaa;">📷</div>';
-          let optionsHtml = '', optionsData = null;
-          if (p.options) { try { optionsData = typeof p.options === 'string' ? JSON.parse(p.options) : p.options; if (Array.isArray(optionsData) && optionsData.length) { optionsHtml = `<select class="option-select" data-id="${p.id}">`; optionsData.forEach((opt, idx) => optionsHtml += `<option value="${opt.name}" data-price="${opt.price||0}" ${idx===0?'selected':''}>${opt.name} (+${opt.price||0} ل.س)</option>`); optionsHtml += `</select>`; } } catch(e) {} }
-          html += `<div class="product-item">
+          const imgHtml = p.image_url ? `<img src="${p.image_url}">` : '<div style="height:160px; background:var(--gray-200); display:flex; align-items:center; justify-content:center;">📷</div>';
+          let optionsHtml = '';
+          if (p.options) {
+            try {
+              const opts = typeof p.options === 'string' ? JSON.parse(p.options) : p.options;
+              if (Array.isArray(opts) && opts.length <= 3) {
+                optionsHtml = '<div class="option-buttons">';
+                opts.forEach(opt => optionsHtml += `<button class="option-btn" data-price="${opt.price}">${opt.name} +${opt.price}</button>`);
+                optionsHtml += '</div>';
+              } else {
+                optionsHtml = `<select class="option-select" data-id="${p.id}">`;
+                opts.forEach(opt => optionsHtml += `<option value="${opt.name}" data-price="${opt.price}">${opt.name} (+${opt.price})</option>`);
+                optionsHtml += '</select>';
+              }
+            } catch(e) {}
+          }
+          html += `<div class="product-card">
             ${imgHtml}
             <div class="product-info">
               <b>${p.name}</b>
               <div class="price">${p.price} ل.س</div>
               ${optionsHtml}
+              <button class="btn btn-block add-btn" data-id="${p.id}" data-name="${p.name}" data-price="${p.price}"><i data-lucide="plus"></i> أضف للسلة</button>
             </div>
-            <button class="btn" data-id="${p.id}" data-name="${p.name}" data-price="${p.price}" data-options='${JSON.stringify(optionsData)}'><i data-lucide="plus"></i> أضف</button>
           </div>`;
         });
       }
+      html += '</div>';
       container.innerHTML = html || '<div class="empty-state">لا توجد منتجات</div>';
       if (typeof lucide !== 'undefined') lucide.createIcons();
-
-      document.querySelectorAll('.btn').forEach(btn => { if(btn.dataset.id) btn.onclick = () => {
-        const productId = btn.dataset.id, productName = btn.dataset.name, basePrice = parseFloat(btn.dataset.price);
-        let selectedOption = null, extraPrice = 0;
-        const selectEl = document.querySelector(`.option-select[data-id="${productId}"]`);
-        if (selectEl) { const selectedOpt = selectEl.options[selectEl.selectedIndex]; selectedOption = selectedOpt.value; extraPrice = parseFloat(selectedOpt.dataset.price) || 0; }
-        const finalPrice = basePrice + extraPrice;
-        const existing = cart.find(i => i.id === productId && i.shopId === shopId && i.option === selectedOption);
-        if (existing) existing.quantity++;
-        else { if (cart.length && cart[0].shopId !== shopId) { tg.showConfirm('السلة تحتوي منتجات من متجر آخر. هل تريد استبدال السلة؟', ok => { if(ok) { cart = []; addItem(); } }); return; } addItem(); }
-        function addItem() { cart.push({ id: productId, name: productName, price: finalPrice, shopId, shopName, quantity: 1, option: selectedOption, optionName: selectedOption }); localStorage.setItem('dragon_cart', JSON.stringify(cart)); tg.HapticFeedback.impactOccurred('light'); tg.showPopup({ title: '✅ تمت الإضافة', message: `${productName} ${selectedOption ? '('+selectedOption+')' : ''} في السلة` }); }
-        localStorage.setItem('dragon_cart', JSON.stringify(cart));
-      }; });
+      
+      // ربط أحداث الإضافة
+      document.querySelectorAll('.add-btn').forEach(btn => {
+        btn.onclick = () => {
+          const productId = btn.dataset.id, productName = btn.dataset.name, basePrice = parseFloat(btn.dataset.price);
+          let extraPrice = 0, selectedOption = null;
+          const card = btn.closest('.product-card');
+          const activeOpt = card?.querySelector('.option-btn.active');
+          const selectEl = card?.querySelector('.option-select');
+          if (activeOpt) { selectedOption = activeOpt.innerText.split(' ')[0]; extraPrice = parseFloat(activeOpt.dataset.price); }
+          else if (selectEl) { const opt = selectEl.options[selectEl.selectedIndex]; selectedOption = opt.value; extraPrice = parseFloat(opt.dataset.price); }
+          
+          const finalPrice = basePrice + extraPrice;
+          const existing = cart.find(i => i.id === productId && i.shopId === shopId && i.option === selectedOption);
+          if (existing) existing.quantity++;
+          else {
+            if (cart.length && cart[0].shopId !== shopId) {
+              tg.showConfirm('السلة تحتوي منتجات من متجر آخر. استبدال؟', ok => { if(ok) { cart = []; addItem(); } });
+              return;
+            }
+            addItem();
+          }
+          function addItem() { cart.push({ id: productId, name: productName, price: finalPrice, shopId, shopName, quantity: 1, option: selectedOption }); localStorage.setItem('dragon_cart', JSON.stringify(cart)); updateCartCount(); tg.HapticFeedback.impactOccurred('light'); tg.showPopup({ title: '✅ تمت الإضافة', message: `${productName} في السلة` }); }
+          localStorage.setItem('dragon_cart', JSON.stringify(cart)); updateCartCount();
+        };
+      });
+      
+      // تفعيل أزرار الخيارات
+      document.querySelectorAll('.option-btn').forEach(btn => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          const parent = btn.parentNode;
+          parent.querySelectorAll('.option-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+        };
+      });
+      
     } catch(e) { container.innerHTML = `<div class="empty-state">⚠️ ${e.message}</div>`; }
   }
-
-  async function loadRating() { try { const res = await fetch(`${API}/api/shops/${shopId}/ratings`); const data = await res.json(); if (data.count > 0) { const stars = '★'.repeat(Math.round(data.average)) + '☆'.repeat(5 - Math.round(data.average)); document.getElementById('shopRating').innerHTML = `${stars} (${data.count})`; } } catch(e) {} }
-  loadMenu(); loadRating();
+  
+  async function loadRating() {
+    try {
+      const res = await fetch(`${API}/api/shops/${shopId}/ratings`);
+      const data = await res.json();
+      if (data.count > 0) {
+        const stars = '★'.repeat(Math.round(data.average)) + '☆'.repeat(5 - Math.round(data.average));
+        document.getElementById('shopRating').innerHTML = `${stars} (${data.count})`;
+        document.getElementById('bottomShopRating').innerHTML = `${stars}`;
+      }
+    } catch(e) {}
+  }
+  
+  document.getElementById('searchInput').oninput = (e) => {
+    const term = e.target.value.toLowerCase();
+    document.querySelectorAll('.product-card').forEach(card => card.style.display = card.innerText.toLowerCase().includes(term) ? 'block' : 'none');
+    document.querySelectorAll('.category').forEach(cat => {
+      const next = cat.nextElementSibling;
+      if (next?.classList.contains('product-card')) cat.style.display = next.style.display;
+    });
+  };
+  
+  loadMenu(); loadRating(); updateCartCount();
 </script>
 </body>
 </html>

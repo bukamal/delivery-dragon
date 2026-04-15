@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>شاهين | الملف الشخصي</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .profile-header { display: flex; align-items: center; gap: var(--space-4); margin-bottom: var(--space-6); }
+    .avatar { width: 80px; height: 80px; background: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 36px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-4); margin: var(--space-5) 0; }
+    .stat-card { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: var(--radius-xl); padding: var(--space-4); text-align: center; }
+    .stat-value { font-size: var(--text-3xl); font-weight: 700; color: var(--primary); }
+    .stat-label { color: var(--gray-600); font-size: var(--text-sm); }
+  </style>
+</head>
+<body class="has-bottom-nav">
+<div class="app-header">
+  <button class="back-btn" onclick="history.back()"><i data-lucide="arrow-right"></i></button>
+  <h1>🦅 الملف الشخصي</h1>
+</div>
+<div class="container">
+  <div id="profileContent"><div class="skeleton" style="height:200px;"></div></div>
+</div>
+<script src="bottom-nav.js"></script>
+<script>
+  const tg = Telegram.WebApp; tg.ready(); tg.expand();
+  const API = 'https://delivery-dragon.vercel.app';
+  
+  async function loadProfile() {
+    const res = await fetch(`${API}/api/me`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
+    const user = await res.json();
+    const ordersRes = await fetch(`${API}/api/me/orders`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
+    const orders = await ordersRes.json();
+    const totalOrders = orders.length;
+    const totalSpent = orders.reduce((sum, o) => sum + (o.status === 'completed' ? o.total_price : 0), 0);
+    
+    document.getElementById('profileContent').innerHTML = `
+      <div class="profile-header">
+        <div class="avatar">${(user.name || 'ز')[0]}</div>
+        <div><h2>${user.name || 'زبون شاهين'}</h2><p class="badge badge-success">${user.role}</p></div>
+      </div>
+      <div class="card">
+        <div class="form-group"><label>الاسم</label><input type="text" id="profileName" value="${user.name || ''}"></div>
+        <div class="form-group"><label>رقم الهاتف</label><input type="tel" id="profilePhone" value="${user.phone || ''}"></div>
+        <button class="btn btn-block" onclick="updateProfile()">حفظ التغييرات</button>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-value">${totalOrders}</div><div class="stat-label">طلب</div></div>
+        <div class="stat-card"><div class="stat-value">${totalSpent}</div><div class="stat-label">ل.س</div></div>
+      </div>
+      <div class="card"><h3>⚙️ الإعدادات</h3><button class="btn btn-outline btn-block" onclick="localStorage.clear(); tg.showAlert('تم مسح البيانات المحلية');">مسح ذاكرة التخزين</button></div>
+    `;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
+  window.updateProfile = async () => {
+    const name = document.getElementById('profileName').value;
+    const phone = document.getElementById('profilePhone').value;
+    await fetch(`${API}/api/me/update`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData }, body: JSON.stringify({ name, phone }) });
+    tg.showAlert('✅ تم تحديث الملف الشخصي');
+  };
+  loadProfile();
+</script>
+</body>
+</html>

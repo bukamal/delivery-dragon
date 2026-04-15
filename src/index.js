@@ -207,7 +207,7 @@ async function calculateETA(originLat, originLng, destLat, destLng) {
 app.get('/api/categories', optionalAuth, async (req, res) => { const result = await pool.query('SELECT * FROM shop_categories'); res.json(result.rows); });
 app.get('/api/cities', optionalAuth, async (req, res) => { const result = await pool.query('SELECT * FROM cities WHERE is_active = true ORDER BY name'); res.json(result.rows); });
 app.get('/api/zones', optionalAuth, async (req, res) => { const { city_id } = req.query; let query = 'SELECT * FROM delivery_zones WHERE is_active = true'; const params = []; if (city_id) { query += ' AND city_id = $1'; params.push(city_id); } query += ' ORDER BY zone_name'; const result = await pool.query(query, params); res.json(result.rows); });
-app.get('/api/shops', optionalAuth, async (req, res) => { try { const { city_id, page=1, limit=20 } = req.query; const offset = (page-1)*limit; let query = `SELECT s.*, c.name as category_name, c.icon FROM shops s LEFT JOIN shop_categories c ON s.category_id=c.id WHERE s.is_open=true`; const params = []; if (city_id) { query += ' AND s.city_id = $1'; params.push(city_id); } query += ` ORDER BY s.created_at DESC LIMIT $${params.length+1} OFFSET $${params.length+2}`; params.push(limit, offset); const result = await pool.query(query, params); res.json(result.rows); } catch(error) { res.status(500).json({ error: error.message }); } });
+app.get('/api/shops', optionalAuth, async (req, res) => { try { const { city_id, category_id, page=1, limit=20 } = req.query; const offset = (page-1)*limit; let query = `SELECT s.*, c.name as category_name, c.icon FROM shops s LEFT JOIN shop_categories c ON s.category_id=c.id WHERE s.is_open=true`; const params = []; if (city_id) { query += ' AND s.city_id = $1'; params.push(city_id); } if (category_id) { query += ` AND s.category_id = $${params.length+1}`; params.push(category_id); } query += ` ORDER BY s.created_at DESC LIMIT $${params.length+1} OFFSET $${params.length+2}`; params.push(limit, offset); const result = await pool.query(query, params); res.json(result.rows); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.get('/api/shops/:shopId/products', optionalAuth, async (req, res) => { try { const { shopId } = req.params; const result = await pool.query(`SELECT p.*, pc.name as category_name FROM products p LEFT JOIN product_categories pc ON p.category_id=pc.id WHERE p.shop_id=$1 AND p.is_available=true ORDER BY pc.display_order, p.name`,[shopId]); const categories = {}; result.rows.forEach(p => { const cat = p.category_name || 'أخرى'; if (!categories[cat]) categories[cat] = []; categories[cat].push(p); }); res.json({ categories }); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.get('/api/orders/:orderId/status', optionalAuth, async (req, res) => {
   try {
@@ -282,6 +282,14 @@ app.get('/api/me', async (req, res) => {
       [tgUser.id.toString(), tgUser.first_name || 'User']
     );
     res.json(result.rows[0] || { role: 'customer' });
+  } catch(error) { res.status(500).json({ error: error.message }); }
+});
+app.put('/api/me/update', async (req, res) => {
+  try {
+    const tgUser = req.tgUser;
+    const { name, phone } = req.body;
+    await pool.query(`UPDATE users SET name=$1, phone=$2 WHERE telegram_id=$3`, [name, phone, tgUser.id.toString()]);
+    res.json({ success: true });
   } catch(error) { res.status(500).json({ error: error.message }); }
 });
 app.post('/api/register/shop', async (req, res) => { try { const tgUser = req.tgUser; const { name, shop_name, category_id, phone, address, city_id, latitude, longitude } = req.body; await pool.query(`INSERT INTO users (telegram_id, name, phone, role, is_approved) VALUES ($1,$2,$3,'shop',false) ON CONFLICT(telegram_id) DO UPDATE SET name=EXCLUDED.name, phone=EXCLUDED.phone, role='shop', is_approved=false`,[tgUser.id.toString(), name, phone]); await pool.query(`INSERT INTO shops (owner_id, shop_name, category_id, phone, address, city_id, latitude, longitude) VALUES ((SELECT id FROM users WHERE telegram_id=$1),$2,$3,$4,$5,$6,$7,$8)`,[tgUser.id.toString(), shop_name, category_id, phone, address, city_id, latitude, longitude]); res.status(201).json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
@@ -379,7 +387,6 @@ app.get('/api/shop/profile', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
 app.put('/api/shop/location', async (req, res) => {
   try {
     const tgUser = req.tgUser;
@@ -387,14 +394,29 @@ app.put('/api/shop/location', async (req, res) => {
     if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' });
     const { latitude, longitude } = req.body;
     if (!latitude || !longitude) return res.status(400).json({ error: 'الإحداثيات مطلوبة' });
-    await pool.query(
-      `UPDATE shops SET latitude=$1, longitude=$2 WHERE owner_id=$3`,
-      [latitude, longitude, dbUser.id]
-    );
+    await pool.query(`UPDATE shops SET latitude=$1, longitude=$2 WHERE owner_id=$3`, [latitude, longitude, dbUser.id]);
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+});
+app.get('/api/shop/stats', requireAuth, async (req, res) => {
+  try {
+    const tgUser = req.tgUser;
+    const dbUser = await getDbUser(tgUser.id);
+    if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' });
+    const shop = await pool.query('SELECT id FROM shops WHERE owner_id=$1', [dbUser.id]);
+    if (!shop.rows[0]) return res.json({ today_orders: 0, today_revenue: 0, active_orders: 0 });
+    const shopId = shop.rows[0].id;
+    const today = new Date().toISOString().split('T')[0];
+    const stats = await pool.query(`
+      SELECT
+        (SELECT COUNT(*) FROM orders WHERE shop_id=$1 AND DATE(created_at)=$2) as today_orders,
+        (SELECT COALESCE(SUM(total_price),0) FROM orders WHERE shop_id=$1 AND DATE(created_at)=$2 AND status='completed') as today_revenue,
+        (SELECT COUNT(*) FROM orders WHERE shop_id=$1 AND status IN ('paid','preparing','ready_for_pickup','delivering')) as active_orders
+    `, [shopId, today]);
+    res.json(stats.rows[0]);
+  } catch(error) { res.status(500).json({ error: error.message }); }
 });
 
 // ========== RIDER ==========
@@ -446,6 +468,22 @@ app.post('/api/rider/complete-order', async (req, res) => {
 app.post('/api/rider/cancel-order', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'rider') return res.status(403).json({ error: 'Forbidden' }); const { order_id } = req.body; const result = await pool.query(`UPDATE orders SET rider_id = NULL, status = 'ready_for_pickup' WHERE id = $1 AND rider_id = $2 AND status = 'delivering'`, [order_id, dbUser.id]); if (result.rowCount === 0) return res.status(400).json({ error: 'Order not found or not yours' }); await notifyCustomer(order_id, 'ready_for_pickup'); res.json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
 
 // ========== ADMIN ==========
+app.get('/api/admin/stats', requireAuth, async (req, res) => {
+  try {
+    const tgUser = req.tgUser;
+    const dbUser = await getDbUser(tgUser.id);
+    if (dbUser?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+    const today = new Date().toISOString().split('T')[0];
+    const stats = await pool.query(`
+      SELECT
+        (SELECT COUNT(*) FROM orders WHERE DATE(created_at) = $1) as today_orders,
+        (SELECT COALESCE(SUM(total_price),0) FROM orders WHERE DATE(created_at) = $1 AND status = 'completed') as today_revenue,
+        (SELECT COUNT(*) FROM users WHERE role = 'shop' AND is_approved = false) as pending_shops,
+        (SELECT COUNT(*) FROM users WHERE role = 'rider' AND is_approved = false) as pending_riders
+    `, [today]);
+    res.json(stats.rows[0]);
+  } catch(error) { res.status(500).json({ error: error.message }); }
+});
 app.get('/api/admin/pending', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' }); const pending = await pool.query(`SELECT id, telegram_id, name, phone, role, created_at FROM users WHERE is_approved=false AND role IN ('shop','rider') ORDER BY created_at DESC`); res.json(pending.rows); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.post('/api/admin/approve', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' }); const { user_id } = req.body; await pool.query(`UPDATE users SET is_approved=true WHERE id=$1`,[user_id]); res.json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.get('/api/admin/orders/pending', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' }); const { page=1, limit=10 } = req.query; const offset = (page-1)*limit; const orders = await pool.query(`SELECT o.*, u.name as customer_name, s.shop_name FROM orders o JOIN users u ON o.customer_id = u.id JOIN shops s ON o.shop_id = s.id WHERE o.status = 'pending' ORDER BY o.created_at DESC LIMIT $1 OFFSET $2`, [limit, offset]); res.json(orders.rows); } catch(error) { res.status(500).json({ error: error.message }); } });

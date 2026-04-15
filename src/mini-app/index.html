@@ -34,7 +34,6 @@
         const isApproved = user?.is_approved;
         const name = user?.name || 'بطل';
         
-        // توجيه المستخدم الجديد إلى onboarding
         if (role === 'customer' && !localStorage.getItem('shahin_onboarded')) {
           window.location.href = 'onboarding.html';
           return;
