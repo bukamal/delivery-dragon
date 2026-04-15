@@ -35,6 +35,7 @@
       .shop-sidebar.open { transform: translateX(0); }
       .sidebar-toggle { display: block; }
     }
+    .update-status-btn { margin-top: 8px; padding: 6px 12px; background: var(--primary); color: white; border: none; border-radius: 20px; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -148,10 +149,13 @@
               <p><b>📍 العنوان:</b> ${o.address || 'غير محدد'}</p>
               ${o.rider_name ? `<p><b>🛵 السائق:</b> ${o.rider_name}</p>` : ''}
               ${!archived && o.status !== 'completed' && o.status !== 'rejected' ? `
-                <select class="status-select" data-order-id="${o.id}" style="margin-top:12px;">
-                  <option value="preparing" ${o.status === 'preparing' ? 'selected' : ''}>👨‍🍳 تحضير</option>
-                  <option value="ready_for_pickup" ${o.status === 'ready_for_pickup' ? 'selected' : ''}>📦 جاهز للتوصيل</option>
-                </select>
+                <div style="display: flex; gap: 8px; align-items: center; margin-top: 12px;">
+                  <select id="status-${o.id}" class="status-select" style="flex: 1;">
+                    <option value="preparing" ${o.status === 'preparing' ? 'selected' : ''}>👨‍🍳 تحضير</option>
+                    <option value="ready_for_pickup" ${o.status === 'ready_for_pickup' ? 'selected' : ''}>📦 جاهز للتوصيل</option>
+                  </select>
+                  <button class="update-status-btn" onclick="updateOrderStatus('${o.id}')">تحديث</button>
+                </div>
               ` : ''}
             </div>
           </div>`;
@@ -160,20 +164,18 @@
       
       contentArea.innerHTML = html;
       
-      // ربط أحداث تغيير الحالة
-      document.querySelectorAll('.status-select').forEach(select => {
-        select.addEventListener('change', async (e) => {
-          const orderId = select.dataset.orderId;
-          const newStatus = select.value;
-          await fetch(`${API}/api/shop/orders/${orderId}/status`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData },
-            body: JSON.stringify({ status: newStatus })
-          });
-          loadOrders(archived); // إعادة التحميل
-          tg.showPopup({ message: `تم تحديث حالة الطلب #${orderId}` });
+      // تعريف دالة التحديث في النطاق العام
+      window.updateOrderStatus = async (orderId) => {
+        const select = document.getElementById(`status-${orderId}`);
+        const newStatus = select.value;
+        await fetch(`${API}/api/shop/orders/${orderId}/status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData },
+          body: JSON.stringify({ status: newStatus })
         });
-      });
+        loadOrders(archived);
+        tg.showPopup({ message: `تم تحديث حالة الطلب #${orderId} إلى ${newStatus}` });
+      };
       
       if (typeof lucide !== 'undefined') lucide.createIcons();
     } catch(e) {
@@ -181,7 +183,7 @@
     }
   }
   
-  // تحميل الصفحة الافتراضية (نظرة عامة)
+  // تحميل الصفحة الافتراضية
   loadOverview();
 </script>
 </body>
