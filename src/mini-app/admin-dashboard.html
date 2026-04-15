@@ -7,53 +7,6 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="stylesheet" href="styles.css">
-  <style>
-    .admin-layout { display: flex; height: 100vh; }
-    .admin-sidebar {
-      width: 280px; background: var(--tg-theme-secondary-bg-color, #fff);
-      border-left: 1px solid var(--gray-200); display: flex; flex-direction: column;
-      transition: transform 0.3s ease; overflow-y: auto;
-    }
-    .sidebar-header { padding: var(--space-5); font-size: var(--text-2xl); font-weight: 700; color: var(--primary); border-bottom: 1px solid var(--gray-200); }
-    .sidebar-nav { flex: 1; padding: var(--space-4); }
-    .sidebar-link {
-      display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4);
-      border-radius: var(--radius-md); color: var(--gray-700); text-decoration: none;
-      transition: all 0.2s; margin-bottom: var(--space-1);
-    }
-    .sidebar-link i { width: 22px; height: 22px; }
-    .sidebar-link.active { background: var(--primary); color: white; }
-    .sidebar-link:active { background: var(--gray-200); }
-    .sidebar-group { margin: var(--space-5) 0; }
-    .sidebar-group-title { padding: var(--space-2) var(--space-4); font-size: var(--text-xs); color: var(--gray-500); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
-    .admin-main { flex: 1; overflow-y: auto; background: var(--tg-theme-bg-color, #f5f7fb); }
-    .admin-main .app-header {
-      display: flex; align-items: center; padding: var(--space-4) var(--space-5);
-      background: var(--tg-theme-secondary-bg-color, #fff);
-      border-bottom: 1px solid var(--gray-200); position: sticky; top: 0; z-index: 5;
-    }
-    .sidebar-toggle { background: none; border: none; margin-left: var(--space-4); cursor: pointer; display: none; }
-    .admin-content { padding: var(--space-5); max-width: 1200px; margin: 0 auto; }
-    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-4); margin-bottom: var(--space-6); }
-    .kpi-card { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: var(--radius-xl); padding: var(--space-5); box-shadow: var(--shadow-md); }
-    .kpi-value { font-size: var(--text-4xl); font-weight: 700; color: var(--primary); }
-    .kpi-label { color: var(--gray-600); margin-top: var(--space-1); }
-    .data-table { width: 100%; border-collapse: collapse; }
-    .data-table th { text-align: right; padding: var(--space-3); background: var(--gray-100); font-weight: 600; }
-    .data-table td { padding: var(--space-3); border-bottom: 1px solid var(--gray-200); }
-    .search-bar { margin-bottom: var(--space-4); }
-    @media (max-width: 768px) {
-      .admin-sidebar { position: fixed; top: 0; right: 0; bottom: 0; z-index: 100; transform: translateX(100%); }
-      .admin-sidebar.open { transform: translateX(0); }
-      .sidebar-toggle { display: block; }
-    }
-    .chat-messages { height: 60vh; overflow-y: auto; padding: var(--space-2); background: var(--tg-theme-bg-color, var(--gray-100)); border-radius: var(--radius-lg); margin-bottom: var(--space-3); }
-    .chat-bubble { max-width: 80%; padding: var(--space-3) var(--space-4); border-radius: var(--radius-lg); margin-bottom: var(--space-3); }
-    .chat-bubble.admin { background: var(--primary); color: white; margin-left: auto; text-align: left; }
-    .chat-bubble.user { background: #fff; border: 1px solid var(--gray-200); margin-right: auto; text-align: right; }
-    .chat-input-area { display: flex; gap: var(--space-2); }
-    .chat-input-area input { flex: 1; margin: 0; }
-  </style>
 </head>
 <body>
 <div class="admin-layout">
@@ -64,19 +17,16 @@
       <a href="#" class="sidebar-link active" data-page="dashboard"><i data-lucide="layout-dashboard"></i><span>الرئيسية</span></a>
       <a href="#" class="sidebar-link" data-page="pending"><i data-lucide="clock"></i><span>طلبات التسجيل</span></a>
       <a href="#" class="sidebar-link" data-page="orders"><i data-lucide="shopping-bag"></i><span>مراجعة الطلبات</span></a>
-      
       <div class="sidebar-group">
         <span class="sidebar-group-title">المستخدمين</span>
         <a href="#" class="sidebar-link" data-page="shops"><i data-lucide="store"></i> المتاجر</a>
         <a href="#" class="sidebar-link" data-page="riders"><i data-lucide="bike"></i> السائقين</a>
       </div>
-      
       <div class="sidebar-group">
         <span class="sidebar-group-title">الإعدادات</span>
         <a href="#" class="sidebar-link" data-page="cities"><i data-lucide="map-pin"></i> المدن</a>
         <a href="#" class="sidebar-link" data-page="zones"><i data-lucide="layers"></i> المناطق</a>
       </div>
-      
       <a href="#" class="sidebar-link" data-page="finance"><i data-lucide="dollar-sign"></i><span>المالية</span></a>
       <a href="#" class="sidebar-link" data-page="reports"><i data-lucide="bar-chart"></i><span>التقارير</span></a>
       <a href="#" class="sidebar-link" data-page="ratings"><i data-lucide="star"></i><span>التقييمات</span></a>
@@ -89,6 +39,7 @@
     <div class="app-header">
       <button class="sidebar-toggle" id="sidebarToggle"><i data-lucide="menu"></i></button>
       <h1 id="pageTitle">الرئيسية</h1>
+      <div style="width:40px;"></div>
     </div>
     <div class="admin-content" id="adminContent">
       <!-- يتم تحميل المحتوى ديناميكياً -->
@@ -141,7 +92,7 @@
     }
   }
   
-  // ========== الصفحة الرئيسية (Dashboard) ==========
+  // ========== الصفحة الرئيسية ==========
   async function loadDashboard() {
     contentArea.innerHTML = '<div class="skeleton" style="height:200px;"></div>';
     try {
@@ -298,8 +249,9 @@
   }
   window.sendAdminReply = async (userId) => { const input = document.getElementById('adminReplyInput'); const message = input.value.trim(); if (!message) return; await fetch(`${API}/api/admin/support/messages/${userId}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData }, body: JSON.stringify({ message }) }); input.value = ''; loadSupportChat(userId); loadSupportUsers(); };
 
-  // بدء الصفحة الرئيسية
+  // بدء الصفحة الرئيسية وإنشاء الأيقونات
   loadDashboard();
+  if (typeof lucide !== 'undefined') lucide.createIcons();
 </script>
 </body>
 </html>

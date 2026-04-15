@@ -54,7 +54,7 @@ body {
   border-bottom: 1px solid var(--gray-200);
   position: sticky; top: 0; z-index: 10; backdrop-filter: blur(10px);
 }
-.app-header h1 { font-size: var(--text-3xl); font-weight: 700; color: var(--primary); margin-right: var(--space-3); }
+.app-header h1 { font-size: var(--text-3xl); font-weight: 700; color: var(--primary); margin-right: var(--space-3); flex: 1; }
 .back-btn { background: none; border: none; color: var(--primary); font-size: var(--text-3xl); cursor: pointer; padding: 0; }
 .container { padding: var(--space-5) var(--space-4); max-width: 600px; margin: 0 auto; }
 .container-wide { max-width: 900px; }
@@ -247,7 +247,17 @@ body.has-bottom-nav { padding-bottom: 80px; }
   background: var(--tg-theme-secondary-bg-color, #fff);
   border-bottom: 1px solid var(--gray-200); position: sticky; top: 0; z-index: 5;
 }
-.sidebar-toggle { background: none; border: none; margin-left: var(--space-4); cursor: pointer; display: none; }
+.sidebar-toggle {
+  display: none;
+  background: var(--tg-theme-secondary-bg-color, #fff);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+  margin-left: var(--space-2);
+  cursor: pointer;
+  color: var(--gray-700);
+}
+.sidebar-toggle i { width: 24px; height: 24px; }
 .admin-content, .shop-content { padding: var(--space-5); max-width: 1200px; margin: 0 auto; }
 .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-4); margin-bottom: var(--space-6); }
 .kpi-card { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: var(--radius-xl); padding: var(--space-5); box-shadow: var(--shadow-md); }
@@ -270,5 +280,6 @@ body.has-bottom-nav { padding-bottom: 80px; }
 @media (max-width: 768px) {
   .admin-sidebar, .shop-sidebar { position: fixed; top: 0; right: 0; bottom: 0; z-index: 100; transform: translateX(100%); }
   .admin-sidebar.open, .shop-sidebar.open { transform: translateX(0); }
-  .sidebar-toggle { display: block; }
+  .sidebar-toggle { display: flex; align-items: center; justify-content: center; }
+  .app-header { justify-content: space-between; }
 }

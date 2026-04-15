@@ -8,44 +8,13 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="stylesheet" href="styles.css">
   <style>
-    .shop-layout { display: flex; height: 100vh; }
-    .shop-sidebar {
-      width: 280px; background: var(--tg-theme-secondary-bg-color, #fff);
-      border-left: 1px solid var(--gray-200); display: flex; flex-direction: column;
-      transition: transform 0.3s ease; overflow-y: auto;
-    }
-    .sidebar-header { padding: var(--space-5); font-size: var(--text-2xl); font-weight: 700; color: var(--primary); border-bottom: 1px solid var(--gray-200); }
-    .sidebar-nav { flex: 1; padding: var(--space-4); }
-    .sidebar-link {
-      display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4);
-      border-radius: var(--radius-md); color: var(--gray-700); text-decoration: none;
-      transition: all 0.2s; margin-bottom: var(--space-1);
-    }
-    .sidebar-link i { width: 22px; height: 22px; }
-    .sidebar-link.active { background: var(--primary); color: white; }
-    .shop-main { flex: 1; overflow-y: auto; background: var(--tg-theme-bg-color, #f5f7fb); }
-    .shop-main .app-header {
-      display: flex; align-items: center; padding: var(--space-4) var(--space-5);
-      background: var(--tg-theme-secondary-bg-color, #fff);
-      border-bottom: 1px solid var(--gray-200); position: sticky; top: 0; z-index: 5;
-    }
-    .sidebar-toggle { background: none; border: none; margin-left: var(--space-4); cursor: pointer; display: none; }
-    .shop-content { padding: var(--space-5); max-width: 1200px; margin: 0 auto; }
-    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-4); margin-bottom: var(--space-6); }
-    .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: var(--space-4); }
-    .product-card { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: var(--radius-xl); overflow: hidden; box-shadow: var(--shadow-md); }
-    .product-card img { width: 100%; height: 160px; object-fit: cover; }
-    .product-info { padding: var(--space-4); }
+    .option-row { display: flex; gap: var(--space-2); align-items: center; margin-bottom: var(--space-2); }
+    .image-preview { max-width: 150px; max-height: 150px; border-radius: var(--radius-md); margin-top: var(--space-2); }
     .category-item { background: var(--tg-theme-secondary-bg-color, #fff); padding: var(--space-3); border-radius: var(--radius-md); margin-bottom: var(--space-2); display: flex; align-items: center; gap: var(--space-2); }
     .order-accordion { border-bottom: 1px solid var(--gray-200); }
     .order-header { padding: var(--space-3); cursor: pointer; display: flex; justify-content: space-between; }
     .order-details { padding: var(--space-3); background: var(--gray-100); display: none; }
     .order-details.open { display: block; }
-    @media (max-width: 768px) {
-      .shop-sidebar { position: fixed; top: 0; right: 0; bottom: 0; z-index: 100; transform: translateX(100%); }
-      .shop-sidebar.open { transform: translateX(0); }
-      .sidebar-toggle { display: block; }
-    }
   </style>
 </head>
 <body>
@@ -68,6 +37,7 @@
     <div class="app-header">
       <button class="sidebar-toggle" id="sidebarToggle"><i data-lucide="menu"></i></button>
       <h1 id="pageTitle">نظرة عامة</h1>
+      <div style="width:40px;"></div>
     </div>
     <div class="shop-content" id="shopContent">
       <!-- المحتوى الديناميكي -->
@@ -105,6 +75,7 @@
 <script>
   const tg = Telegram.WebApp; tg.ready(); tg.BackButton.show(); tg.BackButton.onClick(() => history.back());
   const API = 'https://delivery-dragon.vercel.app';
+  let productCategories = [], editingProduct = null;
   
   const sidebar = document.getElementById('sidebar');
   const toggleBtn = document.getElementById('sidebarToggle');
@@ -180,8 +151,8 @@
           <b>${p.name}</b>
           <div class="price">${p.price} ل.س</div>
           <div class="flex" style="margin-top:8px;">
-            <button class="btn btn-sm" onclick="editProduct(${p.id})">✏️</button>
-            <button class="btn btn-danger btn-sm" onclick="deleteProduct(${p.id})">🗑️</button>
+            <button class="btn" onclick="editProduct(${p.id})">✏️</button>
+            <button class="btn btn-danger" onclick="deleteProduct(${p.id})">🗑️</button>
           </div>
         </div>
       </div>`;
@@ -195,13 +166,47 @@
     if (typeof lucide !== 'undefined') lucide.createIcons();
   }
   
-  // دوال المنتجات (موجودة مسبقاً مع تعديلات بسيطة)
-  let editingProduct = null;
-  function openProductModal(product=null) { /* ... */ }
-  function closeProductModal() { document.getElementById('productModal').style.display = 'none'; }
-  async function saveProduct() { /* ... */ }
-  window.editProduct = async (id) => { /* ... */ }
-  window.deleteProduct = async (id) => { /* ... */ }
+  function addOptionRow(optName='', optPrice='') {
+    const div = document.createElement('div'); div.className = 'option-row';
+    div.innerHTML = `<input type="text" placeholder="اسم الخيار" value="${optName}" class="opt-name" style="flex:2"><input type="number" placeholder="السعر الإضافي" value="${optPrice}" class="opt-price" style="flex:1"><button type="button" class="btn btn-danger" onclick="this.parentElement.remove()">🗑️</button>`;
+    document.getElementById('optionsContainer').appendChild(div);
+  }
+  function openProductModal(product=null) {
+    editingProduct = product;
+    document.getElementById('modalTitle').innerText = product ? 'تعديل منتج' : 'إضافة منتج';
+    document.getElementById('productId').value = product?.id || '';
+    document.getElementById('productName').value = product?.name || '';
+    document.getElementById('productPrice').value = product?.price || '';
+    document.getElementById('optionsContainer').innerHTML = '';
+    if (product?.options) { try { const opts = typeof product.options === 'string' ? JSON.parse(product.options) : product.options; if (Array.isArray(opts)) opts.forEach(o => addOptionRow(o.name, o.price)); } catch(e) {} }
+    const preview = document.getElementById('imagePreview');
+    if (product?.image_url) { preview.src = product.image_url; preview.style.display = 'block'; } else { preview.style.display = 'none'; }
+    loadProductCategoriesForSelect(product?.category_id);
+    document.getElementById('productModal').style.display = 'flex';
+  }
+  async function loadProductCategoriesForSelect(selectedId = null) {
+    const res = await fetch(`${API}/api/shop/product-categories`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
+    productCategories = await res.json();
+    const sel = document.getElementById('productCategory'); sel.innerHTML = '<option value="">بدون تصنيف</option>';
+    productCategories.forEach(c => { const option = new Option(c.name, c.id); if (c.id === selectedId) option.selected = true; sel.add(option); });
+  }
+  function closeProductModal() { document.getElementById('productModal').style.display = 'none'; editingProduct = null; }
+  async function saveProduct() {
+    const id = document.getElementById('productId').value, name = document.getElementById('productName').value.trim(), price = parseFloat(document.getElementById('productPrice').value), category_id = document.getElementById('productCategory').value;
+    if (!name || isNaN(price)) return tg.showAlert('يرجى إدخال اسم المنتج وسعر صحيح');
+    const options = []; document.querySelectorAll('.option-row').forEach(row => { const optName = row.querySelector('.opt-name')?.value.trim(); const optPrice = parseFloat(row.querySelector('.opt-price')?.value) || 0; if (optName) options.push({ name: optName, price: optPrice }); });
+    let image = null; const fileInput = document.getElementById('productImage');
+    if (fileInput.files.length > 0) { const file = fileInput.files[0]; if (file.size > 5 * 1024 * 1024) return tg.showAlert('حجم الصورة كبير جداً. الحد الأقصى 5 ميجابايت.'); const reader = new FileReader(); reader.onload = async (e) => { image = e.target.result; await submitProduct({ name, price, category_id: category_id || null, image, options: options.length ? JSON.stringify(options) : null }); }; reader.readAsDataURL(file); return; }
+    else if (editingProduct?.image_url) image = editingProduct.image_url;
+    await submitProduct({ name, price, category_id: category_id || null, image, options: options.length ? JSON.stringify(options) : null });
+  }
+  async function submitProduct(data) {
+    const id = document.getElementById('productId').value, url = id ? `${API}/api/shop/products/${id}` : `${API}/api/shop/products`, method = id ? 'PUT' : 'POST';
+    try { const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData }, body: JSON.stringify(data) }); if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'فشل الحفظ'); } closeProductModal(); loadProducts(); }
+    catch (error) { tg.showAlert('❌ ' + error.message); }
+  }
+  window.editProduct = async (id) => { const res = await fetch(`${API}/api/shop/products/${id}`, { headers: { 'X-Telegram-Init-Data': tg.initData } }); if (res.ok) { const product = await res.json(); openProductModal(product); } else tg.showAlert('تعذر تحميل بيانات المنتج'); };
+  window.deleteProduct = async (id) => { tg.showConfirm('حذف المنتج؟', async ok => { if (!ok) return; const res = await fetch(`${API}/api/shop/products/${id}`, { method: 'DELETE', headers: { 'X-Telegram-Init-Data': tg.initData } }); if (res.ok) loadProducts(); else tg.showAlert('فشل الحذف'); }); };
   
   // التصنيفات
   async function loadCategoriesList() {
@@ -212,8 +217,20 @@
     html += '</div>';
     contentArea.innerHTML = html;
   }
+  function openCategoryModal(id=null, name='', order=0) { document.getElementById('categoryModalTitle').innerText = id ? 'تعديل تصنيف' : 'إضافة تصنيف'; document.getElementById('categoryId').value = id || ''; document.getElementById('categoryName').value = name; document.getElementById('categoryOrder').value = order; document.getElementById('categoryModal').style.display = 'flex'; }
+  window.editCategory = (id, name, order) => openCategoryModal(id, name, order);
+  window.closeCategoryModal = () => document.getElementById('categoryModal').style.display = 'none';
+  async function saveCategory() {
+    const id = document.getElementById('categoryId').value, name = document.getElementById('categoryName').value.trim(), display_order = parseInt(document.getElementById('categoryOrder').value) || 0;
+    if (!name) return tg.showAlert('اسم التصنيف مطلوب');
+    const url = id ? `${API}/api/shop/product-categories/${id}` : `${API}/api/shop/product-categories`, method = id ? 'PUT' : 'POST';
+    try { const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData }, body: JSON.stringify({ name, display_order }) }); if (!res.ok) throw new Error((await res.json()).error); closeCategoryModal(); loadCategoriesList(); }
+    catch (e) { tg.showAlert('❌ ' + e.message); }
+  }
+  window.deleteCategory = async (id) => { tg.showConfirm('حذف التصنيف؟', async ok => { if (!ok) return; const res = await fetch(`${API}/api/shop/product-categories/${id}`, { method: 'DELETE', headers: { 'X-Telegram-Init-Data': tg.initData } }); if (res.ok) loadCategoriesList(); else tg.showAlert('فشل الحذف'); }); };
+  document.getElementById('addCategoryBtn')?.addEventListener('click', () => openCategoryModal());
   
-  // الإعدادات (موقع المتجر)
+  // الإعدادات
   async function loadSettings() {
     const res = await fetch(`${API}/api/shop/profile`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
     const shop = await res.json();
@@ -225,7 +242,15 @@
       </div>
     `;
   }
-  window.updateShopLocation = () => { /* ... */ };
+  window.updateShopLocation = () => {
+    if (!navigator.geolocation) { tg.showAlert('متصفحك لا يدعم تحديد الموقع'); return; }
+    navigator.geolocation.getCurrentPosition(async pos => {
+      const lat = pos.coords.latitude, lng = pos.coords.longitude;
+      const res = await fetch(`${API}/api/shop/location`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData }, body: JSON.stringify({ latitude: lat, longitude: lng }) });
+      if (res.ok) { tg.showAlert('✅ تم تحديث موقع المتجر'); loadSettings(); }
+      else { const err = await res.json(); tg.showAlert('❌ فشل التحديث: ' + (err.error || '')); }
+    }, err => { tg.showAlert('❌ فشل تحديد الموقع: ' + err.message); });
+  };
   
   // الطلبات
   async function loadOrders(archived=false) {
@@ -234,7 +259,7 @@
     let html = `<div class="tabs"><button class="tab ${archived?'':'active'}" onclick="loadOrders(false)">النشطة</button><button class="tab ${archived?'active':''}" onclick="loadOrders(true)">المؤرشفة</button></div>`;
     orders.forEach(o => {
       let items = JSON.parse(o.items).map(i => `${i.name} ×${i.quantity}`).join('، ');
-      html += `<div class="order-accordion"><div class="order-header" onclick="this.nextElementSibling.classList.toggle('open')"><span>#${o.id} - ${o.customer_name}</span><span class="badge">${o.status}</span></div><div class="order-details"><p>📦 ${items}</p><p>💰 ${o.total_price} ل.س</p>${!archived ? `<select onchange="updateOrderStatus(${o.id}, this.value)"><option value="preparing">تحضير</option><option value="ready_for_pickup">جاهز</option></select>` : ''}</div></div>`;
+      html += `<div class="order-accordion"><div class="order-header" onclick="this.nextElementSibling.classList.toggle('open')"><span>#${o.id} - ${o.customer_name}</span><span class="badge">${o.status}</span></div><div class="order-details"><p>📦 ${items}</p><p>💰 ${o.total_price} ل.س</p>${!archived ? `<select onchange="updateOrderStatus(${o.id}, this.value)"><option value="preparing" ${o.status==='preparing'?'selected':''}>تحضير</option><option value="ready_for_pickup" ${o.status==='ready_for_pickup'?'selected':''}>جاهز</option></select>` : ''}</div></div>`;
     });
     contentArea.innerHTML = html;
   }
@@ -242,6 +267,7 @@
   
   // البدء
   loadOverview();
+  if (typeof lucide !== 'undefined') lucide.createIcons();
 </script>
 </body>
 </html>
