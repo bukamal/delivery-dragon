@@ -6,36 +6,39 @@
   <title>شاهين | لوحة التاجر</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
-  <link rel="stylesheet" href="styles.css?v=2.0.0">
   <style>
-    .shop-layout { display: flex; height: 100vh; }
-    .shop-sidebar { width: 280px; background: var(--tg-theme-secondary-bg-color, #fff); border-left: 1px solid var(--gray-200); display: flex; flex-direction: column; transition: transform 0.3s; overflow-y: auto; }
-    .sidebar-header { padding: var(--space-5); font-size: var(--text-2xl); font-weight: 700; color: var(--primary); border-bottom: 1px solid var(--gray-200); }
-    .sidebar-nav { flex: 1; padding: var(--space-4); }
-    .sidebar-link { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); color: var(--gray-700); text-decoration: none; transition: all 0.2s; margin-bottom: var(--space-1); }
-    .sidebar-link i { width: 22px; height: 22px; }
-    .sidebar-link.active { background: var(--primary); color: white; }
-    .shop-main { flex: 1; overflow-y: auto; background: var(--tg-theme-bg-color, #f5f7fb); }
-    .shop-main .app-header { display: flex; align-items: center; padding: var(--space-4) var(--space-5); background: var(--tg-theme-secondary-bg-color, #fff); border-bottom: 1px solid var(--gray-200); position: sticky; top: 0; z-index: 5; }
-    .sidebar-toggle { background: none; border: none; margin-left: var(--space-4); cursor: pointer; display: none; }
-    .shop-content { padding: var(--space-5); max-width: 1200px; margin: 0 auto; }
-    .order-card { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: var(--radius-xl); padding: var(--space-4); margin-bottom: var(--space-3); box-shadow: var(--shadow-md); }
-    .order-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
-    .order-details { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--gray-200); display: none; }
-    .order-details.open { display: block; }
-    .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; }
-    .status-paid { background: var(--info); color: white; }
-    .status-preparing { background: var(--primary); color: white; }
-    .status-ready { background: var(--success); color: white; }
-    .status-delivering { background: #9b59b6; color: white; }
-    .status-completed { background: var(--success); color: white; }
-    .status-rejected { background: var(--danger); color: white; }
-    @media (max-width: 768px) {
-      .shop-sidebar { position: fixed; top: 0; right: 0; bottom: 0; z-index: 100; transform: translateX(100%); }
-      .shop-sidebar.open { transform: translateX(0); }
-      .sidebar-toggle { display: block; }
+    * { margin:0; padding:0; box-sizing:border-box; font-family:'Tajawal', sans-serif; }
+    body { background: var(--tg-theme-bg-color, #f0f2f5); color: var(--tg-theme-text-color, #1e1e2f); }
+    .shop-layout { display:flex; height:100vh; }
+    .shop-sidebar { width:260px; background:rgba(255,255,255,0.8); backdrop-filter:blur(12px); border-left:1px solid rgba(0,0,0,0.05); display:flex; flex-direction:column; transition:0.3s; }
+    .sidebar-header { padding:24px 20px; font-size:1.6rem; font-weight:700; color:#e67e22; border-bottom:1px solid rgba(0,0,0,0.05); }
+    .sidebar-nav { flex:1; padding:16px; }
+    .sidebar-link { display:flex; align-items:center; gap:12px; padding:12px 16px; border-radius:16px; color:#1e1e2f; text-decoration:none; margin-bottom:4px; }
+    .sidebar-link.active { background:#e67e22; color:#fff; }
+    .shop-main { flex:1; overflow-y:auto; background:rgba(255,255,255,0.4); }
+    .shop-main .app-header { display:flex; align-items:center; padding:16px 24px; background:rgba(255,255,255,0.8); backdrop-filter:blur(12px); border-bottom:1px solid rgba(0,0,0,0.05); position:sticky; top:0; z-index:5; }
+    .sidebar-toggle { background:none; border:none; margin-left:16px; cursor:pointer; display:none; }
+    .shop-content { padding:24px; max-width:1200px; margin:0 auto; }
+    .kpi-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:24px; }
+    .kpi-card { background:rgba(255,255,255,0.7); backdrop-filter:blur(8px); border-radius:20px; padding:20px; }
+    .kpi-value { font-size:2rem; font-weight:700; color:#e67e22; }
+    .card { background:rgba(255,255,255,0.7); backdrop-filter:blur(8px); border-radius:20px; padding:20px; margin-bottom:16px; }
+    .btn { background:#e67e22; color:#fff; border:none; padding:10px 20px; border-radius:30px; cursor:pointer; }
+    .btn-danger { background:#e74c3c; }
+    .order-card { background:rgba(255,255,255,0.7); border-radius:20px; padding:16px; margin-bottom:12px; }
+    .order-header { display:flex; justify-content:space-between; cursor:pointer; }
+    .order-details { margin-top:12px; padding-top:12px; border-top:1px solid #ddd; display:none; }
+    .order-details.open { display:block; }
+    .status-badge { padding:4px 12px; border-radius:20px; font-size:0.8rem; }
+    .status-paid{background:#3498db;color:#fff} .status-preparing{background:#e67e22;color:#fff} .status-ready{background:#2ecc71;color:#fff}
+    .modal { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:1000; }
+    .modal-content { background:#fff; border-radius:28px; padding:24px; width:90%; max-width:500px; max-height:80vh; overflow-y:auto; }
+    @media (max-width:768px) {
+      .shop-sidebar { position:fixed; top:0; right:0; bottom:0; z-index:100; transform:translateX(100%); }
+      .shop-sidebar.open { transform:translateX(0); }
+      .sidebar-toggle { display:block; }
+      .kpi-grid { grid-template-columns:1fr; }
     }
-    .update-status-btn { margin-top: 8px; padding: 6px 12px; background: var(--primary); color: white; border: none; border-radius: 20px; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -55,35 +58,23 @@
     <div class="app-header">
       <button class="sidebar-toggle" id="sidebarToggle"><i data-lucide="menu"></i></button>
       <h1 id="pageTitle">نظرة عامة</h1>
-      <div style="width:40px;"></div>
     </div>
     <div class="shop-content" id="shopContent"></div>
   </div>
 </div>
 
+<div id="productModal" class="modal" style="display:none"><div class="modal-content"><h3>إضافة منتج</h3><input type="hidden" id="productId"><div class="form-group"><input type="text" id="productName" placeholder="اسم المنتج"></div><div class="form-group"><input type="number" id="productPrice" placeholder="السعر"></div><div class="form-group"><select id="productCategory"></select></div><div class="form-group"><input type="file" id="productImage" accept="image/*"><img id="imagePreview" style="max-width:100%; display:none;"></div><div class="form-group"><div id="optionsContainer"></div><button type="button" class="btn" onclick="addOptionRow()">➕ إضافة خيار</button></div><button class="btn" onclick="saveProduct()">حفظ</button><button class="btn" onclick="closeProductModal()" style="background:#95a5a6; margin-top:8px;">إلغاء</button></div></div>
+<div id="categoryModal" class="modal" style="display:none"><div class="modal-content"><h3>إضافة تصنيف</h3><input type="hidden" id="categoryId"><input type="text" id="categoryName" placeholder="اسم التصنيف"><input type="number" id="categoryOrder" placeholder="الترتيب" value="0"><button class="btn" onclick="saveCategory()">حفظ</button><button class="btn" onclick="closeCategoryModal()" style="background:#95a5a6;">إلغاء</button></div></div>
+
 <script>
-  const tg = Telegram.WebApp; tg.ready(); tg.BackButton.show(); tg.BackButton.onClick(() => history.back());
+  const tg = Telegram.WebApp; tg.ready();
+  if (tg.BackButton) { tg.BackButton.show(); tg.BackButton.onClick(() => history.back()); }
   const API = 'https://delivery-dragon.vercel.app';
-  
-  const sidebar = document.getElementById('sidebar');
-  const toggleBtn = document.getElementById('sidebarToggle');
-  const links = document.querySelectorAll('.sidebar-link');
-  const pageTitle = document.getElementById('pageTitle');
-  const contentArea = document.getElementById('shopContent');
+  const sidebar = document.getElementById('sidebar'), toggleBtn = document.getElementById('sidebarToggle');
+  const links = document.querySelectorAll('.sidebar-link'), pageTitle = document.getElementById('pageTitle'), contentArea = document.getElementById('shopContent');
   
   toggleBtn.onclick = () => sidebar.classList.toggle('open');
-  
-  links.forEach(link => {
-    link.onclick = (e) => {
-      e.preventDefault();
-      links.forEach(l => l.classList.remove('active'));
-      link.classList.add('active');
-      const page = link.dataset.page;
-      pageTitle.innerText = link.querySelector('span')?.innerText || link.innerText.trim();
-      loadPage(page);
-      if (window.innerWidth <= 768) sidebar.classList.remove('open');
-    };
-  });
+  links.forEach(link => { link.onclick = (e) => { e.preventDefault(); links.forEach(l => l.classList.remove('active')); link.classList.add('active'); pageTitle.innerText = link.querySelector('span')?.innerText; loadPage(link.dataset.page); if (window.innerWidth <= 768) sidebar.classList.remove('open'); }; });
   
   async function loadPage(page) {
     switch(page) {
@@ -92,99 +83,38 @@
       case 'products': loadProducts(); break;
       case 'categories': loadCategoriesList(); break;
       case 'settings': loadSettings(); break;
-      case 'support': contentArea.innerHTML = '<div class="card" style="text-align:center"><h3>الدعم الفني</h3><p>تواصل معنا عبر صفحة الدعم</p><button class="btn btn-block" onclick="location.href=\'support.html\'">فتح الدعم</button></div>'; break;
+      case 'support': contentArea.innerHTML = '<div class="card" style="text-align:center"><h3>الدعم الفني</h3><button class="btn" onclick="location.href=\'support.html\'">فتح الدعم</button></div>'; break;
     }
   }
-  
+
   async function loadOverview() {
-    contentArea.innerHTML = '<div class="skeleton" style="height:200px;"></div>';
-    try {
-      const [statsRes, ordersRes] = await Promise.all([
-        fetch(`${API}/api/shop/stats`, { headers: { 'X-Telegram-Init-Data': tg.initData } }),
-        fetch(`${API}/api/shop/orders?archived=false`, { headers: { 'X-Telegram-Init-Data': tg.initData } })
-      ]);
-      const stats = await statsRes.json();
-      const orders = await ordersRes.json();
-      contentArea.innerHTML = `
-        <div class="kpi-grid">
-          <div class="kpi-card"><div class="kpi-value">${stats.today_orders || 0}</div><div class="kpi-label">طلبات اليوم</div></div>
-          <div class="kpi-card"><div class="kpi-value">${stats.today_revenue || 0} ل.س</div><div class="kpi-label">إيرادات اليوم</div></div>
-          <div class="kpi-card"><div class="kpi-value">${stats.active_orders || 0}</div><div class="kpi-label">طلبات نشطة</div></div>
-        </div>
-        <div class="card">
-          <h3>📋 آخر الطلبات النشطة</h3>
-          ${orders.length ? orders.slice(0,5).map(o => `<div class="flex-between"><span>#${o.id} - ${o.customer_name}</span><span class="status-badge status-${o.status}">${o.status}</span></div>`).join('') : '<p>لا توجد طلبات نشطة</p>'}
-        </div>
-      `;
-    } catch(e) { contentArea.innerHTML = '<div class="empty-state">تعذر تحميل البيانات</div>'; }
+    contentArea.innerHTML = '<div class="skeleton"></div>';
+    const [statsRes, ordersRes] = await Promise.all([fetch(`${API}/api/shop/stats`,{headers:{'X-Telegram-Init-Data':tg.initData}}), fetch(`${API}/api/shop/orders?archived=false`,{headers:{'X-Telegram-Init-Data':tg.initData}})]);
+    const stats = await statsRes.json(); const orders = await ordersRes.json();
+    contentArea.innerHTML = `<div class="kpi-grid">
+      <div class="kpi-card"><div class="kpi-value">${stats.today_orders||0}</div><div>طلبات اليوم</div></div>
+      <div class="kpi-card"><div class="kpi-value">${stats.today_revenue||0} ل.س</div><div>إيرادات اليوم</div></div>
+      <div class="kpi-card"><div class="kpi-value">${stats.active_orders||0}</div><div>طلبات نشطة</div></div>
+    </div>
+    <div class="card"><h3>آخر الطلبات</h3>${orders.slice(0,5).map(o=>`<div class="flex-between"><span>#${o.id} - ${o.customer_name}</span><span class="status-badge status-${o.status}">${o.status}</span></div>`).join('')}</div>`;
   }
-  
-  async function loadOrders(archived = false) {
-    contentArea.innerHTML = '<div class="skeleton" style="height:200px;"></div>';
-    try {
-      const res = await fetch(`${API}/api/shop/orders?archived=${archived}`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
-      const orders = await res.json();
-      
-      let html = `<div class="tabs"><button class="tab ${!archived?'active':''}" onclick="loadOrders(false)">النشطة</button><button class="tab ${archived?'active':''}" onclick="loadOrders(true)">المؤرشفة</button></div>`;
-      
-      if (!orders.length) {
-        html += '<div class="empty-state"><p>لا توجد طلبات</p></div>';
-      } else {
-        orders.forEach(o => {
-          let items = [];
-          try { items = typeof o.items === 'string' ? JSON.parse(o.items) : o.items; } catch(e) { items = []; }
-          const itemsText = items.map(i => `${i.name} ×${i.quantity}`).join('، ');
-          
-          html += `<div class="order-card">
-            <div class="order-header" onclick="this.nextElementSibling.classList.toggle('open')">
-              <div>
-                <b>#${o.id}</b> - ${o.customer_name || 'زبون'}
-                <div style="font-size:0.9rem; color: var(--gray-600);">📞 ${o.customer_phone || 'غير متوفر'}</div>
-              </div>
-              <span class="status-badge status-${o.status}">${o.status}</span>
-            </div>
-            <div class="order-details">
-              <p><b>📦 المنتجات:</b> ${itemsText}</p>
-              <p><b>💰 الإجمالي:</b> ${o.total_price} ل.س</p>
-              <p><b>📍 العنوان:</b> ${o.address || 'غير محدد'}</p>
-              ${o.rider_name ? `<p><b>🛵 السائق:</b> ${o.rider_name}</p>` : ''}
-              ${!archived && o.status !== 'completed' && o.status !== 'rejected' ? `
-                <div style="display: flex; gap: 8px; align-items: center; margin-top: 12px;">
-                  <select id="status-${o.id}" class="status-select" style="flex: 1;">
-                    <option value="preparing" ${o.status === 'preparing' ? 'selected' : ''}>👨‍🍳 تحضير</option>
-                    <option value="ready_for_pickup" ${o.status === 'ready_for_pickup' ? 'selected' : ''}>📦 جاهز للتوصيل</option>
-                  </select>
-                  <button class="update-status-btn" onclick="updateOrderStatus('${o.id}')">تحديث</button>
-                </div>
-              ` : ''}
-            </div>
-          </div>`;
-        });
-      }
-      
-      contentArea.innerHTML = html;
-      
-      // تعريف دالة التحديث في النطاق العام
-      window.updateOrderStatus = async (orderId) => {
-        const select = document.getElementById(`status-${orderId}`);
-        const newStatus = select.value;
-        await fetch(`${API}/api/shop/orders/${orderId}/status`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData },
-          body: JSON.stringify({ status: newStatus })
-        });
-        loadOrders(archived);
-        tg.showPopup({ message: `تم تحديث حالة الطلب #${orderId} إلى ${newStatus}` });
-      };
-      
-      if (typeof lucide !== 'undefined') lucide.createIcons();
-    } catch(e) {
-      contentArea.innerHTML = '<div class="empty-state">تعذر تحميل الطلبات</div>';
-    }
+
+  async function loadOrders(archived) {
+    const res = await fetch(`${API}/api/shop/orders?archived=${archived}`,{headers:{'X-Telegram-Init-Data':tg.initData}}); const orders = await res.json();
+    let html = `<div class="tabs"><button class="tab ${!archived?'active':''}" onclick="loadOrders(false)">النشطة</button><button class="tab ${archived?'active':''}" onclick="loadOrders(true)">المؤرشفة</button></div>`;
+    orders.forEach(o => {
+      let items = JSON.parse(o.items).map(i=>`${i.name} ×${i.quantity}`).join('، ');
+      html += `<div class="order-card"><div class="order-header" onclick="this.nextElementSibling.classList.toggle('open')"><div><b>#${o.id}</b> - ${o.customer_name}</div><span class="status-badge status-${o.status}">${o.status}</span></div>
+        <div class="order-details"><p>📦 ${items}</p><p>💰 ${o.total_price} ل.س</p>${!archived?`<select onchange="updateOrderStatus('${o.id}', this.value)"><option value="preparing" ${o.status==='preparing'?'selected':''}>تحضير</option><option value="ready_for_pickup" ${o.status==='ready_for_pickup'?'selected':''}>جاهز للتوصيل</option></select>`:''}</div></div>`;
+    });
+    contentArea.innerHTML = html;
   }
+  window.updateOrderStatus = async (id, status) => { await fetch(`${API}/api/shop/orders/${id}/status`,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify({status})}); loadOrders(false); };
   
-  // تحميل الصفحة الافتراضية
+  // المنتجات والتصنيفات والإعدادات (موجودة في النسخ السابقة، سيتم دمجها في الرفع النهائي)
+
   loadOverview();
+  if (typeof lucide !== 'undefined') lucide.createIcons();
 </script>
 </body>
 </html>
