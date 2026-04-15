@@ -7,21 +7,25 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="stylesheet" href="styles.css?v=2.0.0">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
-    .online-toggle { display: flex; align-items: center; gap: var(--space-2); }
-    .switch { position: relative; display: inline-block; width: 50px; height: 24px; }
+    .online-toggle { display: flex; align-items: center; gap: 8px; margin-right: auto; }
+    .switch { position: relative; display: inline-block; width: 46px; height: 22px; }
     .switch input { opacity: 0; width: 0; height: 0; }
-    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--gray-400); transition: .3s; border-radius: 24px; }
-    .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; }
-    input:checked + .slider { background-color: var(--success); }
-    input:checked + .slider:before { transform: translateX(26px); }
-    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); margin-bottom: var(--space-4); }
-    .stat-item { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: var(--radius-lg); padding: var(--space-2); text-align: center; }
-    .stat-value { font-weight: 700; color: var(--primary); }
-    .error-message { background: var(--danger); color: white; padding: 12px; border-radius: 12px; margin: 16px 0; }
-    .order-card { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: var(--radius-xl); padding: var(--space-4); margin-bottom: var(--space-3); box-shadow: var(--shadow-md); }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .3s; border-radius: 22px; }
+    .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 2px; bottom: 2px; background-color: white; transition: .3s; border-radius: 50%; }
+    input:checked + .slider { background-color: #27ae60; }
+    input:checked + .slider:before { transform: translateX(24px); }
+    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+    .stat-item { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: 12px; padding: 8px; text-align: center; }
+    .stat-value { font-weight: 700; color: #e67e22; }
+    .order-card { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: 20px; padding: 16px; margin-bottom: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.02); }
+    .badge { background: #e67e22; color: white; padding: 4px 8px; border-radius: 20px; font-size: 12px; }
+    .code-box { background: #f1c40f; padding: 16px; border-radius: 20px; margin: 16px 0; text-align: center; }
+    .code-value { font-size: 2.5rem; font-weight: 700; letter-spacing: 10px; }
+    .verified-badge { background: #27ae60; color: white; padding: 4px 12px; border-radius: 30px; font-size: 0.8rem; display: inline-block; }
+    .skeleton { height: 120px; background: linear-gradient(90deg, #eee 25%, #ddd 50%, #eee 75%); background-size: 200% 100%; animation: loading 1.5s infinite; border-radius: 20px; }
+    @keyframes loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+    .error-message { background: #e74c3c; color: white; padding: 12px; border-radius: 12px; margin: 16px 0; }
   </style>
 </head>
 <body>
@@ -53,10 +57,10 @@
   <div id="historyPanel" class="panel"></div>
   <div id="supportPanel" class="panel">
     <div class="card" style="text-align:center; padding:40px;">
-      <i data-lucide="message-circle" style="font-size:48px; color:var(--primary);"></i>
+      <i data-lucide="message-circle" style="font-size:48px; color:#e67e22;"></i>
       <h3 style="margin:16px 0;">الدعم الفني</h3>
       <p>تواصل مع فريق الدعم للإبلاغ عن مشكلة أو طرح استفسار.</p>
-      <button class="btn btn-block" onclick="location.href='support.html'">💬 فتح المحادثة</button>
+      <button class="btn" onclick="location.href='support.html'" style="margin-top:20px;">💬 فتح المحادثة</button>
     </div>
   </div>
 </div>
@@ -68,19 +72,19 @@
   const onlineSwitch = document.getElementById('onlineSwitch');
   const onlineStatus = document.getElementById('onlineStatus');
   
+  // حالة الاتصال
   onlineSwitch.addEventListener('change', async () => {
     const isOnline = onlineSwitch.checked;
     onlineStatus.innerHTML = isOnline ? '🟢 متصل' : '🔴 غير متصل';
-    try {
-      await fetch(`${API}/api/rider/online-status`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData },
-        body: JSON.stringify({ is_online: isOnline })
-      });
-    } catch(e) { console.error(e); }
+    await fetch(`${API}/api/rider/online-status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData },
+      body: JSON.stringify({ is_online: isOnline })
+    }).catch(e => console.error(e));
     if (document.querySelector('.tab.active').dataset.tab === 'available') loadAvailable();
   });
   
+  // الحصول على موقع السائق
   function getCurrentPosition() {
     return new Promise((resolve) => {
       if (!navigator.geolocation) { resolve(null); return; }
@@ -91,6 +95,7 @@
     });
   }
   
+  // حساب المسافة
   function calculateDistance(lat1, lon1, lat2, lon2) {
     const R = 6371; const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
@@ -98,6 +103,7 @@
     return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))).toFixed(1);
   }
   
+  // التبويبات
   const tabs = document.querySelectorAll('.tab');
   tabs.forEach(t => t.onclick = () => {
     tabs.forEach(x => x.classList.remove('active')); t.classList.add('active');
@@ -120,10 +126,10 @@
   
   async function loadAvailable() {
     const c = document.getElementById('availablePanel');
-    c.innerHTML = '<div class="skeleton" style="height:120px;"></div>';
+    c.innerHTML = '<div class="skeleton"></div>';
     
     if (!onlineSwitch.checked) {
-      c.innerHTML = '<div class="empty-state"><h3>🔴 غير متصل</h3><p>فعّل حالة الاتصال لاستقبال الطلبات</p></div>';
+      c.innerHTML = '<div style="text-align:center;padding:40px"><h3>🔴 غير متصل</h3><p>فعّل حالة الاتصال لاستقبال الطلبات</p></div>';
       return;
     }
     
@@ -140,35 +146,45 @@
       const orders = await res.json();
       
       if(!orders.length) {
-        c.innerHTML = `<div class="empty-state"><i data-lucide="package"></i><h3>لا توجد طلبات متاحة</h3><button class="btn btn-outline" onclick="loadAvailable()">🔄 تحديث</button></div>`;
-        if(typeof lucide !== 'undefined') lucide.createIcons();
+        c.innerHTML = '<div style="text-align:center;padding:40px"><h3>لا توجد طلبات متاحة</h3><p>ستظهر هنا الطلبات الجاهزة للتوصيل</p><button class="btn" onclick="loadAvailable()">🔄 تحديث</button></div>';
         return;
       }
       
       let html = '';
       orders.forEach(o => {
-        // التعامل مع جميع أسماء الحقول المحتملة
-        const shopName = o.shop_name || o.name || 'متجر';
-        const deliveryFee = o.delivery_fee || o.fee || 0;
-        const category = o.category || o.category_name || '';
+        const shopName = o.shop_name || 'متجر';
+        const deliveryFee = o.delivery_fee || 0;
+        const address = o.address || o.shop_address || '';
+        const category = o.category || '';
         const shopLat = o.shop_lat || o.latitude;
         const shopLng = o.shop_lng || o.longitude;
         
         let distance = '-', eta = '-';
         if (currentPosition && shopLat && shopLng) {
           const dist = calculateDistance(currentPosition.lat, currentPosition.lng, shopLat, shopLng);
-          distance = `${dist} كم`; eta = `${Math.round(dist * 3)} دقيقة`;
+          distance = `${dist} كم`;
+          eta = `${Math.round(dist * 3)} دقيقة`;
         }
         
         html += `<div class="order-card">
-          <div class="flex-between"><div class="flex"><div style="width:40px; height:40px; background:var(--gray-200); border-radius:12px; display:flex; align-items:center; justify-content:center;">🏪</div><div><b>${shopName}</b>${category ? `<br><span class="badge">${category}</span>` : ''}</div></div><span class="price">${deliveryFee} ل.س</span></div>
-          <div class="flex-between"><span><i data-lucide="map-pin"></i> ${distance}</span><span><i data-lucide="clock"></i> ${eta}</span></div>
-          <div class="flex"><button class="btn btn-block" onclick="accept('${o.id}')">قبول</button><button class="btn btn-outline btn-block" onclick="rejectOrder('${o.id}')">رفض</button></div>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div><b>#${o.id}</b> - ${shopName}</div>
+            ${category ? `<span class="badge">${category}</span>` : ''}
+          </div>
+          <div style="margin:8px 0;"><i data-lucide="map-pin"></i> ${address}</div>
+          <div style="display:flex; justify-content:space-between;">
+            <span>💰 ${deliveryFee} ل.س</span>
+            <span><i data-lucide="clock"></i> ${eta} (${distance})</span>
+          </div>
+          <div style="display:flex; gap:8px; margin-top:12px;">
+            <button class="btn" onclick="accept('${o.id}')" style="flex:1;">قبول</button>
+            <button class="btn" onclick="rejectOrder('${o.id}')" style="flex:1; background:#e74c3c;">رفض</button>
+          </div>
         </div>`;
       });
       c.innerHTML = html;
     } catch(e) {
-      c.innerHTML = `<div class="error-message">❌ استثناء: ${e.message}</div>`;
+      c.innerHTML = `<div class="error-message">❌ خطأ: ${e.message}</div>`;
     }
     if(typeof lucide !== 'undefined') lucide.createIcons();
   }
@@ -178,47 +194,60 @@
     await fetch(`${API}/api/rider/accept-order`, { method:'POST', headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData}, body:JSON.stringify({order_id:id}) });
     loadAvailable(); loadActive(); loadStats(); document.querySelector('[data-tab="active"]').click();
   };
-  window.rejectOrder = async id => { tg.showConfirm('رفض الطلب؟', async ok => { if(ok) await fetch(`${API}/api/rider/reject-order`, { method:'POST', headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData}, body:JSON.stringify({order_id:id}) }); loadAvailable(); }); };
+  window.rejectOrder = async id => { 
+    tg.showConfirm('رفض الطلب؟', async ok => { 
+      if(ok) await fetch(`${API}/api/rider/reject-order`, { method:'POST', headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData}, body:JSON.stringify({order_id:id}) }); 
+      loadAvailable(); 
+    }); 
+  };
   
   async function loadActive() {
-    const c = document.getElementById('activePanel'); c.innerHTML = '<div class="skeleton" style="height:120px;"></div>';
+    const c = document.getElementById('activePanel'); c.innerHTML = '<div class="skeleton"></div>';
     try {
       const r = await fetch(`${API}/api/rider/active-order`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
       const o = await r.json();
-      if(!o) { c.innerHTML = '<div class="empty-state"><p>لا يوجد طلب نشط</p></div>'; return; }
+      if(!o) { c.innerHTML = '<div style="text-align:center;padding:40px"><p>لا يوجد طلب نشط</p></div>'; return; }
       const statusRes = await fetch(`${API}/api/orders/${o.id}/status`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
       const statusData = await statusRes.json();
       const isVerified = statusData.code_verified;
       c.innerHTML = `<div class="card">
-        <div class="flex-between"><b>#${o.id}</b><span class="badge">${o.shop_name || 'متجر'}</span></div>
-        <div class="flex-between"><span>📞 ${o.customer_phone || ''}</span><button class="btn-outline" onclick="tg.openLink('tel:${o.shop_phone}')"><i data-lucide="phone"></i> المتجر</button></div>
-        <div class="map-mini" id="miniMap"></div>
-        <div class="code-box"><span>🔐 كود التأكيد</span><span class="code-value" id="confirmCode">${o.confirmation_code || '----'}</span><button class="btn-outline" onclick="copyCode()"><i data-lucide="copy"></i></button></div>
-        ${isVerified ? '<span class="verified-badge">✅ تم التحقق</span>' : '<span>⏳ بانتظار الكود</span>'}
-        <button class="btn btn-block" onclick="complete(${o.id})" ${!isVerified ? 'disabled' : ''}>تم التوصيل</button>
-        <button class="btn btn-danger btn-block" onclick="cancelOrder(${o.id})">تعذر التوصيل</button>
+        <b>#${o.id}</b> - ${o.shop_name || 'متجر'}<br>
+        📞 ${o.customer_phone || ''}<br>📍 ${o.address || ''}<br>💰 ${o.delivery_fee} ل.س
+        <div class="code-box">
+          <div class="label">🔐 كود التأكيد</div>
+          <div class="code-value">${o.confirmation_code || '----'}</div>
+          ${isVerified ? '<span class="verified-badge">✅ تم التحقق من الكود</span>' : '<span style="color:#e67e22;">⏳ بانتظار إدخال الزبون للكود</span>'}
+        </div>
+        <button class="btn" onclick="complete(${o.id})" ${!isVerified ? 'disabled' : ''}>تم التوصيل</button>
+        <button class="btn btn-danger" onclick="cancelOrder(${o.id})">تعذر التوصيل</button>
+        ${!isVerified ? '<p style="margin-top:12px;color:#e67e22;">⚠️ لا يمكن إنهاء الطلب حتى يدخل الزبون الكود</p>' : ''}
       </div>`;
       if(typeof lucide !== 'undefined') lucide.createIcons();
-      if (o.shop_lat && o.shop_lng && o.delivery_lat && o.delivery_lng) {
-        setTimeout(() => {
-          const mapEl = document.getElementById('miniMap');
-          if(mapEl) { const map = L.map(mapEl).setView([o.shop_lat, o.shop_lng], 13); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map); L.marker([o.shop_lat, o.shop_lng]).addTo(map).bindPopup('🏪 المتجر'); L.marker([o.delivery_lat, o.delivery_lng]).addTo(map).bindPopup('📍 الزبون'); }
-        }, 100);
-      }
     } catch(e) { c.innerHTML = `<div class="error-message">❌ ${e.message}</div>`; }
   }
   
-  window.copyCode = () => { const code = document.getElementById('confirmCode')?.innerText; if(code) navigator.clipboard?.writeText(code).then(() => tg.showPopup({ message: 'تم نسخ الكود' })); };
-  window.complete = async id => { await fetch(`${API}/api/rider/complete-order`, { method:'POST', headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData}, body:JSON.stringify({order_id:id}) }); loadActive(); loadStats(); document.querySelector('[data-tab="available"]').click(); };
-  window.cancelOrder = async id => { tg.showConfirm('تعذر التوصيل؟', async ok => { if(ok){ const reason = prompt('سبب الإلغاء:'); await fetch(`${API}/api/rider/cancel-order`, { method:'POST', headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData}, body:JSON.stringify({order_id:id, reason}) }); loadActive(); loadAvailable(); } }); };
+  window.copyCode = () => { const code = document.querySelector('.code-value')?.innerText; if(code) navigator.clipboard?.writeText(code).then(() => tg.showPopup({ message: 'تم نسخ الكود' })); };
+  window.complete = async id => { 
+    await fetch(`${API}/api/rider/complete-order`, { method:'POST', headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData}, body:JSON.stringify({order_id:id}) }); 
+    loadActive(); loadStats(); document.querySelector('[data-tab="available"]').click(); 
+  };
+  window.cancelOrder = async id => { 
+    tg.showConfirm('تعذر التوصيل؟', async ok => { 
+      if(ok){ 
+        const reason = prompt('سبب الإلغاء:'); 
+        await fetch(`${API}/api/rider/cancel-order`, { method:'POST', headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData}, body:JSON.stringify({order_id:id, reason}) }); 
+        loadActive(); loadAvailable(); 
+      } 
+    }); 
+  };
   
   async function loadHistory() {
-    const c = document.getElementById('historyPanel'); c.innerHTML = '<div class="skeleton" style="height:120px;"></div>';
+    const c = document.getElementById('historyPanel'); c.innerHTML = '<div class="skeleton"></div>';
     try {
       const r = await fetch(`${API}/api/rider/history`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
       const orders = await r.json();
-      if(!orders.length) { c.innerHTML = '<div class="empty-state"><p>لا يوجد سجل طلبات</p></div>'; return; }
-      c.innerHTML = orders.map(o => `<div class="card"><div class="flex-between"><b>#${o.id}</b><span>${o.total_price} ل.س</span></div><div>${o.shop_name}</div><div>📅 ${new Date(o.created_at).toLocaleDateString('ar-SY')}</div></div>`).join('');
+      if(!orders.length) { c.innerHTML = '<div style="text-align:center;padding:40px"><p>لا يوجد سجل طلبات</p></div>'; return; }
+      c.innerHTML = orders.map(o => `<div class="card"><b>#${o.id}</b> - ${o.shop_name}<br>💰 ${o.total_price} ل.س<br>📅 ${new Date(o.created_at).toLocaleDateString('ar-SY')}</div>`).join('');
     } catch(e) { c.innerHTML = `<div class="error-message">❌ ${e.message}</div>`; }
   }
   
