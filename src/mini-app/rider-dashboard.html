@@ -7,6 +7,8 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     .online-toggle { display: flex; align-items: center; gap: var(--space-2); }
     .switch { position: relative; display: inline-block; width: 50px; height: 24px; }
@@ -22,6 +24,7 @@
     .code-box { background: var(--warning); padding: var(--space-3); border-radius: var(--radius-lg); margin: var(--space-3) 0; display: flex; align-items: center; justify-content: space-between; }
     .code-value { font-size: var(--text-2xl); font-weight: 700; letter-spacing: 4px; }
     .map-mini { height: 120px; border-radius: var(--radius-lg); background: var(--gray-200); margin: var(--space-3) 0; }
+    .refresh-btn { margin-left: auto; background: none; border: none; color: var(--primary); cursor: pointer; }
   </style>
 </head>
 <body>
@@ -91,7 +94,7 @@
     });
   }
   
-  // حساب المسافة التقريبية (Haversine)
+  // حساب المسافة التقريبية
   function calculateDistance(lat1, lon1, lat2, lon2) {
     const R = 6371; const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
@@ -116,17 +119,34 @@
       const stats = await res.json();
       document.getElementById('todayOrders').innerText = stats.today_orders || 0;
       document.getElementById('todayEarnings').innerText = stats.today_earnings || 0;
-      document.getElementById('rating').innerText = stats.rating || '-';
+      document.getElementById('rating').innerText = stats.rating ? parseFloat(stats.rating).toFixed(1) : '-';
     } catch(e) {}
   }
   
   async function loadAvailable() {
-    const c = document.getElementById('availablePanel'); c.innerHTML = '<div class="skeleton" style="height:120px;"></div>';
-    if (!onlineSwitch.checked) { c.innerHTML = '<div class="empty-state"><h3>غير متصل</h3><p>فعّل حالة الاتصال لاستقبال الطلبات</p></div>'; return; }
+    const c = document.getElementById('availablePanel');
+    c.innerHTML = '<div class="skeleton" style="height:120px;"></div>';
+    
+    if (!onlineSwitch.checked) {
+      c.innerHTML = '<div class="empty-state"><h3>🔴 غير متصل</h3><p>فعّل حالة الاتصال لاستقبال الطلبات</p></div>';
+      return;
+    }
+    
     await getCurrentPosition();
     const r = await fetch(`${API}/api/rider/available-orders`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
     const orders = await r.json();
-    if(!orders.length) { c.innerHTML = '<div class="empty-state"><h3>لا توجد طلبات</h3></div>'; return; }
+    
+    if(!orders.length) {
+      c.innerHTML = `<div class="empty-state">
+        <i data-lucide="package" style="font-size:48px; opacity:0.5;"></i>
+        <h3>لا توجد طلبات متاحة حالياً</h3>
+        <p>ستظهر هنا الطلبات الجاهزة للتوصيل</p>
+        <button class="btn btn-outline" onclick="loadAvailable()" style="margin-top:16px;"><i data-lucide="refresh-cw"></i> تحديث</button>
+      </div>`;
+      if(typeof lucide !== 'undefined') lucide.createIcons();
+      return;
+    }
+    
     let html = '';
     for (const o of orders) {
       let distance = '-', eta = '-';
@@ -191,7 +211,5 @@
   loadStats(); loadAvailable();
   setInterval(() => { if (document.querySelector('.tab.active')?.dataset.tab === 'available') loadAvailable(); else if (document.querySelector('.tab.active')?.dataset.tab === 'active') loadActive(); }, 15000);
 </script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </body>
 </html>
