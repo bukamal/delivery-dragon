@@ -116,7 +116,7 @@ async function notifyCustomer(orderId, status) {
 }
 async function notifyRiders(orderId) {
   try {
-    const order = await pool.query(`SELECT o.*, s.shop_name, s.address as shop_address FROM orders o JOIN shops s ON o.shop_id=s.id WHERE o.id=$1`,[orderId]);
+    const order = await pool.query(`SELECT o.*, s.shop_name, s.address as shop_address, s.latitude as shop_lat, s.longitude as shop_lng FROM orders o JOIN shops s ON o.shop_id=s.id WHERE o.id=$1`,[orderId]);
     const o = order.rows[0]; if (!o) return;
     const riders = await pool.query(`SELECT u.chat_id, u.name FROM users u WHERE u.role='rider' AND u.is_approved=true AND u.chat_id IS NOT NULL`);
     const msg = `🚨 *طلب توصيل جديد!*\n\n🆔 #${orderId}\n🏪 ${o.shop_name} - ${o.shop_address}\n📍 إلى: ${o.address}\n💵 الأجرة: ${o.delivery_fee} ل.س\n\n_اضغط لفتح لوحة السائق لقبول الطلب._`;
@@ -254,6 +254,16 @@ app.post('/api/orders/:orderId/verify-code', optionalAuth, async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+});
+
+app.get('/api/distance', optionalAuth, async (req, res) => {
+  try {
+    const { lat1, lng1, lat2, lng2 } = req.query;
+    if (!lat1 || !lng1 || !lat2 || !lng2) return res.status(400).json({ error: 'Missing coordinates' });
+    const distance = await calculateDistance(parseFloat(lat1), parseFloat(lng1), parseFloat(lat2), parseFloat(lng2));
+    const eta = distance ? Math.ceil(distance * 3) : null;
+    res.json({ distance_km: distance, eta_minutes: eta });
+  } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
 // ========== WEBHOOK ==========
@@ -420,7 +430,41 @@ app.get('/api/shop/stats', requireAuth, async (req, res) => {
 });
 
 // ========== RIDER ==========
-app.get('/api/rider/available-orders', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'rider' || !dbUser?.is_approved) return res.status(403).json({ error: 'Forbidden' }); const orders = await pool.query(`SELECT o.*, s.shop_name, s.address as shop_address FROM orders o JOIN shops s ON o.shop_id=s.id WHERE o.status='ready_for_pickup' AND o.rider_id IS NULL`); res.json(orders.rows); } catch(error) { res.status(500).json({ error: error.message }); } });
+app.get('/api/rider/stats', requireAuth, async (req, res) => {
+  try {
+    const tgUser = req.tgUser;
+    const dbUser = await getDbUser(tgUser.id);
+    if (dbUser?.role !== 'rider') return res.status(403).json({ error: 'Forbidden' });
+    const today = new Date().toISOString().split('T')[0];
+    const stats = await pool.query(`
+      SELECT
+        (SELECT COUNT(*) FROM orders WHERE rider_id=$1 AND DATE(created_at)=$2 AND status='completed') as today_orders,
+        (SELECT COALESCE(SUM(rider_fee),0) FROM orders WHERE rider_id=$1 AND DATE(created_at)=$2 AND status='completed') as today_earnings,
+        (SELECT AVG(rating) FROM ratings WHERE to_user_id=$1) as rating
+    `, [dbUser.id, today]);
+    res.json(stats.rows[0] || { today_orders: 0, today_earnings: 0, rating: null });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+app.get('/api/rider/history', requireAuth, async (req, res) => {
+  try {
+    const tgUser = req.tgUser;
+    const dbUser = await getDbUser(tgUser.id);
+    if (dbUser?.role !== 'rider') return res.status(403).json({ error: 'Forbidden' });
+    const orders = await pool.query(`SELECT o.*, s.shop_name FROM orders o JOIN shops s ON o.shop_id=s.id WHERE o.rider_id=$1 AND o.status='completed' ORDER BY o.created_at DESC LIMIT 50`, [dbUser.id]);
+    res.json(orders.rows);
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+app.post('/api/rider/online-status', requireAuth, async (req, res) => {
+  try {
+    const tgUser = req.tgUser;
+    const dbUser = await getDbUser(tgUser.id);
+    if (dbUser?.role !== 'rider') return res.status(403).json({ error: 'Forbidden' });
+    const { is_online } = req.body;
+    await pool.query(`UPDATE rider_details SET is_online=$1 WHERE user_id=$2`, [is_online, dbUser.id]);
+    res.json({ success: true });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+app.get('/api/rider/available-orders', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'rider' || !dbUser?.is_approved) return res.status(403).json({ error: 'Forbidden' }); const rider = await pool.query('SELECT is_online FROM rider_details WHERE user_id=$1', [dbUser.id]); if (!rider.rows[0]?.is_online) return res.json([]); const orders = await pool.query(`SELECT o.*, s.shop_name, s.address as shop_address, s.latitude as shop_lat, s.longitude as shop_lng, c.name as category FROM orders o JOIN shops s ON o.shop_id=s.id LEFT JOIN shop_categories c ON s.category_id=c.id WHERE o.status='ready_for_pickup' AND o.rider_id IS NULL`); res.json(orders.rows); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.post('/api/rider/accept-order', async (req, res) => {
   try {
     const tgUser = req.tgUser;
@@ -442,7 +486,17 @@ app.post('/api/rider/accept-order', async (req, res) => {
     res.json({ success: true, confirmation_code: confirmationCode });
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
-app.get('/api/rider/active-order', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'rider' || !dbUser?.is_approved) return res.status(403).json({ error: 'Forbidden' }); const activeOrder = await pool.query(`SELECT o.*, s.shop_name, s.address as shop_address FROM orders o JOIN shops s ON o.shop_id = s.id WHERE o.rider_id = $1 AND o.status = 'delivering' ORDER BY o.created_at DESC LIMIT 1`, [dbUser.id]); res.json(activeOrder.rows[0] || null); } catch(error) { res.status(500).json({ error: error.message }); } });
+app.post('/api/rider/reject-order', requireAuth, async (req, res) => {
+  try {
+    const tgUser = req.tgUser;
+    const dbUser = await getDbUser(tgUser.id);
+    if (dbUser?.role !== 'rider') return res.status(403).json({ error: 'Forbidden' });
+    const { order_id } = req.body;
+    await pool.query(`UPDATE rider_details SET last_rejected_order=$1 WHERE user_id=$2`, [order_id, dbUser.id]);
+    res.json({ success: true });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+app.get('/api/rider/active-order', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'rider' || !dbUser?.is_approved) return res.status(403).json({ error: 'Forbidden' }); const activeOrder = await pool.query(`SELECT o.*, s.shop_name, s.address as shop_address, s.phone as shop_phone, s.latitude as shop_lat, s.longitude as shop_lng FROM orders o JOIN shops s ON o.shop_id = s.id WHERE o.rider_id = $1 AND o.status = 'delivering' ORDER BY o.created_at DESC LIMIT 1`, [dbUser.id]); res.json(activeOrder.rows[0] || null); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.post('/api/rider/complete-order', async (req, res) => {
   try {
     const tgUser = req.tgUser;
@@ -465,7 +519,7 @@ app.post('/api/rider/complete-order', async (req, res) => {
     res.json({ success: true });
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
-app.post('/api/rider/cancel-order', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'rider') return res.status(403).json({ error: 'Forbidden' }); const { order_id } = req.body; const result = await pool.query(`UPDATE orders SET rider_id = NULL, status = 'ready_for_pickup' WHERE id = $1 AND rider_id = $2 AND status = 'delivering'`, [order_id, dbUser.id]); if (result.rowCount === 0) return res.status(400).json({ error: 'Order not found or not yours' }); await notifyCustomer(order_id, 'ready_for_pickup'); res.json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
+app.post('/api/rider/cancel-order', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'rider') return res.status(403).json({ error: 'Forbidden' }); const { order_id, reason } = req.body; const result = await pool.query(`UPDATE orders SET rider_id = NULL, status = 'ready_for_pickup' WHERE id = $1 AND rider_id = $2 AND status = 'delivering'`, [order_id, dbUser.id]); if (result.rowCount === 0) return res.status(400).json({ error: 'Order not found or not yours' }); if (reason) await pool.query(`UPDATE orders SET cancel_reason=$1 WHERE id=$2`, [reason, order_id]); await notifyCustomer(order_id, 'ready_for_pickup'); res.json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
 
 // ========== ADMIN ==========
 app.get('/api/admin/stats', requireAuth, async (req, res) => {
