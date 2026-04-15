@@ -15,7 +15,6 @@
     .rider-info { background: var(--tg-theme-bg-color, var(--gray-100)); padding: var(--space-4); border-radius: var(--radius-xl); margin: var(--space-4) 0; display: flex; align-items: center; gap: var(--space-4); }
     .eta-badge { background: var(--primary); color: white; padding: var(--space-2) var(--space-4); border-radius: var(--radius-full); text-align: center; font-weight: 500; }
     .code-section { margin-top: var(--space-5); padding: var(--space-4); background: var(--tg-theme-bg-color, var(--gray-100)); border-radius: var(--radius-xl); }
-    .code-input { width: 100%; padding: var(--space-4); border-radius: var(--radius-lg); border: 1px solid var(--gray-300); text-align: center; font-size: var(--text-3xl); letter-spacing: var(--space-3); }
   </style>
 </head>
 <body>
@@ -38,7 +37,12 @@
   
   <div id="codeSection" class="code-section" style="display:none;">
     <label style="display:block; margin-bottom:12px; font-weight:500;">🔐 أدخل كود التأكيد (من السائق)</label>
-    <input type="text" id="confirmCodeInput" class="code-input" placeholder="0000" maxlength="4" inputmode="numeric">
+    <div class="otp-container">
+      <input type="text" class="otp-input" maxlength="1" inputmode="numeric" pattern="\d" id="otp1">
+      <input type="text" class="otp-input" maxlength="1" inputmode="numeric" pattern="\d" id="otp2">
+      <input type="text" class="otp-input" maxlength="1" inputmode="numeric" pattern="\d" id="otp3">
+      <input type="text" class="otp-input" maxlength="1" inputmode="numeric" pattern="\d" id="otp4">
+    </div>
     <button class="btn btn-block" onclick="verifyCode()" style="margin-top:12px;">تحقق من الكود</button>
     <p id="codeError" style="color:var(--danger); margin-top:8px;"></p>
     <div id="codeVerifiedMessage" class="verified-badge" style="display:none;">✅ تم التحقق من الكود - شكراً لثقتك!</div>
@@ -60,6 +64,13 @@
     else { document.getElementById('map').innerHTML = ''; map = L.map('map').setView([lat, lng], 15); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map); marker = L.marker([lat, lng]).addTo(map).bindPopup('📍 موقع السائق').openPopup(); }
   }
 
+  // تهيئة حقول OTP
+  const otpInputs = ['otp1','otp2','otp3','otp4'].map(id => document.getElementById(id));
+  otpInputs.forEach((input, index) => {
+    input.oninput = (e) => { if (e.target.value && index < 3) otpInputs[index+1].focus(); };
+    input.onkeydown = (e) => { if (e.key === 'Backspace' && !e.target.value && index > 0) otpInputs[index-1].focus(); };
+  });
+
   async function fetchData() {
     try {
       const statusRes = await fetch(`${API}/api/orders/${orderId}/status`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
@@ -76,8 +87,17 @@
 
       if (status === 'delivering') {
         document.getElementById('codeSection').style.display = 'block';
-        if (codeVerified) { document.getElementById('confirmCodeInput').style.display = 'none'; document.querySelector('#codeSection .btn').style.display = 'none'; document.getElementById('codeError').style.display = 'none'; document.getElementById('codeVerifiedMessage').style.display = 'block'; }
-        else { document.getElementById('confirmCodeInput').style.display = 'block'; document.querySelector('#codeSection .btn').style.display = 'block'; document.getElementById('codeError').style.display = 'block'; document.getElementById('codeVerifiedMessage').style.display = 'none'; }
+        if (codeVerified) {
+          otpInputs.forEach(i => i.style.display = 'none');
+          document.querySelector('#codeSection .btn').style.display = 'none';
+          document.getElementById('codeError').style.display = 'none';
+          document.getElementById('codeVerifiedMessage').style.display = 'block';
+        } else {
+          otpInputs.forEach(i => i.style.display = 'block');
+          document.querySelector('#codeSection .btn').style.display = 'block';
+          document.getElementById('codeError').style.display = 'block';
+          document.getElementById('codeVerifiedMessage').style.display = 'none';
+        }
 
         const [locationRes, etaRes] = await Promise.all([fetch(`${API}/api/orders/${orderId}/location`, { headers: { 'X-Telegram-Init-Data': tg.initData } }), fetch(`${API}/api/orders/${orderId}/eta`, { headers: { 'X-Telegram-Init-Data': tg.initData } })]);
         const locationData = await locationRes.json(), etaData = await etaRes.json();
@@ -97,8 +117,8 @@
   }
 
   window.verifyCode = async () => {
-    const code = document.getElementById('confirmCodeInput').value.trim();
-    if (!code) return tg.showAlert('أدخل الكود'); if (code.length !== 4) return tg.showAlert('الكود يجب أن يكون 4 أرقام');
+    const code = otpInputs.map(i => i.value).join('');
+    if (code.length !== 4) return tg.showAlert('أدخل الكود كاملاً');
     try {
       const res = await fetch(`${API}/api/orders/${orderId}/verify-code`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData }, body: JSON.stringify({ code }) });
       const data = await res.json(); if (!res.ok) throw new Error(data.error);

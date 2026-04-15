@@ -12,13 +12,15 @@
     .verifying{background:var(--warning);color:black} .paid{background:var(--info);color:white} .preparing{background:var(--primary);color:white} .ready{background:var(--success);color:white} .delivering{background:#9b59b6;color:white} .completed{background:var(--success);color:white} .rejected{background:var(--danger);color:white}
     .stars { display:flex; justify-content:center; gap:12px; margin:20px 0; font-size:36px; cursor:pointer; }
     .star { color:var(--gray-400); transition:0.2s; } .star.active { color:var(--warning); }
+    .pull-indicator { text-align: center; padding: 8px; color: var(--gray-500); font-size: var(--text-sm); }
   </style>
 </head>
 <body class="has-bottom-nav">
 <div class="app-header">
   <h1>🦅 شاهين</h1>
 </div>
-<div class="container">
+<div class="container" id="pullContainer">
+  <div class="pull-indicator" id="pullIndicator">↓ اسحب للتحديث</div>
   <h2 style="margin-bottom:20px;"><i data-lucide="clipboard-list"></i> طلباتي</h2>
   <div id="ordersContainer"><div class="skeleton" style="height:120px;"></div></div>
 </div>
@@ -27,6 +29,18 @@
 <script>
   const tg = Telegram.WebApp; tg.ready(); tg.expand();
   const API = 'https://delivery-dragon.vercel.app'; let currentOrderId, shopRating=0, riderRating=0;
+  let touchStartY = 0, pullDistance = 0, isPulling = false;
+  const container = document.getElementById('pullContainer');
+  const indicator = document.getElementById('pullIndicator');
+  
+  function showToast(msg, icon='info') {
+    const toast = document.createElement('div'); toast.className = 'toast';
+    toast.innerHTML = `<i data-lucide="${icon}"></i><span>${msg}</span>`;
+    document.body.appendChild(toast); if (typeof lucide !== 'undefined') lucide.createIcons();
+    setTimeout(() => toast.classList.add('show'), 10);
+    setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 2000);
+  }
+  
   function getStatusProgress(s){ const steps=['paid','preparing','ready_for_pickup','delivering','completed']; const idx=steps.indexOf(s); const pct=idx>=0?(idx/(steps.length-1))*100:0; const labels={paid:'مدفوع',preparing:'تحضير',ready_for_pickup:'جاهز',delivering:'توصيل',completed:'مكتمل'}; return{percent:pct,label:labels[s]||s}; }
   async function load() {
     const r = await fetch(`${API}/api/me/orders`,{headers:{'X-Telegram-Init-Data':tg.initData}}); const orders = await r.json();
@@ -42,6 +56,25 @@
   window.submitRating = async () => { if(!shopRating||!riderRating) return tg.showAlert('قيم الطرفين'); const c=document.getElementById('commentInput').value.trim(); await Promise.all([fetch(`${API}/api/orders/${currentOrderId}/rate`,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify({rating:shopRating,comment:c,target:'shop'})}),fetch(`${API}/api/orders/${currentOrderId}/rate`,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify({rating:riderRating,comment:c,target:'rider'})})]); tg.showAlert('شكراً!'); closeModal(); load(); };
   window.cancel = async id => { tg.showConfirm('إلغاء الطلب؟',async ok=>{ if(ok){ await fetch(`${API}/api/orders/${id}/cancel`,{method:'POST',headers:{'X-Telegram-Init-Data':tg.initData}}); load(); } }); };
   window.closeModal = () => document.getElementById('ratingModal').style.display='none';
+  
+  // سحب للتحديث
+  container.addEventListener('touchstart', e => { touchStartY = e.touches[0].clientY; }, { passive: true });
+  container.addEventListener('touchmove', e => {
+    if (window.scrollY > 0) return;
+    const currentY = e.touches[0].clientY;
+    pullDistance = Math.max(0, currentY - touchStartY);
+    if (pullDistance > 20 && !isPulling) { isPulling = true; indicator.style.opacity = '1'; }
+    if (isPulling) {
+      indicator.innerText = pullDistance > 60 ? '✓ حرر للتحديث' : '↓ اسحب للتحديث';
+      e.preventDefault();
+    }
+  }, { passive: false });
+  container.addEventListener('touchend', () => {
+    if (isPulling && pullDistance > 60) { load(); showToast('تم تحديث الطلبات', 'refresh-cw'); }
+    indicator.innerText = '↓ اسحب للتحديث'; indicator.style.opacity = '0.5';
+    isPulling = false; pullDistance = 0;
+  });
+  
   load();
 </script>
 </body>

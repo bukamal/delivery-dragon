@@ -33,6 +33,13 @@
         const role = user?.role || 'customer';
         const isApproved = user?.is_approved;
         const name = user?.name || 'بطل';
+        
+        // توجيه المستخدم الجديد إلى onboarding
+        if (role === 'customer' && !localStorage.getItem('shahin_onboarded')) {
+          window.location.href = 'onboarding.html';
+          return;
+        }
+        
         let html = '';
         if (role === 'admin') { window.location.href = 'admin-dashboard.html'; return; }
         else if (role === 'shop' && isApproved) { window.location.href = 'shop-dashboard.html'; return; }

@@ -15,13 +15,15 @@
     .shop-icon { font-size: 44px; background: var(--tg-theme-bg-color, #f0f2f5); width: 70px; height: 70px; border-radius: var(--radius-xl); display: flex; align-items: center; justify-content: center; }
     .shop-info h3 { font-size: var(--text-lg); margin-bottom: var(--space-1); }
     .shop-info p { color: var(--gray-600); font-size: var(--text-sm); display: flex; align-items: center; gap: var(--space-1); }
+    .pull-indicator { text-align: center; padding: 8px; color: var(--gray-500); font-size: var(--text-sm); transition: 0.2s; }
   </style>
 </head>
 <body class="has-bottom-nav">
 <div class="app-header">
   <h1>🦅 شاهين</h1>
 </div>
-<div class="container">
+<div class="container" id="pullContainer">
+  <div class="pull-indicator" id="pullIndicator">↓ اسحب للتحديث</div>
   <div class="city-chip">
     <select id="citySelect"><option value="">اختر المدينة...</option></select>
   </div>
@@ -44,6 +46,18 @@
   const tg = window.Telegram.WebApp; tg.ready(); tg.expand();
   const API = 'https://delivery-dragon.vercel.app';
   let shops = [], cart = JSON.parse(localStorage.getItem('dragon_cart')) || [], currentCityId = null;
+  let searchTimeout, touchStartY = 0, pullDistance = 0, isPulling = false;
+  const container = document.getElementById('pullContainer');
+  const indicator = document.getElementById('pullIndicator');
+  
+  function showToast(msg, icon='info') {
+    const toast = document.createElement('div'); toast.className = 'toast';
+    toast.innerHTML = `<i data-lucide="${icon}"></i><span>${msg}</span>`;
+    document.body.appendChild(toast); if (typeof lucide !== 'undefined') lucide.createIcons();
+    setTimeout(() => toast.classList.add('show'), 10);
+    setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 2000);
+  }
+  
   function updateCartCount() { document.getElementById('cartCount').innerText = cart.reduce((s,i) => s + i.quantity, 0); }
   async function loadCities() {
     const res = await fetch(`${API}/api/cities`);
@@ -72,8 +86,36 @@
       </div>`).join('');
     if (typeof lucide !== 'undefined') lucide.createIcons();
   }
+  
+  // بحث محسّن (debounced)
+  document.getElementById('searchInput').oninput = e => {
+    clearTimeout(searchTimeout);
+    const query = e.target.value.trim();
+    searchTimeout = setTimeout(() => {
+      if (!query) renderShops(shops);
+      else renderShops(shops.filter(s => s.shop_name.includes(query)));
+    }, 300);
+  };
+  
+  // سحب للتحديث
+  container.addEventListener('touchstart', e => { touchStartY = e.touches[0].clientY; }, { passive: true });
+  container.addEventListener('touchmove', e => {
+    if (window.scrollY > 0) return;
+    const currentY = e.touches[0].clientY;
+    pullDistance = Math.max(0, currentY - touchStartY);
+    if (pullDistance > 20 && !isPulling) { isPulling = true; indicator.style.opacity = '1'; }
+    if (isPulling) {
+      indicator.innerText = pullDistance > 60 ? '✓ حرر للتحديث' : '↓ اسحب للتحديث';
+      e.preventDefault();
+    }
+  }, { passive: false });
+  container.addEventListener('touchend', () => {
+    if (isPulling && pullDistance > 60) { loadShops(); showToast('تم تحديث المتاجر', 'refresh-cw'); }
+    indicator.innerText = '↓ اسحب للتحديث'; indicator.style.opacity = '0.5';
+    isPulling = false; pullDistance = 0;
+  });
+  
   document.getElementById('citySelect').onchange = e => { currentCityId = e.target.value; loadShops(); };
-  document.getElementById('searchInput').oninput = e => { renderShops(shops.filter(s => s.shop_name.includes(e.target.value))); };
   document.getElementById('viewCartBtn').onclick = () => location.href = 'cart.html';
   loadCities(); updateCartCount();
 </script>
