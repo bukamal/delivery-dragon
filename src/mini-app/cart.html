@@ -16,6 +16,9 @@
     .summary { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: var(--radius-2xl); padding: var(--space-6); margin: var(--space-6) 0; box-shadow: var(--shadow-lg); }
     .locate-btn { background: var(--info); color: white; border: none; padding: var(--space-3) var(--space-4); border-radius: var(--radius-full); width: 100%; margin: var(--space-2) 0; cursor: pointer; }
     .readonly-field { background: var(--gray-100); color: var(--gray-600); }
+    .zone-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+    .zone-chip { padding: 10px 16px; border: 1px solid var(--gray-300); border-radius: 40px; background: var(--tg-theme-secondary-bg-color, #fff); color: inherit; cursor: pointer; }
+    .zone-chip.active { background: var(--primary); color: #fff; border-color: var(--primary); }
   </style>
 </head>
 <body>
@@ -28,6 +31,10 @@
   <div id="itemsContainer"><div class="skeleton" style="height:80px;"></div></div>
   <div class="summary">
     <div class="flex-between"><span>المجموع</span><span id="subtotal">0</span> ل.س</div>
+    <select id="citySelect"><option>اختر المدينة</option></select>
+    <label>📍 منطقة التوصيل</label>
+    <div id="zoneChips" class="zone-chips">اختر المدينة أولاً</div>
+    <input type="hidden" id="zoneSelect">
     <div class="flex-between"><span>التوصيل (يحسب آلياً)</span><span id="deliveryFee">0</span> ل.س</div>
     <div class="flex-between" style="font-weight:700; margin-top:10px"><span>الإجمالي</span><span id="total">0</span> ل.س</div>
     <input type="text" id="addressInput" placeholder="العنوان التفصيلي">
@@ -45,7 +52,7 @@
   const API = 'https://delivery-dragon.vercel.app';
   let cart = JSON.parse(localStorage.getItem('dragon_cart')) || [];
   if (!cart.length) location.href = 'customer-home.html';
-  let deliveryFee = 0, currentTotal = 0;
+  let deliveryFee = 0, currentTotal = 0, currentCityId = null;
 
   async function fetchProductImage(productId) {
     try {
@@ -78,11 +85,58 @@
     }
     document.getElementById('itemsContainer').innerHTML = html;
     document.getElementById('subtotal').innerText = subtotal;
+    updateTotal(subtotal);
     if (typeof lucide !== 'undefined') lucide.createIcons();
   }
 
   window.update = (i, d) => { if (cart[i].quantity + d > 0) cart[i].quantity += d; else cart.splice(i,1); localStorage.setItem('dragon_cart', JSON.stringify(cart)); render(); };
   window.remove = i => { tg.showConfirm('حذف المنتج؟', ok => { if (ok) { cart.splice(i,1); localStorage.setItem('dragon_cart', JSON.stringify(cart)); render(); } }); };
+
+  async function loadCities() {
+    const res = await fetch(`${API}/api/cities`);
+    const cities = await res.json();
+    const sel = document.getElementById('citySelect');
+    cities.forEach(c => sel.add(new Option(c.name, c.id)));
+    if (cities.length) { sel.value = cities[0].id; currentCityId = cities[0].id; loadZones(currentCityId); }
+  }
+
+  async function loadZones(cityId) {
+    const container = document.getElementById('zoneChips');
+    container.innerHTML = '<span>جاري تحميل المناطق...</span>';
+    const res = await fetch(`${API}/api/zones?city_id=${cityId}`);
+    const zones = await res.json();
+    if (!zones.length) {
+      container.innerHTML = '<span>⚠️ لا توجد مناطق محددة لهذه المدينة بعد.</span>';
+      document.getElementById('zoneSelect').value = '';
+      deliveryFee = 0;
+      document.getElementById('deliveryFee').innerText = deliveryFee;
+      updateTotal(parseFloat(document.getElementById('subtotal').innerText));
+      return;
+    }
+    let html = '';
+    zones.forEach((z, i) => {
+      html += `<button class="zone-chip ${i===0?'active':''}" data-id="${z.id}" data-fee="${z.base_fee}">${z.zone_name} (${z.base_fee} ل.س)</button>`;
+    });
+    container.innerHTML = html;
+    document.getElementById('zoneSelect').value = zones[0]?.id || '';
+    deliveryFee = zones[0]?.base_fee || 0;
+    document.getElementById('deliveryFee').innerText = deliveryFee;
+    updateTotal(parseFloat(document.getElementById('subtotal').innerText));
+    document.querySelectorAll('.zone-chip').forEach(chip => {
+      chip.onclick = () => {
+        document.querySelectorAll('.zone-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        document.getElementById('zoneSelect').value = chip.dataset.id;
+        deliveryFee = parseFloat(chip.dataset.fee);
+        document.getElementById('deliveryFee').innerText = deliveryFee;
+        updateTotal(parseFloat(document.getElementById('subtotal').innerText));
+      };
+    });
+  }
+
+  function updateTotal(sub) { currentTotal = sub + deliveryFee; document.getElementById('total').innerText = currentTotal; }
+
+  document.getElementById('citySelect').onchange = e => { currentCityId = e.target.value; loadZones(currentCityId); };
 
   document.getElementById('locateBtn').onclick = () => {
     if (!navigator.geolocation) { tg.showAlert('متصفحك لا يدعم تحديد الموقع'); return; }
@@ -113,9 +167,10 @@
     if (!delivery_latitude || !delivery_longitude) return tg.showAlert('الرجاء تحديد موقع التسليم');
     const items = cart.map(i => ({ id: i.id, quantity: i.quantity }));
     const city_name = document.getElementById('cityDisplay').value;
+    const zone_id = document.getElementById('zoneSelect').value;
     tg.MainButton.showProgress();
     try {
-      const res = await fetch(`${API}/api/orders`, { method: 'POST', headers: { 'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData }, body: JSON.stringify({ shop_id: cart[0].shopId, items, address: addr, delivery_latitude, delivery_longitude, city_name: city_name }) });
+      const res = await fetch(`${API}/api/orders`, { method: 'POST', headers: { 'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData }, body: JSON.stringify({ shop_id: cart[0].shopId, items, zone_id: zone_id || null, address: addr, delivery_latitude, delivery_longitude, city_name: city_name }) });
       if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'فشل الطلب'); }
       const data = await res.json();
       cart = []; localStorage.removeItem('dragon_cart');
@@ -132,7 +187,8 @@
       window.copyWallet = function() { const wallet = document.getElementById('walletNumber').innerText; navigator.clipboard?.writeText(wallet).then(() => tg.showPopup({ title: '✅ تم النسخ', message: 'رقم المحفظة جاهز للصق' })).catch(() => tg.showAlert('تعذر النسخ')); };
     } catch(e) { tg.MainButton.hideProgress(); tg.showAlert('❌ ' + e.message); }
   };
-  render();
+
+  render(); loadCities();
 </script>
 </body>
 </html>
