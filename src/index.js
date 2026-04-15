@@ -116,10 +116,10 @@ async function notifyCustomer(orderId, status) {
 }
 async function notifyRiders(orderId) {
   try {
-    const order = await pool.query(`SELECT o.*, s.shop_name, s.address as shop_address, z.zone_name FROM orders o JOIN shops s ON o.shop_id=s.id LEFT JOIN delivery_zones z ON o.zone_id=z.id WHERE o.id=$1`,[orderId]);
+    const order = await pool.query(`SELECT o.*, s.shop_name, s.address as shop_address FROM orders o JOIN shops s ON o.shop_id=s.id WHERE o.id=$1`,[orderId]);
     const o = order.rows[0]; if (!o) return;
     const riders = await pool.query(`SELECT u.chat_id, u.name FROM users u WHERE u.role='rider' AND u.is_approved=true AND u.chat_id IS NOT NULL`);
-    const msg = `🚨 *طلب توصيل جديد!*\n\n🆔 #${orderId}\n🏪 ${o.shop_name} - ${o.shop_address}\n📍 إلى: ${o.zone_name || 'غير محدد'} - ${o.address}\n💵 الأجرة: ${o.delivery_fee} ل.س\n\n_اضغط لفتح لوحة السائق لقبول الطلب._`;
+    const msg = `🚨 *طلب توصيل جديد!*\n\n🆔 #${orderId}\n🏪 ${o.shop_name} - ${o.shop_address}\n📍 إلى: ${o.address}\n💵 الأجرة: ${o.delivery_fee} ل.س\n\n_اضغط لفتح لوحة السائق لقبول الطلب._`;
     for (const r of riders.rows) { try { await bot.api.sendMessage(r.chat_id, msg, {parse_mode:'Markdown'}); } catch(e){} }
   } catch(e){ console.error('Notify riders error:',e); }
 }
@@ -274,9 +274,14 @@ app.use('/api', requireAuth);
 app.get('/api/me', async (req, res) => {
   try {
     const tgUser = req.tgUser;
-    await pool.query(`INSERT INTO users (telegram_id, name, role, is_approved) VALUES ($1,$2,'customer',true) ON CONFLICT(telegram_id) DO NOTHING`,[tgUser.id.toString(), tgUser.first_name||'User']);
-    const dbUser = await getDbUser(tgUser.id);
-    res.json(dbUser || { role:'customer' });
+    const result = await pool.query(
+      `INSERT INTO users (telegram_id, name, role, is_approved) 
+       VALUES ($1, $2, 'customer', true) 
+       ON CONFLICT(telegram_id) DO UPDATE SET name = EXCLUDED.name 
+       RETURNING *`,
+      [tgUser.id.toString(), tgUser.first_name || 'User']
+    );
+    res.json(result.rows[0] || { role: 'customer' });
   } catch(error) { res.status(500).json({ error: error.message }); }
 });
 app.post('/api/register/shop', async (req, res) => { try { const tgUser = req.tgUser; const { name, shop_name, category_id, phone, address, city_id, latitude, longitude } = req.body; await pool.query(`INSERT INTO users (telegram_id, name, phone, role, is_approved) VALUES ($1,$2,$3,'shop',false) ON CONFLICT(telegram_id) DO UPDATE SET name=EXCLUDED.name, phone=EXCLUDED.phone, role='shop', is_approved=false`,[tgUser.id.toString(), name, phone]); await pool.query(`INSERT INTO shops (owner_id, shop_name, category_id, phone, address, city_id, latitude, longitude) VALUES ((SELECT id FROM users WHERE telegram_id=$1),$2,$3,$4,$5,$6,$7,$8)`,[tgUser.id.toString(), shop_name, category_id, phone, address, city_id, latitude, longitude]); res.status(201).json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });

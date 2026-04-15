@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS users (
     chat_id TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
 -- فئات المحلات
 CREATE TABLE IF NOT EXISTS shop_categories (
     id SERIAL PRIMARY KEY,
@@ -16,6 +17,15 @@ CREATE TABLE IF NOT EXISTS shop_categories (
     icon TEXT
 );
 INSERT INTO shop_categories (name, icon) VALUES ('مطعم','🍔'),('سوبرماركت','🛒'),('صيدلية','💊'),('مخبز','🥖') ON CONFLICT (name) DO NOTHING;
+
+-- المدن
+CREATE TABLE IF NOT EXISTS cities (
+    id SERIAL PRIMARY KEY,
+    name TEXT UNIQUE NOT NULL,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- المحلات
 CREATE TABLE IF NOT EXISTS shops (
     id SERIAL PRIMARY KEY,
@@ -28,15 +38,19 @@ CREATE TABLE IF NOT EXISTS shops (
     latitude REAL,
     longitude REAL,
     is_open BOOLEAN DEFAULT true,
+    city_id INTEGER REFERENCES cities(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
--- فئات المنتجات
+
+-- فئات المنتجات (خاصة بالمتجر)
 CREATE TABLE IF NOT EXISTS product_categories (
     id SERIAL PRIMARY KEY,
     shop_id INTEGER NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
-    display_order INTEGER DEFAULT 0
+    display_order INTEGER DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
 -- المنتجات
 CREATE TABLE IF NOT EXISTS products (
     id SERIAL PRIMARY KEY,
@@ -50,15 +64,17 @@ CREATE TABLE IF NOT EXISTS products (
     options JSONB,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
--- مناطق التوصيل (نوى فقط)
+
+-- مناطق التوصيل
 CREATE TABLE IF NOT EXISTS delivery_zones (
     id SERIAL PRIMARY KEY,
-    zone_name TEXT UNIQUE NOT NULL,
+    city_id INTEGER REFERENCES cities(id) ON DELETE CASCADE,
+    zone_name TEXT NOT NULL,
     base_fee REAL NOT NULL,
     is_active BOOLEAN DEFAULT true
 );
-INSERT INTO delivery_zones (zone_name, base_fee) VALUES ('نوى', 20000) ON CONFLICT (zone_name) DO UPDATE SET base_fee=20000;
--- الطلبات (تم إضافة حالات جديدة)
+
+-- الطلبات
 CREATE TABLE IF NOT EXISTS orders (
     id SERIAL PRIMARY KEY,
     customer_id INTEGER NOT NULL REFERENCES users(id),
@@ -74,10 +90,16 @@ CREATE TABLE IF NOT EXISTS orders (
     rider_fee REAL DEFAULT 0,
     shop_net REAL DEFAULT 0,
     address TEXT,
+    city_id INTEGER REFERENCES cities(id) ON DELETE SET NULL,
+    delivery_latitude REAL,
+    delivery_longitude REAL,
     screenshot_file_id TEXT,
+    confirmation_code TEXT,
+    code_verified BOOLEAN DEFAULT false,
     rider_accepted_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
 -- مواقع السائقين
 CREATE TABLE IF NOT EXISTS rider_locations (
     id SERIAL PRIMARY KEY,
@@ -86,6 +108,7 @@ CREATE TABLE IF NOT EXISTS rider_locations (
     longitude REAL NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
 -- تفاصيل السائقين
 CREATE TABLE IF NOT EXISTS rider_details (
     user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
@@ -95,6 +118,7 @@ CREATE TABLE IF NOT EXISTS rider_details (
     current_lat REAL,
     current_lng REAL
 );
+
 -- المعاملات المالية
 CREATE TABLE IF NOT EXISTS financial_transactions (
     id SERIAL PRIMARY KEY,
@@ -104,6 +128,7 @@ CREATE TABLE IF NOT EXISTS financial_transactions (
     status TEXT DEFAULT 'pending',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
 -- تقييمات
 CREATE TABLE IF NOT EXISTS ratings (
     id SERIAL PRIMARY KEY,
@@ -114,3 +139,20 @@ CREATE TABLE IF NOT EXISTS ratings (
     comment TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- الدعم الفني
+CREATE TABLE IF NOT EXISTS support_messages (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    admin_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    message TEXT NOT NULL,
+    is_from_admin BOOLEAN DEFAULT false,
+    is_read BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- فهارس لتحسين الأداء
+CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+CREATE INDEX IF NOT EXISTS idx_orders_customer_id ON orders(customer_id);
+CREATE INDEX IF NOT EXISTS idx_products_shop_id ON products(shop_id);
