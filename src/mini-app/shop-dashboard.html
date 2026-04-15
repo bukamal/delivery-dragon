@@ -6,30 +6,10 @@
   <title>شاهين | لوحة التاجر</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Tajawal', sans-serif; background: var(--tg-theme-bg-color, #f5f7fb); color: var(--tg-theme-text-color, #1a1a2c); padding: 0 0 20px; }
-    .app-header { display: flex; align-items: center; padding: 16px 20px; background: var(--tg-theme-secondary-bg-color, #fff); border-bottom: 1px solid #ddd; position: sticky; top:0; z-index:10; }
-    .app-header h1 { font-size:1.7rem; color:#e67e22; margin-right:12px; }
-    .back-btn { background:none; border:none; color:#e67e22; font-size:1.8rem; cursor:pointer; }
-    .container { padding:16px; max-width:600px; margin:0 auto; }
-    .tabs { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:20px; }
-    .tab { flex:1 0 auto; padding:10px 12px; background:var(--tg-theme-secondary-bg-color, #fff); border-radius:30px; text-align:center; cursor:pointer; border:1px solid #ddd; font-size:0.9rem; }
-    .tab.active { background:#e67e22; color:#fff; }
-    .panel { display:none; }
-    .panel.active { display:block; }
-    .card { background:var(--tg-theme-secondary-bg-color, #fff); border-radius:20px; padding:16px; margin-bottom:16px; box-shadow:0 4px 12px rgba(0,0,0,.02); }
-    .btn { background:#e67e22; color:#fff; border:none; padding:10px 20px; border-radius:30px; cursor:pointer; margin:2px; }
-    .btn-danger { background:#e74c3c; }
-    .btn-outline { background:transparent; border:1px solid #e67e22; color:#e67e22; }
-    .form-group { margin-bottom:16px; }
-    label { display:block; margin-bottom:6px; font-weight:500; }
-    input, select, textarea { width:100%; padding:12px; border-radius:12px; border:1px solid #ccc; background:var(--tg-theme-bg-color, #fff); color:inherit; }
-    .option-row { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
-    .image-preview { max-width:150px; max-height:150px; border-radius:12px; margin-top:8px; }
-    .skeleton { height:100px; background:linear-gradient(90deg,#eee 25%,#ddd 50%,#eee 75%); background-size:200% 100%; animation:loading 1.5s infinite; border-radius:20px; }
-    @keyframes loading { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+    .option-row { display: flex; gap: var(--space-2); align-items: center; margin-bottom: var(--space-2); }
+    .image-preview { max-width: 150px; max-height: 150px; border-radius: var(--radius-md); margin-top: var(--space-2); }
   </style>
 </head>
 <body>
@@ -37,7 +17,7 @@
   <button class="back-btn" onclick="history.back()"><i data-lucide="arrow-right"></i></button>
   <h1>🦅 شاهين</h1>
 </div>
-<div class="container">
+<div class="container container-wide">
   <h2>🏪 لوحة التحكم</h2>
   <div class="tabs">
     <div class="tab active" data-tab="active">🟢 النشطة</div>
@@ -49,11 +29,11 @@
   </div>
   <div id="activePanel" class="panel active"></div>
   <div id="productsPanel" class="panel">
-    <button class="btn" id="addProductBtn" style="width:100%; margin-bottom:16px"><i data-lucide="plus"></i> إضافة منتج</button>
+    <button class="btn btn-block" id="addProductBtn" style="margin-bottom:16px"><i data-lucide="plus"></i> إضافة منتج</button>
     <div id="productsList"></div>
   </div>
   <div id="categoriesPanel" class="panel">
-    <button class="btn" id="addCategoryBtn" style="width:100%; margin-bottom:16px"><i data-lucide="folder-plus"></i> إضافة تصنيف</button>
+    <button class="btn btn-block" id="addCategoryBtn" style="margin-bottom:16px"><i data-lucide="folder-plus"></i> إضافة تصنيف</button>
     <div id="categoriesList"></div>
   </div>
   <div id="archivePanel" class="panel"></div>
@@ -61,52 +41,51 @@
     <div class="card">
       <h3>📍 موقع المتجر</h3>
       <p id="currentLocation" style="margin:12px 0;">جاري التحميل...</p>
-      <button class="btn" onclick="updateShopLocation()"><i data-lucide="map-pin"></i> تحديث الموقع الحالي</button>
-      <input type="hidden" id="shopLat">
-      <input type="hidden" id="shopLng">
+      <button class="btn btn-block" onclick="updateShopLocation()"><i data-lucide="map-pin"></i> تحديث الموقع الحالي</button>
+      <input type="hidden" id="shopLat"><input type="hidden" id="shopLng">
     </div>
   </div>
   <div id="supportPanel" class="panel">
     <div class="card" style="text-align:center; padding:40px;">
-      <i data-lucide="message-circle" style="font-size:48px; color:#e67e22;"></i>
+      <i data-lucide="message-circle" style="font-size:48px; color:var(--primary);"></i>
       <h3 style="margin:16px 0;">الدعم الفني</h3>
       <p>تواصل مع فريق الدعم للإبلاغ عن مشكلة أو طرح استفسار.</p>
-      <button class="btn" onclick="location.href='support.html'" style="margin-top:20px;">💬 فتح المحادثة</button>
+      <button class="btn btn-block" onclick="location.href='support.html'" style="margin-top:20px;">💬 فتح المحادثة</button>
     </div>
   </div>
 </div>
 
-<!-- مودال إضافة/تعديل منتج -->
-<div id="productModal" style="position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); display:none; align-items:center; justify-content:center; z-index:1000;">
-  <div style="background:var(--tg-theme-secondary-bg-color, #fff); border-radius:28px; padding:24px; width:90%; max-width:500px; max-height:80vh; overflow-y:auto;">
+<!-- مودال المنتج -->
+<div id="productModal" class="modal" style="display:none">
+  <div class="modal-content">
     <h3 id="modalTitle">إضافة منتج</h3>
     <input type="hidden" id="productId">
     <div class="form-group"><label>اسم المنتج</label><input type="text" id="productName" placeholder="اسم المنتج"></div>
     <div class="form-group"><label>السعر (ل.س)</label><input type="number" id="productPrice" placeholder="السعر"></div>
     <div class="form-group"><label>التصنيف</label><select id="productCategory"></select></div>
-    <div class="form-group"><label>صورة المنتج</label><input type="file" id="productImage" accept="image/*" capture="environment"><img id="imagePreview" class="image-preview" style="display:none;"><button type="button" class="btn-outline" onclick="document.getElementById('productImage').click()" style="width:100%; margin-top:8px;">اختيار صورة</button></div>
-    <div class="form-group"><label>الخيارات (مثل الحجم)</label><div id="optionsContainer"></div><button type="button" class="btn-outline" onclick="addOptionRow()" style="width:100%;">➕ إضافة خيار</button></div>
-    <button class="btn" onclick="saveProduct()" style="width:100%">حفظ</button>
-    <button class="btn" onclick="closeProductModal()" style="background:#95a5a6; margin-top:8px">إلغاء</button>
+    <div class="form-group"><label>صورة المنتج</label><input type="file" id="productImage" accept="image/*" capture="environment"><img id="imagePreview" class="image-preview" style="display:none;"><button type="button" class="btn btn-outline btn-block" onclick="document.getElementById('productImage').click()" style="margin-top:8px;">اختيار صورة</button></div>
+    <div class="form-group"><label>الخيارات</label><div id="optionsContainer"></div><button type="button" class="btn btn-outline btn-block" onclick="addOptionRow()">➕ إضافة خيار</button></div>
+    <button class="btn btn-block" onclick="saveProduct()">حفظ</button>
+    <button class="btn btn-block" onclick="closeProductModal()" style="background:var(--gray-500); margin-top:8px;">إلغاء</button>
   </div>
 </div>
 
-<!-- مودال إضافة/تعديل تصنيف -->
-<div id="categoryModal" style="position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); display:none; align-items:center; justify-content:center; z-index:1000;">
-  <div style="background:var(--tg-theme-secondary-bg-color, #fff); border-radius:28px; padding:24px; width:90%; max-width:400px;">
+<!-- مودال التصنيف -->
+<div id="categoryModal" class="modal" style="display:none">
+  <div class="modal-content">
     <h3 id="categoryModalTitle">إضافة تصنيف</h3>
     <input type="hidden" id="categoryId">
     <div class="form-group"><label>اسم التصنيف</label><input type="text" id="categoryName" placeholder="مثال: مقبلات"></div>
     <div class="form-group"><label>ترتيب العرض</label><input type="number" id="categoryOrder" placeholder="0" value="0"></div>
-    <button class="btn" onclick="saveCategory()" style="width:100%">حفظ</button>
-    <button class="btn" onclick="closeCategoryModal()" style="background:#95a5a6; margin-top:8px">إلغاء</button>
+    <button class="btn btn-block" onclick="saveCategory()">حفظ</button>
+    <button class="btn btn-block" onclick="closeCategoryModal()" style="background:var(--gray-500); margin-top:8px;">إلغاء</button>
   </div>
 </div>
 
 <script>
   const tg = Telegram.WebApp; tg.ready(); tg.BackButton.show(); tg.BackButton.onClick(()=>history.back());
   const API = 'https://delivery-dragon.vercel.app';
-  let categories = [], productCategories = [], editingProduct = null;
+  let productCategories = [], editingProduct = null;
 
   const tabs = document.querySelectorAll('.tab');
   tabs.forEach(t => t.onclick = () => {
@@ -118,21 +97,13 @@
     else if(t.dataset.tab === 'products') { loadProducts(); loadProductCategoriesForSelect(); }
     else if(t.dataset.tab === 'categories') loadCategoriesList();
     else if(t.dataset.tab === 'settings') loadSettings();
-    // support لا يحتاج تحميل
   });
 
   async function loadProducts() {
-    const container = document.getElementById('productsList'); container.innerHTML = '<div class="skeleton"></div>';
+    const container = document.getElementById('productsList'); container.innerHTML = '<div class="skeleton" style="height:100px;"></div>';
     const res = await fetch(`${API}/api/shop/products`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
     const products = await res.json();
-    container.innerHTML = products.map(p => `
-      <div class="card" style="display:flex; gap:12px;">
-        ${p.image_url ? `<img src="${p.image_url}" style="width:60px; height:60px; border-radius:12px; object-fit:cover;">` : '<div style="width:60px; height:60px; background:#eee; border-radius:12px;"></div>'}
-        <div style="flex:1"><b>${p.name}</b> - ${p.price} ل.س
-          <div style="margin-top:8px"><button class="btn" onclick="editProduct(${p.id})">✏️ تعديل</button><button class="btn btn-danger" onclick="deleteProduct(${p.id})">🗑️ حذف</button></div>
-        </div>
-      </div>
-    `).join('') || '<p>لا توجد منتجات</p>';
+    container.innerHTML = products.map(p => `<div class="card flex"><div style="display:flex; gap:12px; width:100%;">${p.image_url ? `<img src="${p.image_url}" style="width:60px; height:60px; border-radius:12px; object-fit:cover;">` : '<div style="width:60px; height:60px; background:var(--gray-200); border-radius:12px;"></div>'}<div style="flex:1"><b>${p.name}</b> - ${p.price} ل.س<div style="margin-top:8px"><button class="btn" onclick="editProduct(${p.id})">✏️ تعديل</button><button class="btn btn-danger" onclick="deleteProduct(${p.id})">🗑️ حذف</button></div></div></div></div>`).join('') || '<p>لا توجد منتجات</p>';
     if (typeof lucide !== 'undefined') lucide.createIcons();
   }
 
@@ -164,7 +135,6 @@
   }
 
   function closeProductModal() { document.getElementById('productModal').style.display = 'none'; editingProduct = null; }
-
   async function saveProduct() {
     const id = document.getElementById('productId').value, name = document.getElementById('productName').value.trim(), price = parseFloat(document.getElementById('productPrice').value), category_id = document.getElementById('productCategory').value;
     if (!name || isNaN(price)) return tg.showAlert('يرجى إدخال اسم المنتج وسعر صحيح');
@@ -174,24 +144,21 @@
     else if (editingProduct?.image_url) image = editingProduct.image_url;
     await submitProduct({ name, price, category_id: category_id || null, image, options: options.length ? JSON.stringify(options) : null });
   }
-
   async function submitProduct(data) {
     const id = document.getElementById('productId').value, url = id ? `${API}/api/shop/products/${id}` : `${API}/api/shop/products`, method = id ? 'PUT' : 'POST';
     try { const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData }, body: JSON.stringify(data) }); if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'فشل الحفظ'); } closeProductModal(); loadProducts(); }
     catch (error) { tg.showAlert('❌ ' + error.message); }
   }
-
   window.editProduct = async (id) => { const res = await fetch(`${API}/api/shop/products/${id}`, { headers: { 'X-Telegram-Init-Data': tg.initData } }); if (res.ok) { const product = await res.json(); openProductModal(product); } else tg.showAlert('تعذر تحميل بيانات المنتج'); };
   window.deleteProduct = async (id) => { tg.showConfirm('حذف المنتج؟', async ok => { if (!ok) return; const res = await fetch(`${API}/api/shop/products/${id}`, { method: 'DELETE', headers: { 'X-Telegram-Init-Data': tg.initData } }); if (res.ok) loadProducts(); else tg.showAlert('فشل الحذف'); }); };
 
   async function loadCategoriesList() {
-    const container = document.getElementById('categoriesList'); container.innerHTML = '<div class="skeleton"></div>';
+    const container = document.getElementById('categoriesList'); container.innerHTML = '<div class="skeleton" style="height:100px;"></div>';
     const res = await fetch(`${API}/api/shop/product-categories`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
     const cats = await res.json();
-    container.innerHTML = cats.map(c => `<div class="card" style="display:flex; justify-content:space-between; align-items:center;"><div><b>${c.name}</b> (ترتيب: ${c.display_order})</div><div><button class="btn" onclick="editCategory(${c.id}, '${c.name}', ${c.display_order})">✏️</button><button class="btn btn-danger" onclick="deleteCategory(${c.id})">🗑️</button></div></div>`).join('') || '<p>لا توجد تصنيفات</p>';
+    container.innerHTML = cats.map(c => `<div class="card flex-between"><div><b>${c.name}</b> (ترتيب: ${c.display_order})</div><div><button class="btn" onclick="editCategory(${c.id}, '${c.name}', ${c.display_order})">✏️</button><button class="btn btn-danger" onclick="deleteCategory(${c.id})">🗑️</button></div></div>`).join('') || '<p>لا توجد تصنيفات</p>';
     if (typeof lucide !== 'undefined') lucide.createIcons();
   }
-
   function openCategoryModal(id=null, name='', order=0) { document.getElementById('categoryModalTitle').innerText = id ? 'تعديل تصنيف' : 'إضافة تصنيف'; document.getElementById('categoryId').value = id || ''; document.getElementById('categoryName').value = name; document.getElementById('categoryOrder').value = order; document.getElementById('categoryModal').style.display = 'flex'; }
   window.editCategory = (id, name, order) => openCategoryModal(id, name, order);
   window.closeCategoryModal = () => document.getElementById('categoryModal').style.display = 'none';
@@ -202,8 +169,7 @@
     try { const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData }, body: JSON.stringify({ name, display_order }) }); if (!res.ok) throw new Error((await res.json()).error); closeCategoryModal(); loadCategoriesList(); }
     catch (e) { tg.showAlert('❌ ' + e.message); }
   }
-  window.deleteCategory = async (id) => { tg.showConfirm('حذف التصنيف؟ (سيتم إزالة التصنيف من المنتجات المرتبطة)', async ok => { if (!ok) return; const res = await fetch(`${API}/api/shop/product-categories/${id}`, { method: 'DELETE', headers: { 'X-Telegram-Init-Data': tg.initData } }); if (res.ok) loadCategoriesList(); else tg.showAlert('فشل الحذف'); }); };
-
+  window.deleteCategory = async (id) => { tg.showConfirm('حذف التصنيف؟', async ok => { if (!ok) return; const res = await fetch(`${API}/api/shop/product-categories/${id}`, { method: 'DELETE', headers: { 'X-Telegram-Init-Data': tg.initData } }); if (res.ok) loadCategoriesList(); else tg.showAlert('فشل الحذف'); }); };
   document.getElementById('addCategoryBtn').onclick = () => openCategoryModal();
   document.getElementById('addProductBtn').onclick = () => openProductModal();
   document.getElementById('productImage').onchange = (e) => { const file = e.target.files[0]; if (file) { const reader = new FileReader(); reader.onload = (ev) => { document.getElementById('imagePreview').src = ev.target.result; document.getElementById('imagePreview').style.display = 'block'; }; reader.readAsDataURL(file); } };
@@ -213,13 +179,9 @@
     const shop = await res.json();
     if (shop.latitude && shop.longitude) {
       document.getElementById('currentLocation').innerHTML = `✅ الإحداثيات: ${shop.latitude}, ${shop.longitude}`;
-      document.getElementById('shopLat').value = shop.latitude;
-      document.getElementById('shopLng').value = shop.longitude;
-    } else {
-      document.getElementById('currentLocation').innerText = '❌ لم يتم تحديد الموقع بعد';
-    }
+      document.getElementById('shopLat').value = shop.latitude; document.getElementById('shopLng').value = shop.longitude;
+    } else { document.getElementById('currentLocation').innerText = '❌ لم يتم تحديد الموقع بعد'; }
   }
-
   window.updateShopLocation = () => {
     if (!navigator.geolocation) { tg.showAlert('متصفحك لا يدعم تحديد الموقع'); return; }
     navigator.geolocation.getCurrentPosition(async pos => {
@@ -231,13 +193,12 @@
   };
 
   async function loadOrders(archived) {
-    const c = document.getElementById(archived ? 'archivePanel' : 'activePanel'); c.innerHTML = '<div class="skeleton"></div>';
+    const c = document.getElementById(archived ? 'archivePanel' : 'activePanel'); c.innerHTML = '<div class="skeleton" style="height:100px;"></div>';
     const r = await fetch(`${API}/api/shop/orders?archived=${archived}`,{headers:{'X-Telegram-Init-Data':tg.initData}});
-    const orders = await r.json(); if(!orders.length) { c.innerHTML='<div style="text-align:center;padding:40px">لا طلبات</div>'; return; }
-    c.innerHTML = orders.map(o => { let items = []; try { items = typeof o.items==='string' ? JSON.parse(o.items) : o.items; } catch(e) {} const itemsText = items.map(i=>`${i.name} ×${i.quantity}`).join('، '); const statusSelect = archived ? '' : `<select data-id="${o.id}" class="statusSelect"><option value="preparing" ${o.status==='preparing'?'selected':''}>تحضير</option><option value="ready_for_pickup" ${o.status==='ready_for_pickup'?'selected':''}>جاهز</option></select>`; return `<div class="card"><b>#${o.id}</b> - ${o.customer_name}<br>📦 ${itemsText}<br>💰 ${o.total_price} ل.س<br>${statusSelect}</div>`; }).join('');
+    const orders = await r.json(); if(!orders.length) { c.innerHTML='<div class="empty-state"><p>لا طلبات</p></div>'; return; }
+    c.innerHTML = orders.map(o => { let items = []; try { items = typeof o.items==='string' ? JSON.parse(o.items) : o.items; } catch(e) {} const itemsText = items.map(i=>`${i.name} ×${i.quantity}`).join('، '); const statusSelect = archived ? '' : `<select data-id="${o.id}" class="statusSelect" style="margin-top:8px;"><option value="preparing" ${o.status==='preparing'?'selected':''}>تحضير</option><option value="ready_for_pickup" ${o.status==='ready_for_pickup'?'selected':''}>جاهز</option></select>`; return `<div class="card"><b>#${o.id}</b> - ${o.customer_name}<br>📦 ${itemsText}<br>💰 ${o.total_price} ل.س<br>${statusSelect}</div>`; }).join('');
     if(!archived) document.querySelectorAll('.statusSelect').forEach(s=>s.onchange=async()=>{ await fetch(`${API}/api/shop/orders/${s.dataset.id}/status`,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify({status:s.value})}); loadOrders(false); });
   }
-
   loadOrders(false);
 </script>
 </body>

@@ -8,96 +8,65 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Tajawal', sans-serif; background: var(--tg-theme-bg-color, #f5f7fb); color: var(--tg-theme-text-color, #1a1a2c); padding: 16px; margin: 0; }
-    .card { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: 28px; padding: 24px 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.04); }
     .status-icon { font-size: 56px; text-align: center; }
-    .status-text { font-size: 1.8rem; font-weight: 700; text-align: center; margin: 12px 0; }
-    .progress { display: flex; justify-content: space-between; margin: 28px 0; }
-    .step { flex: 1; text-align: center; font-size: 0.8rem; color: var(--tg-theme-hint-color, #aaa); }
-    .step.active { color: #e67e22; font-weight: 700; }
-    #map { height: 260px; border-radius: 20px; margin-top: 20px; background: #e9ecef; }
-    .btn { background: #e67e22; color: white; border: none; padding: 16px; border-radius: 60px; width: 100%; margin-top: 16px; font-weight: 700; cursor: pointer; }
-    .btn-outline { background: transparent; border: 1px solid #e67e22; color: #e67e22; }
-    .rider-info { background: var(--tg-theme-bg-color, #f8f9fa); padding: 16px; border-radius: 20px; margin: 16px 0; display: flex; align-items: center; gap: 16px; }
-    .eta-badge { background: #e67e22; color: white; padding: 8px 16px; border-radius: 40px; text-align: center; font-weight: 500; }
-    .code-section { margin-top: 20px; padding: 16px; background: var(--tg-theme-bg-color, #f8f9fa); border-radius: 20px; }
-    .code-input { width: 100%; padding: 16px; border-radius: 16px; border: 1px solid #ccc; text-align: center; font-size: 1.8rem; letter-spacing: 12px; }
-    .verified-badge { background: #27ae60; color: white; padding: 8px 16px; border-radius: 30px; text-align: center; }
+    .status-text { font-size: var(--text-3xl); font-weight: 700; text-align: center; margin: var(--space-3) 0; }
+    .rider-info { background: var(--tg-theme-bg-color, var(--gray-100)); padding: var(--space-4); border-radius: var(--radius-xl); margin: var(--space-4) 0; display: flex; align-items: center; gap: var(--space-4); }
+    .eta-badge { background: var(--primary); color: white; padding: var(--space-2) var(--space-4); border-radius: var(--radius-full); text-align: center; font-weight: 500; }
+    .code-section { margin-top: var(--space-5); padding: var(--space-4); background: var(--tg-theme-bg-color, var(--gray-100)); border-radius: var(--radius-xl); }
+    .code-input { width: 100%; padding: var(--space-4); border-radius: var(--radius-lg); border: 1px solid var(--gray-300); text-align: center; font-size: var(--text-3xl); letter-spacing: var(--space-3); }
   </style>
 </head>
 <body>
-<div class="card">
-  <div style="display: flex; justify-content: space-between; align-items: center;">
-    <span style="font-weight: 500;">طلب #<span id="orderId"></span></span>
-    <button class="btn-outline" id="refreshBtn" style="width: auto; padding: 8px 16px; margin: 0; border-radius: 30px;"><i data-lucide="refresh-cw"></i></button>
+<div class="card" style="margin:16px;">
+  <div class="flex-between">
+    <span style="font-weight:500;">طلب #<span id="orderId"></span></span>
+    <button class="btn-outline" id="refreshBtn" style="padding:8px 16px;"><i data-lucide="refresh-cw"></i></button>
   </div>
   <div class="status-icon" id="statusEmoji">⏳</div>
   <div class="status-text" id="statusMessage">جاري التحميل...</div>
-  <div class="progress">
+  <div class="progress-steps">
     <div class="step" id="stepPaid">✅ مدفوع</div>
     <div class="step" id="stepPrep">🍳 تحضير</div>
     <div class="step" id="stepReady">📦 جاهز</div>
     <div class="step" id="stepDeliver">🚴 توصيل</div>
   </div>
-  <div id="riderInfo" style="display:none;">
-    <div class="rider-info">
-      <i data-lucide="bike" style="font-size: 32px;"></i>
-      <div>
-        <b id="riderName"></b><br>
-        <span id="riderPhone"></span>
-      </div>
-    </div>
-  </div>
+  <div id="riderInfo" style="display:none;"><div class="rider-info"><i data-lucide="bike" style="font-size:32px;"></i><div><b id="riderName"></b><br><span id="riderPhone"></span></div></div></div>
   <div id="etaDisplay" class="eta-badge" style="display:none;"></div>
-  <div id="mapContainer">
-    <div id="map"></div>
-  </div>
+  <div id="mapContainer"><div id="map"></div></div>
   
   <div id="codeSection" class="code-section" style="display:none;">
     <label style="display:block; margin-bottom:12px; font-weight:500;">🔐 أدخل كود التأكيد (من السائق)</label>
     <input type="text" id="confirmCodeInput" class="code-input" placeholder="0000" maxlength="4" inputmode="numeric">
-    <button class="btn" onclick="verifyCode()" style="margin-top:12px;">تحقق من الكود</button>
-    <p id="codeError" style="color:#e74c3c; margin-top:8px;"></p>
+    <button class="btn btn-block" onclick="verifyCode()" style="margin-top:12px;">تحقق من الكود</button>
+    <p id="codeError" style="color:var(--danger); margin-top:8px;"></p>
     <div id="codeVerifiedMessage" class="verified-badge" style="display:none;">✅ تم التحقق من الكود - شكراً لثقتك!</div>
   </div>
   
-  <button class="btn" id="callDriverBtn" style="background:#3498db"><i data-lucide="phone"></i> اتصال بالسائق</button>
+  <button class="btn btn-info btn-block" id="callDriverBtn"><i data-lucide="phone"></i> اتصال بالسائق</button>
 </div>
 <script>
-  const tg = Telegram.WebApp;
-  tg.ready(); tg.BackButton.show(); tg.BackButton.onClick(() => history.back());
-
+  const tg = Telegram.WebApp; tg.ready(); tg.BackButton.show(); tg.BackButton.onClick(() => history.back());
   const API = 'https://delivery-dragon.vercel.app';
   const orderId = new URLSearchParams(location.search).get('order_id');
   document.getElementById('orderId').innerText = orderId;
-
   let map, marker, riderPhone, updateInterval;
   const statusEmojis = { paid: '💰', preparing: '👨‍🍳', ready_for_pickup: '📦', delivering: '🛵', completed: '✅', rejected: '❌' };
   const statusMessages = { paid: 'مدفوع', preparing: 'تحضير', ready_for_pickup: 'جاهز', delivering: 'توصيل', completed: 'مكتمل', rejected: 'ملغي' };
 
   function initMap(lat, lng) {
     if (map) { map.setView([lat, lng], 15); marker.setLatLng([lat, lng]); }
-    else {
-      document.getElementById('map').innerHTML = '';
-      map = L.map('map').setView([lat, lng], 15);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
-      marker = L.marker([lat, lng]).addTo(map).bindPopup('📍 موقع السائق').openPopup();
-    }
+    else { document.getElementById('map').innerHTML = ''; map = L.map('map').setView([lat, lng], 15); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map); marker = L.marker([lat, lng]).addTo(map).bindPopup('📍 موقع السائق').openPopup(); }
   }
 
   async function fetchData() {
     try {
       const statusRes = await fetch(`${API}/api/orders/${orderId}/status`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
       const statusData = await statusRes.json();
-      const status = statusData.status;
-      const codeVerified = statusData.code_verified;
-
+      const status = statusData.status, codeVerified = statusData.code_verified;
       document.getElementById('statusEmoji').innerText = statusEmojis[status] || '⏳';
       document.getElementById('statusMessage').innerText = statusMessages[status] || status;
-
       document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
       if (status === 'paid') document.getElementById('stepPaid').classList.add('active');
       if (status === 'preparing') { document.getElementById('stepPaid').classList.add('active'); document.getElementById('stepPrep').classList.add('active'); }
@@ -107,46 +76,20 @@
 
       if (status === 'delivering') {
         document.getElementById('codeSection').style.display = 'block';
-        if (codeVerified) {
-          document.getElementById('confirmCodeInput').style.display = 'none';
-          document.querySelector('#codeSection .btn').style.display = 'none';
-          document.getElementById('codeError').style.display = 'none';
-          document.getElementById('codeVerifiedMessage').style.display = 'block';
-        } else {
-          document.getElementById('confirmCodeInput').style.display = 'block';
-          document.querySelector('#codeSection .btn').style.display = 'block';
-          document.getElementById('codeError').style.display = 'block';
-          document.getElementById('codeVerifiedMessage').style.display = 'none';
-        }
+        if (codeVerified) { document.getElementById('confirmCodeInput').style.display = 'none'; document.querySelector('#codeSection .btn').style.display = 'none'; document.getElementById('codeError').style.display = 'none'; document.getElementById('codeVerifiedMessage').style.display = 'block'; }
+        else { document.getElementById('confirmCodeInput').style.display = 'block'; document.querySelector('#codeSection .btn').style.display = 'block'; document.getElementById('codeError').style.display = 'block'; document.getElementById('codeVerifiedMessage').style.display = 'none'; }
 
-        const [locationRes, etaRes] = await Promise.all([
-          fetch(`${API}/api/orders/${orderId}/location`, { headers: { 'X-Telegram-Init-Data': tg.initData } }),
-          fetch(`${API}/api/orders/${orderId}/eta`, { headers: { 'X-Telegram-Init-Data': tg.initData } })
-        ]);
-        const locationData = await locationRes.json();
-        const etaData = await etaRes.json();
-
+        const [locationRes, etaRes] = await Promise.all([fetch(`${API}/api/orders/${orderId}/location`, { headers: { 'X-Telegram-Init-Data': tg.initData } }), fetch(`${API}/api/orders/${orderId}/eta`, { headers: { 'X-Telegram-Init-Data': tg.initData } })]);
+        const locationData = await locationRes.json(), etaData = await etaRes.json();
         if (locationData.latitude && locationData.longitude) initMap(locationData.latitude, locationData.longitude);
         else document.getElementById('map').innerHTML = '<p style="text-align:center;padding:20px;">📍 في انتظار مشاركة السائق لموقعه...</p>';
-
-        if (statusData.rider_name) {
-          document.getElementById('riderInfo').style.display = 'block';
-          document.getElementById('riderName').innerText = statusData.rider_name;
-          document.getElementById('riderPhone').innerText = statusData.rider_phone || 'غير متوفر';
-          riderPhone = statusData.rider_phone;
-        }
-
+        if (statusData.rider_name) { document.getElementById('riderInfo').style.display = 'block'; document.getElementById('riderName').innerText = statusData.rider_name; document.getElementById('riderPhone').innerText = statusData.rider_phone || 'غير متوفر'; riderPhone = statusData.rider_phone; }
         document.getElementById('etaDisplay').style.display = 'block';
-        if (etaData.eta_minutes) {
-          document.getElementById('etaDisplay').innerHTML = `⏱️ الوقت المقدر: ${etaData.eta_minutes} دقيقة (${Math.round(etaData.distance_km)} كم)`;
-        } else {
-          document.getElementById('etaDisplay').innerHTML = `⏱️ ${etaData.message || 'جاري حساب الوقت...'}`;
-        }
+        document.getElementById('etaDisplay').innerHTML = etaData.eta_minutes ? `⏱️ الوقت المقدر: ${etaData.eta_minutes} دقيقة (${Math.round(etaData.distance_km)} كم)` : `⏱️ ${etaData.message || 'جاري حساب الوقت...'}`;
       } else {
         document.getElementById('codeSection').style.display = 'none';
         document.getElementById('map').innerHTML = '<p style="text-align:center;padding:20px;">🗺️ الخريطة ستظهر عند بدء التوصيل</p>';
-        document.getElementById('riderInfo').style.display = 'none';
-        document.getElementById('etaDisplay').style.display = 'none';
+        document.getElementById('riderInfo').style.display = 'none'; document.getElementById('etaDisplay').style.display = 'none';
         if (map) { map.remove(); map = null; }
       }
       if (typeof lucide !== 'undefined') lucide.createIcons();
@@ -155,21 +98,12 @@
 
   window.verifyCode = async () => {
     const code = document.getElementById('confirmCodeInput').value.trim();
-    if (!code) return tg.showAlert('أدخل الكود');
-    if (code.length !== 4) return tg.showAlert('الكود يجب أن يكون 4 أرقام');
+    if (!code) return tg.showAlert('أدخل الكود'); if (code.length !== 4) return tg.showAlert('الكود يجب أن يكون 4 أرقام');
     try {
-      const res = await fetch(`${API}/api/orders/${orderId}/verify-code`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData },
-        body: JSON.stringify({ code })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      tg.showAlert('✅ الكود صحيح! شكراً لثقتك.');
-      fetchData();
-    } catch (e) {
-      document.getElementById('codeError').innerText = e.message;
-    }
+      const res = await fetch(`${API}/api/orders/${orderId}/verify-code`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData }, body: JSON.stringify({ code }) });
+      const data = await res.json(); if (!res.ok) throw new Error(data.error);
+      tg.showAlert('✅ الكود صحيح! شكراً لثقتك.'); fetchData();
+    } catch (e) { document.getElementById('codeError').innerText = e.message; }
   };
 
   function startPolling() { fetchData(); updateInterval = setInterval(fetchData, 10000); }

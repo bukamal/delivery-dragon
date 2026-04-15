@@ -6,35 +6,21 @@
   <title>شاهين | طلباتي</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Tajawal', sans-serif; background: var(--tg-theme-bg-color, #f5f7fb); color: var(--tg-theme-text-color, #1a1a2c); padding: 0 0 30px; }
-    .app-header { display: flex; align-items: center; padding: 16px 20px; background: var(--tg-theme-secondary-bg-color, #fff); border-bottom: 1px solid #ddd; position: sticky; top:0; z-index:10; }
-    .app-header h1 { font-size:1.7rem; color:#e67e22; margin-right:12px; }
-    .back-btn { background:none; border:none; color:#e67e22; font-size:1.8rem; cursor:pointer; }
-    .container { padding:20px 16px; max-width:600px; margin:0 auto; }
-    .order-card { background: var(--tg-theme-secondary-bg-color, #fff); border-radius:20px; padding:18px; margin-bottom:16px; box-shadow:0 4px 12px rgba(0,0,0,0.02); }
-    .status { display:inline-block; padding:6px 16px; border-radius:30px; font-size:0.8rem; font-weight:600; }
-    .verifying{background:#f1c40f;color:#000} .paid{background:#3498db;color:#fff} .preparing{background:#e67e22;color:#fff} .ready{background:#2ecc71;color:#fff} .delivering{background:#9b59b6;color:#fff} .completed{background:#27ae60;color:#fff} .rejected{background:#e74c3c;color:#fff}
-    .btn { background:#e67e22; color:#fff; border:none; padding:10px 20px; border-radius:30px; cursor:pointer; margin-top:12px; margin-right:8px; }
-    .btn-danger { background:#e74c3c; }
-    .modal { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:1000; }
-    .modal-content { background:var(--tg-theme-secondary-bg-color, #fff); border-radius:28px; padding:24px; width:90%; max-width:400px; }
+    .status { display:inline-block; padding:var(--space-1) var(--space-4); border-radius:var(--radius-full); font-size:var(--text-sm); font-weight:600; }
+    .verifying{background:var(--warning);color:black} .paid{background:var(--info);color:white} .preparing{background:var(--primary);color:white} .ready{background:var(--success);color:white} .delivering{background:#9b59b6;color:white} .completed{background:var(--success);color:white} .rejected{background:var(--danger);color:white}
     .stars { display:flex; justify-content:center; gap:12px; margin:20px 0; font-size:36px; cursor:pointer; }
-    .star { color:#ccc; transition:0.2s; } .star.active { color:#f1c40f; }
-    textarea { width:100%; padding:14px; border-radius:16px; border:1px solid #ccc; margin:16px 0; background:var(--tg-theme-bg-color, #fff); color:inherit; }
-    .skeleton { height:120px; background:linear-gradient(90deg, #eee 25%, #ddd 50%, #eee 75%); background-size:200% 100%; animation:loading 1.5s infinite; border-radius:20px; }
-    @keyframes loading { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+    .star { color:var(--gray-400); transition:0.2s; } .star.active { color:var(--warning); }
   </style>
 </head>
 <body>
 <div class="app-header"><button class="back-btn" id="backBtn"><i data-lucide="arrow-right"></i></button><h1>🦅 شاهين</h1></div>
 <div class="container">
   <h2 style="margin-bottom:20px;"><i data-lucide="clipboard-list"></i> طلباتي</h2>
-  <div id="ordersContainer"><div class="skeleton"></div></div>
+  <div id="ordersContainer"><div class="skeleton" style="height:120px;"></div></div>
 </div>
-<div id="ratingModal" class="modal" style="display:none"><div class="modal-content"><h3>تقييم #<span id="modalOrderId"></span></h3><p>المطعم</p><div class="stars" id="shopStars"><span class="star" data-rating="1">★</span><span class="star" data-rating="2">★</span><span class="star" data-rating="3">★</span><span class="star" data-rating="4">★</span><span class="star" data-rating="5">★</span></div><p>السائق</p><div class="stars" id="riderStars"><span class="star" data-rating="1">★</span><span class="star" data-rating="2">★</span><span class="star" data-rating="3">★</span><span class="star" data-rating="4">★</span><span class="star" data-rating="5">★</span></div><textarea id="commentInput" placeholder="ملاحظاتك"></textarea><button class="btn" onclick="submitRating()" style="width:100%">إرسال</button><button class="btn" onclick="closeModal()" style="background:#95a5a6;margin-top:8px">إلغاء</button></div></div>
+<div id="ratingModal" class="modal" style="display:none"><div class="modal-content"><h3>تقييم #<span id="modalOrderId"></span></h3><p>المطعم</p><div class="stars" id="shopStars"><span class="star" data-rating="1">★</span><span class="star" data-rating="2">★</span><span class="star" data-rating="3">★</span><span class="star" data-rating="4">★</span><span class="star" data-rating="5">★</span></div><p>السائق</p><div class="stars" id="riderStars"><span class="star" data-rating="1">★</span><span class="star" data-rating="2">★</span><span class="star" data-rating="3">★</span><span class="star" data-rating="4">★</span><span class="star" data-rating="5">★</span></div><textarea id="commentInput" placeholder="ملاحظاتك"></textarea><button class="btn btn-block" onclick="submitRating()">إرسال</button><button class="btn btn-block" onclick="closeModal()" style="background:var(--gray-500);margin-top:8px">إلغاء</button></div></div>
 <script>
   const tg = Telegram.WebApp; tg.ready(); tg.BackButton.show(); tg.BackButton.onClick(()=>history.back()); document.getElementById('backBtn').onclick=()=>history.back();
   const API = 'https://delivery-dragon.vercel.app'; let currentOrderId, shopRating=0, riderRating=0;
@@ -42,9 +28,9 @@
   async function load() {
     const r = await fetch(`${API}/api/me/orders`,{headers:{'X-Telegram-Init-Data':tg.initData}}); const orders = await r.json();
     const h = orders.map(o=>{ const{percent,label}=getStatusProgress(o.status);
-      return `<div class="order-card"><div style="display:flex;justify-content:space-between"><b>#${o.id}</b><span class="status ${o.status}">${label}</span></div><div>${o.shop_name}</div><div>💰 ${o.total_price} ل.س</div><div style="margin-top:12px"><div style="display:flex;justify-content:space-between;font-size:.8rem"><span>${label}</span><span>${Math.round(percent)}%</span></div><div style="background:var(--tg-theme-hint-color,#ddd);height:6px;border-radius:6px"><div style="width:${percent}%;background:#e67e22;height:6px;border-radius:6px"></div></div></div><div>${new Date(o.created_at).toLocaleString('ar-SY')}</div>${o.status==='completed'?`<button class="btn" onclick="openModal(${o.id})"><i data-lucide="star"></i> تقييم</button>`:''}${(o.status==='verifying'||o.status==='pending')?`<button class="btn btn-danger" onclick="cancel(${o.id})"><i data-lucide="x"></i> إلغاء</button>`:''}${o.status==='delivering'?`<button class="btn" onclick="location.href='tracking.html?order_id=${o.id}'"><i data-lucide="map-pin"></i> تتبع</button>`:''}</div>`;
+      return `<div class="card"><div class="flex-between"><b>#${o.id}</b><span class="status ${o.status}">${label}</span></div><div>${o.shop_name}</div><div>💰 ${o.total_price} ل.س</div><div style="margin-top:12px"><div class="flex-between" style="font-size:.8rem"><span>${label}</span><span>${Math.round(percent)}%</span></div><div style="background:var(--gray-300);height:6px;border-radius:6px"><div style="width:${percent}%;background:var(--primary);height:6px;border-radius:6px"></div></div></div><div>${new Date(o.created_at).toLocaleString('ar-SY')}</div>${o.status==='completed'?`<button class="btn btn-outline" onclick="openModal(${o.id})"><i data-lucide="star"></i> تقييم</button>`:''}${(o.status==='verifying'||o.status==='pending')?`<button class="btn btn-danger" onclick="cancel(${o.id})"><i data-lucide="x"></i> إلغاء</button>`:''}${o.status==='delivering'?`<button class="btn btn-outline" onclick="location.href='tracking.html?order_id=${o.id}'"><i data-lucide="map-pin"></i> تتبع</button>`:''}</div>`;
     }).join('');
-    document.getElementById('ordersContainer').innerHTML = h || '<div style="text-align:center;padding:40px"><svg width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="10" y1="14" x2="14" y2="14"/></svg><h3>لا توجد طلبات</h3><p>ابدأ بتصفح المتاجر</p><button class="btn" onclick="location.href=\'customer-home.html\'">تصفح المتاجر</button></div>';
+    document.getElementById('ordersContainer').innerHTML = h || '<div class="empty-state"><h3>لا توجد طلبات</h3><p>ابدأ بتصفح المتاجر</p><button class="btn btn-block" onclick="location.href=\'customer-home.html\'">تصفح المتاجر</button></div>';
     if (typeof lucide !== 'undefined') lucide.createIcons();
   }
   window.openModal = id => { currentOrderId=id; shopRating=riderRating=0; document.getElementById('modalOrderId').innerText=id; document.querySelectorAll('#shopStars .star,#riderStars .star').forEach(s=>s.classList.remove('active')); document.getElementById('commentInput').value=''; document.getElementById('ratingModal').style.display='flex'; };

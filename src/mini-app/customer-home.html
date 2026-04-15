@@ -6,29 +6,16 @@
   <title>شاهين | استكشف المتاجر</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Tajawal', sans-serif; background: var(--tg-theme-bg-color, #f5f7fb); color: var(--tg-theme-text-color, #1a1a2c); padding: 0 0 85px; }
-    .app-header { display: flex; align-items: center; padding: 16px 20px; background: var(--tg-theme-secondary-bg-color, #fff); border-bottom: 1px solid var(--tg-theme-hint-color, rgba(0,0,0,.05)); position: sticky; top: 0; z-index: 10; }
-    .app-header h1 { font-size: 1.7rem; font-weight: 700; color: #e67e22; margin-right: 12px; }
-    .back-btn { background: none; border: none; color: #e67e22; font-size: 1.8rem; cursor: pointer; padding: 0 8px; }
-    .container { padding: 16px; max-width: 600px; margin: 0 auto; }
-    .city-chip { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: 40px; padding: 6px 6px 6px 20px; margin-bottom: 20px; border: 1px solid var(--tg-theme-hint-color, #ddd); display: flex; align-items: center; }
-    .city-chip select { flex: 1; padding: 10px 0; border: none; background: transparent; color: inherit; font-family: inherit; outline: none; }
-    .search-box { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: 40px; padding: 8px 20px; margin-bottom: 24px; display: flex; align-items: center; border: 1px solid var(--tg-theme-hint-color, #ddd); }
-    .search-box input { flex: 1; border: none; background: transparent; outline: none; font-family: inherit; padding: 12px 0; }
-    .shop-grid { display: grid; gap: 16px; }
-    .shop-card { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: 24px; padding: 16px; box-shadow: 0 6px 16px rgba(0,0,0,.02); display: flex; align-items: center; gap: 16px; cursor: pointer; transition: 0.2s; border: 1px solid var(--tg-theme-hint-color, rgba(0,0,0,.03)); }
-    .shop-card:active { transform: scale(0.98); background: var(--tg-theme-secondary-bg-color, #f8f9fa); }
-    .shop-icon { font-size: 44px; background: var(--tg-theme-bg-color, #f0f2f5); width: 70px; height: 70px; border-radius: 20px; display: flex; align-items: center; justify-content: center; }
-    .shop-info h3 { font-size: 1.2rem; margin-bottom: 4px; }
-    .shop-info p { color: var(--tg-theme-hint-color, #7f8c8d); font-size: 0.9rem; display: flex; align-items: center; gap: 6px; }
-    .cart-bar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--tg-theme-secondary-bg-color, #1a1a2c); color: white; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; backdrop-filter: blur(10px); border-top: 1px solid rgba(255,255,255,0.1); }
-    .cart-btn { background: #e67e22; border: none; color: white; padding: 12px 32px; border-radius: 60px; font-weight: 700; cursor: pointer; }
-    .skeleton-shop { height: 100px; background: linear-gradient(90deg, #eee 25%, #ddd 50%, #eee 75%); background-size: 200% 100%; animation: loading 1.5s infinite; border-radius: 24px; }
-    @keyframes loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-    .empty-state { text-align: center; padding: 40px; color: var(--tg-theme-hint-color); }
+    .city-chip { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: var(--radius-full); padding: var(--space-1) var(--space-1) var(--space-1) var(--space-5); margin-bottom: var(--space-5); border: 1px solid var(--gray-200); display: flex; align-items: center; }
+    .city-chip select { flex: 1; padding: var(--space-2) 0; border: none; background: transparent; color: inherit; font-family: inherit; outline: none; }
+    .search-box { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: var(--radius-full); padding: var(--space-2) var(--space-5); margin-bottom: var(--space-6); display: flex; align-items: center; border: 1px solid var(--gray-200); }
+    .search-box input { flex: 1; border: none; background: transparent; outline: none; font-family: inherit; padding: var(--space-3) 0; margin:0; }
+    .shop-icon { font-size: 44px; background: var(--tg-theme-bg-color, #f0f2f5); width: 70px; height: 70px; border-radius: var(--radius-xl); display: flex; align-items: center; justify-content: center; }
+    .shop-info h3 { font-size: var(--text-lg); margin-bottom: var(--space-1); }
+    .shop-info p { color: var(--gray-600); font-size: var(--text-sm); display: flex; align-items: center; gap: var(--space-1); }
+    .cart-bar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--tg-theme-secondary-bg-color, var(--secondary)); color: white; padding: var(--space-3) var(--space-6); display: flex; justify-content: space-between; align-items: center; backdrop-filter: blur(10px); border-top: 1px solid rgba(255,255,255,0.1); }
   </style>
 </head>
 <body>
@@ -45,7 +32,9 @@
     <input type="text" id="searchInput" placeholder="ابحث عن متجر...">
   </div>
   <div class="shop-grid" id="shopsContainer">
-    <div class="skeleton-shop"></div><div class="skeleton-shop"></div><div class="skeleton-shop"></div>
+    <div class="skeleton" style="height:100px;"></div>
+    <div class="skeleton" style="height:100px;"></div>
+    <div class="skeleton" style="height:100px;"></div>
   </div>
 </div>
 <div class="cart-bar">
@@ -69,7 +58,7 @@
   async function loadShops() {
     if (!currentCityId) return;
     const container = document.getElementById('shopsContainer');
-    container.innerHTML = '<div class="skeleton-shop"></div><div class="skeleton-shop"></div><div class="skeleton-shop"></div>';
+    container.innerHTML = '<div class="skeleton" style="height:100px;"></div><div class="skeleton" style="height:100px;"></div><div class="skeleton" style="height:100px;"></div>';
     try {
       const res = await fetch(`${API}/api/shops?city_id=${currentCityId}`);
       shops = await res.json();
@@ -80,7 +69,7 @@
     const container = document.getElementById('shopsContainer');
     if (!list.length) { container.innerHTML = '<div class="empty-state">😕 لا توجد متاجر في هذه المدينة</div>'; return; }
     container.innerHTML = list.map(s => `
-      <div class="shop-card" onclick="location.href='shop-menu.html?id=${s.id}&name=${encodeURIComponent(s.shop_name)}'">
+      <div class="card flex" style="cursor:pointer;" onclick="location.href='shop-menu.html?id=${s.id}&name=${encodeURIComponent(s.shop_name)}'">
         <div class="shop-icon">${s.icon || '🏪'}</div>
         <div class="shop-info"><h3>${s.shop_name}</h3><p>📍 ${s.address || ''}</p></div>
       </div>`).join('');

@@ -6,36 +6,13 @@
   <title>شاهين | لوحة الأدمن</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Tajawal', sans-serif; background: var(--tg-theme-bg-color, #f5f7fb); color: var(--tg-theme-text-color, #1a1a2c); padding: 0 0 20px; }
-    .app-header { display: flex; align-items: center; padding: 16px 20px; background: var(--tg-theme-secondary-bg-color, #fff); border-bottom: 1px solid #ddd; position: sticky; top: 0; z-index: 10; }
-    .app-header h1 { font-size: 1.7rem; color: #e67e22; margin-right: 12px; }
-    .back-btn { background: none; border: none; color: #e67e22; font-size: 1.8rem; cursor: pointer; }
-    .container { padding: 16px; max-width: 900px; margin: 0 auto; }
-    .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
-    .tab { padding: 10px 16px; background: var(--tg-theme-secondary-bg-color, #fff); border-radius: 30px; cursor: pointer; border: 1px solid #ddd; font-size: 0.9rem; }
-    .tab.active { background: #e67e22; color: #fff; }
-    .panel { display: none; }
-    .panel.active { display: block; }
-    .card { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: 20px; padding: 16px; margin-bottom: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.02); }
-    .btn { background: #e67e22; color: #fff; border: none; padding: 8px 16px; border-radius: 30px; cursor: pointer; margin: 2px; }
-    .btn-danger { background: #e74c3c; }
-    .badge { padding: 4px 8px; border-radius: 20px; font-size: 0.8rem; }
-    .badge-success { background: #27ae60; color: #fff; }
-    .badge-warning { background: #f1c40f; }
-    .shop-grid { display: grid; gap: 16px; }
-    .flex { display: flex; align-items: center; gap: 12px; }
-    input, select { padding: 10px; border-radius: 12px; border: 1px solid #ccc; background: var(--tg-theme-bg-color, #fff); color: inherit; width: 100%; margin: 8px 0; }
-    .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-    .modal-content { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: 28px; padding: 24px; width: 90%; max-width: 500px; }
-    .chat-messages { height: 60vh; overflow-y: auto; padding: 8px; background: var(--tg-theme-bg-color); border-radius: 16px; margin-bottom: 12px; }
-    .chat-bubble { max-width: 80%; padding: 10px 14px; border-radius: 18px; margin-bottom: 12px; }
-    .chat-bubble.admin { background: #e67e22; color: white; margin-left: auto; text-align: left; }
-    .chat-bubble.user { background: #fff; border: 1px solid #ddd; margin-right: auto; text-align: right; }
-    .chat-input-area { display: flex; gap: 8px; }
-    .chat-input-area input { flex: 1; margin: 0; }
+    .shop-grid { display: grid; gap: var(--space-4); }
+    .chat-messages { height: 60vh; overflow-y: auto; padding: var(--space-2); background: var(--tg-theme-bg-color, var(--gray-100)); border-radius: var(--radius-lg); margin-bottom: var(--space-3); }
+    .chat-bubble { max-width: 80%; padding: var(--space-3) var(--space-4); border-radius: var(--radius-lg); margin-bottom: var(--space-3); }
+    .chat-bubble.admin { background: var(--primary); color: white; margin-left: auto; text-align: left; }
+    .chat-bubble.user { background: #fff; border: 1px solid var(--gray-200); margin-right: auto; text-align: right; }
   </style>
 </head>
 <body>
@@ -43,7 +20,7 @@
   <button class="back-btn" onclick="history.back()"><i data-lucide="arrow-right"></i></button>
   <h1>🦅 شاهين | الأدمن</h1>
 </div>
-<div class="container">
+<div class="container container-wide">
   <div class="tabs">
     <div class="tab active" data-tab="pending">📋 تسجيل</div>
     <div class="tab" data-tab="orders">🛒 مراجعة</div>
@@ -68,31 +45,10 @@
   <div id="supportPanel" class="panel"></div>
 </div>
 
-<!-- مودال إضافة/تعديل مدينة -->
-<div id="cityModal" class="modal" style="display:none">
-  <div class="modal-content">
-    <h3 id="cityModalTitle">إضافة مدينة</h3>
-    <input type="text" id="cityNameInput" placeholder="اسم المدينة">
-    <label><input type="checkbox" id="cityActiveCheckbox" checked> نشط</label>
-    <input type="hidden" id="cityIdInput">
-    <button class="btn" onclick="saveCity()">حفظ</button>
-    <button class="btn" onclick="closeCityModal()" style="background:#95a5a6">إلغاء</button>
-  </div>
-</div>
-
-<!-- مودال إضافة/تعديل منطقة -->
-<div id="zoneModal" class="modal" style="display:none">
-  <div class="modal-content">
-    <h3 id="zoneModalTitle">إضافة منطقة</h3>
-    <select id="zoneCitySelect"></select>
-    <input type="text" id="zoneNameInput" placeholder="اسم المنطقة">
-    <input type="number" id="zoneFeeInput" placeholder="رسوم التوصيل (ل.س)">
-    <label><input type="checkbox" id="zoneActiveCheckbox" checked> نشط</label>
-    <input type="hidden" id="zoneIdInput">
-    <button class="btn" onclick="saveZone()">حفظ</button>
-    <button class="btn" onclick="closeZoneModal()" style="background:#95a5a6">إلغاء</button>
-  </div>
-</div>
+<!-- مودال مدينة -->
+<div id="cityModal" class="modal" style="display:none"><div class="modal-content"><h3 id="cityModalTitle">إضافة مدينة</h3><input type="text" id="cityNameInput" placeholder="اسم المدينة"><label><input type="checkbox" id="cityActiveCheckbox" checked> نشط</label><input type="hidden" id="cityIdInput"><button class="btn btn-block" onclick="saveCity()">حفظ</button><button class="btn btn-block" onclick="closeCityModal()" style="background:var(--gray-500); margin-top:8px;">إلغاء</button></div></div>
+<!-- مودال منطقة -->
+<div id="zoneModal" class="modal" style="display:none"><div class="modal-content"><h3 id="zoneModalTitle">إضافة منطقة</h3><select id="zoneCitySelect"></select><input type="text" id="zoneNameInput" placeholder="اسم المنطقة"><input type="number" id="zoneFeeInput" placeholder="رسوم التوصيل (ل.س)"><label><input type="checkbox" id="zoneActiveCheckbox" checked> نشط</label><input type="hidden" id="zoneIdInput"><button class="btn btn-block" onclick="saveZone()">حفظ</button><button class="btn btn-block" onclick="closeZoneModal()" style="background:var(--gray-500); margin-top:8px;">إلغاء</button></div></div>
 
 <script>
   const tg = Telegram.WebApp; tg.ready(); tg.BackButton.show(); tg.BackButton.onClick(() => history.back());
@@ -106,161 +62,60 @@
     if (loaders[t.dataset.tab]) loaders[t.dataset.tab]();
   });
 
-  // ========== تسجيل ==========
-  async function loadPending() {
-    const r = await fetch(`${API}/api/admin/pending`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
-    const u = await r.json();
-    const h = u.map(x => `<div class="card"><b>${x.name}</b> (${x.role})<br>📞 ${x.phone||''}<br><button class="btn" onclick="approve(${x.id})">✅ موافقة</button></div>`).join('') || '<p>لا طلبات</p>';
-    document.getElementById('pendingPanel').innerHTML = h;
-  }
+  async function loadPending() { const r = await fetch(`${API}/api/admin/pending`, { headers: { 'X-Telegram-Init-Data': tg.initData } }); const u = await r.json(); const h = u.map(x => `<div class="card"><b>${x.name}</b> (${x.role})<br>📞 ${x.phone||''}<br><button class="btn btn-block" onclick="approve(${x.id})">✅ موافقة</button></div>`).join('') || '<div class="empty-state">لا طلبات</div>'; document.getElementById('pendingPanel').innerHTML = h; }
   window.approve = async id => { await fetch(`${API}/api/admin/approve`, { method:'POST', headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData}, body:JSON.stringify({user_id:id}) }); loadPending(); };
-
-  // ========== مراجعة الطلبات ==========
-  async function loadPendingOrders() {
-    const r = await fetch(`${API}/api/admin/orders/pending`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
-    const o = await r.json();
-    const h = o.map(x => `<div class="card"><b>#${x.id}</b> - ${x.customer_name}<br>🏪 ${x.shop_name}<br>💰 ${x.total_price} ل.س<br><button class="btn" onclick="approveOrder(${x.id})">قبول</button><button class="btn btn-danger" onclick="rejectOrder(${x.id})">رفض</button></div>`).join('') || '<p>لا طلبات</p>';
-    document.getElementById('ordersPanel').innerHTML = h;
-  }
+  async function loadPendingOrders() { const r = await fetch(`${API}/api/admin/orders/pending`, { headers: { 'X-Telegram-Init-Data': tg.initData } }); const o = await r.json(); const h = o.map(x => `<div class="card"><b>#${x.id}</b> - ${x.customer_name}<br>🏪 ${x.shop_name}<br>💰 ${x.total_price} ل.س<br><button class="btn btn-block" onclick="approveOrder(${x.id})">قبول</button><button class="btn btn-danger btn-block" onclick="rejectOrder(${x.id})">رفض</button></div>`).join('') || '<div class="empty-state">لا طلبات</div>'; document.getElementById('ordersPanel').innerHTML = h; }
   window.approveOrder = async id => { await fetch(`${API}/api/admin/orders/${id}/approve`, { method:'POST', headers:{'X-Telegram-Init-Data':tg.initData} }); loadPendingOrders(); };
   window.rejectOrder = async id => { await fetch(`${API}/api/admin/orders/${id}/reject`, { method:'POST', headers:{'X-Telegram-Init-Data':tg.initData} }); loadPendingOrders(); };
-
-  // ========== المتاجر ==========
-  async function loadShops() {
-    const r = await fetch(`${API}/api/admin/shops`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
-    const s = await r.json();
-    let h = '<div class="shop-grid">';
-    s.forEach(x => { h += `<div class="card flex"><div style="font-size:44px">🏪</div><div style="flex:1"><b>${x.shop_name}</b><br>👤 ${x.owner_name}<br>📍 ${x.city_name||''}<br><span class="badge ${x.is_open?'badge-success':'badge-warning'}">${x.is_open?'مفتوح':'مغلق'}</span></div><button class="btn btn-danger" onclick="deleteShop(${x.id})"><i data-lucide="trash-2"></i></button></div>`; });
-    h += '</div>'; document.getElementById('shopsPanel').innerHTML = h; if (typeof lucide !== 'undefined') lucide.createIcons();
-  }
+  async function loadShops() { const r = await fetch(`${API}/api/admin/shops`, { headers: { 'X-Telegram-Init-Data': tg.initData } }); const s = await r.json(); let h = '<div class="shop-grid">'; s.forEach(x => { h += `<div class="card flex-between"><div class="flex"><span style="font-size:44px;">🏪</span><div><b>${x.shop_name}</b><br>👤 ${x.owner_name}<br>📍 ${x.city_name||''}<br><span class="badge ${x.is_open?'badge-success':'badge-warning'}">${x.is_open?'مفتوح':'مغلق'}</span></div></div><button class="btn btn-danger" onclick="deleteShop(${x.id})"><i data-lucide="trash-2"></i></button></div>`; }); h += '</div>'; document.getElementById('shopsPanel').innerHTML = h; if (typeof lucide !== 'undefined') lucide.createIcons(); }
   window.deleteShop = async id => { tg.showConfirm('⚠️ حذف المتجر سيؤدي إلى حذف جميع منتجاته وطلباته. هل أنت متأكد؟', async c => { if(!c) return; await fetch(`${API}/api/admin/shops/${id}`, { method:'DELETE', headers:{'X-Telegram-Init-Data':tg.initData} }); loadShops(); }); };
-
-  // ========== السائقين ==========
-  async function loadRiders() {
-    const r = await fetch(`${API}/api/admin/riders`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
-    const d = await r.json();
-    let h = '<div class="shop-grid">';
-    d.forEach(x => { h += `<div class="card flex"><div style="font-size:44px">🛵</div><div style="flex:1"><b>${x.name}</b><br>📞 ${x.phone||''}<br>🚲 ${x.vehicle_type||''} ${x.vehicle_number||''}<br><span class="badge ${x.is_approved?'badge-success':'badge-warning'}">${x.is_approved?'مفعل':'غير مفعل'}</span></div><button class="btn btn-danger" onclick="deleteRider(${x.id})"><i data-lucide="trash-2"></i></button></div>`; });
-    h += '</div>'; document.getElementById('ridersPanel').innerHTML = h; if (typeof lucide !== 'undefined') lucide.createIcons();
-  }
+  async function loadRiders() { const r = await fetch(`${API}/api/admin/riders`, { headers: { 'X-Telegram-Init-Data': tg.initData } }); const d = await r.json(); let h = '<div class="shop-grid">'; d.forEach(x => { h += `<div class="card flex-between"><div class="flex"><span style="font-size:44px;">🛵</span><div><b>${x.name}</b><br>📞 ${x.phone||''}<br>🚲 ${x.vehicle_type||''} ${x.vehicle_number||''}<br><span class="badge ${x.is_approved?'badge-success':'badge-warning'}">${x.is_approved?'مفعل':'غير مفعل'}</span></div></div><button class="btn btn-danger" onclick="deleteRider(${x.id})"><i data-lucide="trash-2"></i></button></div>`; }); h += '</div>'; document.getElementById('ridersPanel').innerHTML = h; if (typeof lucide !== 'undefined') lucide.createIcons(); }
   window.deleteRider = async id => { tg.showConfirm('⚠️ حذف السائق سيؤدي إلى تحويله إلى زبون عادي. هل أنت متأكد؟', async c => { if(!c) return; await fetch(`${API}/api/admin/riders/${id}`, { method:'DELETE', headers:{'X-Telegram-Init-Data':tg.initData} }); loadRiders(); }); };
 
-  // ========== المدن ==========
-  async function loadCities() {
-    const r = await fetch(`${API}/api/admin/cities`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
-    const cities = await r.json();
-    let h = '<button class="btn" onclick="openCityModal()">➕ إضافة مدينة</button><div class="shop-grid" style="margin-top:16px">';
-    cities.forEach(c => { h += `<div class="card flex"><div style="flex:1"><b>${c.name}</b> ${c.is_active?'✅':'❌'}</div><button class="btn" onclick="editCity(${c.id},'${c.name}',${c.is_active})">✏️</button><button class="btn btn-danger" onclick="deleteCity(${c.id})">🗑️</button></div>`; });
-    h += '</div>'; document.getElementById('citiesPanel').innerHTML = h; if (typeof lucide !== 'undefined') lucide.createIcons();
-  }
+  // المدن
+  async function loadCities() { const r = await fetch(`${API}/api/admin/cities`, { headers: { 'X-Telegram-Init-Data': tg.initData } }); const cities = await r.json(); let h = '<button class="btn btn-block" onclick="openCityModal()">➕ إضافة مدينة</button><div class="shop-grid" style="margin-top:16px">'; cities.forEach(c => { h += `<div class="card flex-between"><div><b>${c.name}</b> ${c.is_active?'✅':'❌'}</div><div><button class="btn" onclick="editCity(${c.id},'${c.name}',${c.is_active})">✏️</button><button class="btn btn-danger" onclick="deleteCity(${c.id})">🗑️</button></div></div>`; }); h += '</div>'; document.getElementById('citiesPanel').innerHTML = h; if (typeof lucide !== 'undefined') lucide.createIcons(); }
   window.openCityModal = (id=null, name='', active=true) => { document.getElementById('cityModalTitle').innerText = id ? 'تعديل مدينة' : 'إضافة مدينة'; document.getElementById('cityIdInput').value = id || ''; document.getElementById('cityNameInput').value = name; document.getElementById('cityActiveCheckbox').checked = active; document.getElementById('cityModal').style.display = 'flex'; };
   window.editCity = (id, name, active) => openCityModal(id, name, active);
   window.closeCityModal = () => document.getElementById('cityModal').style.display = 'none';
   window.saveCity = async () => { const id = document.getElementById('cityIdInput').value, name = document.getElementById('cityNameInput').value.trim(), is_active = document.getElementById('cityActiveCheckbox').checked; if (!name) return tg.showAlert('أدخل اسم المدينة'); const url = id ? `${API}/api/admin/cities/${id}` : `${API}/api/admin/cities`, method = id ? 'PUT' : 'POST'; await fetch(url, { method, headers: { 'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData }, body: JSON.stringify({ name, is_active }) }); closeCityModal(); loadCities(); };
   window.deleteCity = async id => { tg.showConfirm('حذف المدينة؟', async ok => { if(ok){ await fetch(`${API}/api/admin/cities/${id}`, { method:'DELETE', headers:{'X-Telegram-Init-Data':tg.initData} }); loadCities(); } }); };
 
-  // ========== المناطق ==========
-  async function loadZones() {
-    const [zRes, cRes] = await Promise.all([fetch(`${API}/api/admin/zones`, { headers: { 'X-Telegram-Init-Data': tg.initData } }), fetch(`${API}/api/admin/cities`, { headers: { 'X-Telegram-Init-Data': tg.initData } })]);
-    const zones = await zRes.json(); const cities = await cRes.json(); window.citiesList = cities;
-    let h = '<button class="btn" onclick="openZoneModal()">➕ إضافة منطقة</button><div class="shop-grid" style="margin-top:16px">';
-    zones.forEach(z => { h += `<div class="card"><b>${z.city_name}</b> - ${z.zone_name}<br>💰 ${z.base_fee} ل.س ${z.is_active?'✅':'❌'}<br><button class="btn" onclick="editZone(${z.id},${z.city_id},'${z.zone_name}',${z.base_fee},${z.is_active})">✏️</button><button class="btn btn-danger" onclick="deleteZone(${z.id})">🗑️</button></div>`; });
-    h += '</div>'; document.getElementById('zonesPanel').innerHTML = h;
-  }
+  // المناطق
+  async function loadZones() { const [zRes, cRes] = await Promise.all([fetch(`${API}/api/admin/zones`, { headers: { 'X-Telegram-Init-Data': tg.initData } }), fetch(`${API}/api/admin/cities`, { headers: { 'X-Telegram-Init-Data': tg.initData } })]); const zones = await zRes.json(); const cities = await cRes.json(); window.citiesList = cities; let h = '<button class="btn btn-block" onclick="openZoneModal()">➕ إضافة منطقة</button><div class="shop-grid" style="margin-top:16px">'; zones.forEach(z => { h += `<div class="card"><b>${z.city_name}</b> - ${z.zone_name}<br>💰 ${z.base_fee} ل.س ${z.is_active?'✅':'❌'}<br><button class="btn" onclick="editZone(${z.id},${z.city_id},'${z.zone_name}',${z.base_fee},${z.is_active})">✏️</button><button class="btn btn-danger" onclick="deleteZone(${z.id})">🗑️</button></div>`; }); h += '</div>'; document.getElementById('zonesPanel').innerHTML = h; }
   window.openZoneModal = (id=null, city_id='', name='', fee='', active=true) => { const sel = document.getElementById('zoneCitySelect'); sel.innerHTML = window.citiesList.map(c => `<option value="${c.id}" ${c.id==city_id?'selected':''}>${c.name}</option>`).join(''); document.getElementById('zoneModalTitle').innerText = id ? 'تعديل منطقة' : 'إضافة منطقة'; document.getElementById('zoneIdInput').value = id || ''; document.getElementById('zoneNameInput').value = name; document.getElementById('zoneFeeInput').value = fee; document.getElementById('zoneActiveCheckbox').checked = active; document.getElementById('zoneModal').style.display = 'flex'; };
   window.editZone = (id, city_id, name, fee, active) => openZoneModal(id, city_id, name, fee, active);
   window.closeZoneModal = () => document.getElementById('zoneModal').style.display = 'none';
   window.saveZone = async () => { const id = document.getElementById('zoneIdInput').value, city_id = document.getElementById('zoneCitySelect').value, zone_name = document.getElementById('zoneNameInput').value.trim(), base_fee = parseFloat(document.getElementById('zoneFeeInput').value), is_active = document.getElementById('zoneActiveCheckbox').checked; if (!city_id || !zone_name || isNaN(base_fee)) return tg.showAlert('جميع الحقول مطلوبة'); const url = id ? `${API}/api/admin/zones/${id}` : `${API}/api/admin/zones`, method = id ? 'PUT' : 'POST'; await fetch(url, { method, headers: { 'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData }, body: JSON.stringify({ city_id, zone_name, base_fee, is_active }) }); closeZoneModal(); loadZones(); };
   window.deleteZone = async id => { tg.showConfirm('حذف المنطقة؟', async ok => { if(ok){ await fetch(`${API}/api/admin/zones/${id}`, { method:'DELETE', headers:{'X-Telegram-Init-Data':tg.initData} }); loadZones(); } }); };
 
-  // ========== التقييمات ==========
-  async function loadRatings() {
-    const r = await fetch(`${API}/api/admin/ratings`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
-    const ratings = await r.json();
-    let h = ratings.map(r => `<div class="card"><b>طلب #${r.order_id}</b> | ${r.from_name} قيّم ${r.to_name}<br>⭐ ${r.rating}/5 - ${r.comment||''}<br><button class="btn btn-danger" onclick="deleteRating(${r.id})">حذف</button></div>`).join('') || '<p>لا تقييمات</p>';
-    document.getElementById('ratingsPanel').innerHTML = h;
-  }
+  async function loadRatings() { const r = await fetch(`${API}/api/admin/ratings`, { headers: { 'X-Telegram-Init-Data': tg.initData } }); const ratings = await r.json(); let h = ratings.map(r => `<div class="card"><b>طلب #${r.order_id}</b> | ${r.from_name} قيّم ${r.to_name}<br>⭐ ${r.rating}/5 - ${r.comment||''}<br><button class="btn btn-danger" onclick="deleteRating(${r.id})">حذف</button></div>`).join('') || '<div class="empty-state">لا تقييمات</div>'; document.getElementById('ratingsPanel').innerHTML = h; }
   window.deleteRating = async id => { await fetch(`${API}/api/admin/ratings/${id}`, { method:'DELETE', headers:{'X-Telegram-Init-Data':tg.initData} }); loadRatings(); };
+  async function loadFinance() { const r = await fetch(`${API}/api/admin/finance`, { headers: { 'X-Telegram-Init-Data': tg.initData } }); const d = await r.json(); document.getElementById('financePanel').innerHTML = `<div class="card"><h3>📊 ملخص الأرباح</h3><p>💰 إجمالي العمولات: ${d.total_platform_fees||0} ل.س</p><p>🏪 مستحقات المتاجر: ${d.pending_shop_payouts||0} ل.س</p><p>🛵 مستحقات السائقين: ${d.pending_rider_payouts||0} ل.س</p></div>`; }
+  async function loadCompletedOrders() { const r = await fetch(`${API}/api/admin/completed-orders`, { headers: { 'X-Telegram-Init-Data': tg.initData } }); const orders = await r.json(); let h = orders.map(o => `<div class="card"><b>#${o.id}</b> - ${o.customer_name}<br>🏪 ${o.shop_name}<br>🛵 ${o.rider_name||'-'}<br>💰 ${o.total_price} ل.س (عمولة: ${o.platform_commission} ل.س)<br>📅 ${new Date(o.created_at).toLocaleDateString('ar-SY')}</div>`).join('') || '<div class="empty-state">لا طلبات مكتملة</div>'; document.getElementById('completedOrdersPanel').innerHTML = h; }
 
-  // ========== المالية ==========
-  async function loadFinance() {
-    const r = await fetch(`${API}/api/admin/finance`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
-    const d = await r.json();
-    document.getElementById('financePanel').innerHTML = `<div class="card"><h3>📊 ملخص الأرباح</h3><p>💰 إجمالي العمولات: ${d.total_platform_fees||0} ل.س</p><p>🏪 مستحقات المتاجر: ${d.pending_shop_payouts||0} ل.س</p><p>🛵 مستحقات السائقين: ${d.pending_rider_payouts||0} ل.س</p></div>`;
-  }
-
-  // ========== التقارير (الطلبات المكتملة) ==========
-  async function loadCompletedOrders() {
-    const r = await fetch(`${API}/api/admin/completed-orders`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
-    const orders = await r.json();
-    let h = orders.map(o => `<div class="card"><b>#${o.id}</b> - ${o.customer_name}<br>🏪 ${o.shop_name}<br>🛵 ${o.rider_name||'-'}<br>💰 ${o.total_price} ل.س (عمولة: ${o.platform_commission} ل.س)<br>📅 ${new Date(o.created_at).toLocaleDateString('ar-SY')}</div>`).join('') || '<p>لا طلبات مكتملة</p>';
-    document.getElementById('completedOrdersPanel').innerHTML = h;
-  }
-
-  // ========== الدعم الفني ==========
+  // الدعم
   let selectedSupportUserId = null;
-
   async function loadSupportUsers() {
-    const panel = document.getElementById('supportPanel');
-    panel.innerHTML = '<div class="skeleton"></div>';
+    const panel = document.getElementById('supportPanel'); panel.innerHTML = '<div class="skeleton" style="height:100px;"></div>';
     const res = await fetch(`${API}/api/admin/support/users`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
     const users = await res.json();
-    let html = '<div style="display:flex; gap:16px; height:80vh;">';
-    html += '<div style="width:35%; border-left:1px solid #ddd; padding-left:8px; overflow-y:auto;">';
-    users.forEach(u => {
-      html += `<div class="card" style="cursor:pointer;" onclick="selectSupportUser(${u.id})">
-        <b>${u.name}</b> (${u.role})<br>
-        ${u.unread_count > 0 ? '<span class="badge badge-warning">' + u.unread_count + ' جديد</span>' : ''}
-        <div style="font-size:0.8rem;">${u.phone||''}</div>
-      </div>`;
-    });
-    html += '</div><div style="width:65%;" id="supportChatArea"><p style="text-align:center;padding:40px;">اختر محادثة</p></div>';
-    html += '</div>';
+    let html = '<div style="display:flex; gap:16px; height:80vh;"><div style="width:35%; border-left:1px solid var(--gray-200); padding-left:8px; overflow-y:auto;">';
+    users.forEach(u => { html += `<div class="card" style="cursor:pointer;" onclick="selectSupportUser(${u.id})"><b>${u.name}</b> (${u.role})<br>${u.unread_count > 0 ? '<span class="badge badge-warning">' + u.unread_count + ' جديد</span>' : ''}<div style="font-size:0.8rem;">${u.phone||''}</div></div>`; });
+    html += '</div><div style="width:65%;" id="supportChatArea"><p style="text-align:center;padding:40px;">اختر محادثة</p></div></div>';
     panel.innerHTML = html;
   }
-
-  window.selectSupportUser = async (userId) => {
-    selectedSupportUserId = userId;
-    await loadSupportChat(userId);
-  };
-
+  window.selectSupportUser = async (userId) => { selectedSupportUserId = userId; await loadSupportChat(userId); };
   async function loadSupportChat(userId) {
-    const area = document.getElementById('supportChatArea');
-    area.innerHTML = '<div class="skeleton"></div>';
+    const area = document.getElementById('supportChatArea'); area.innerHTML = '<div class="skeleton" style="height:100px;"></div>';
     const res = await fetch(`${API}/api/admin/support/messages/${userId}`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
     const messages = await res.json();
     let html = `<div class="chat-messages">`;
-    messages.forEach(m => {
-      const isAdmin = m.is_from_admin;
-      html += `<div class="chat-bubble ${isAdmin ? 'admin' : 'user'}">
-        <div style="font-size:0.7rem; opacity:0.8;">${isAdmin ? 'الدعم' : m.user_name} - ${new Date(m.created_at).toLocaleTimeString('ar-SY')}</div>
-        ${m.message}
-      </div>`;
-    });
-    html += `</div>
-      <div class="chat-input-area">
-        <input type="text" id="adminReplyInput" placeholder="اكتب رداً...">
-        <button class="btn" onclick="sendAdminReply(${userId})">إرسال</button>
-      </div>`;
-    area.innerHTML = html;
-    if (typeof lucide !== 'undefined') lucide.createIcons();
+    messages.forEach(m => { const isAdmin = m.is_from_admin; html += `<div class="chat-bubble ${isAdmin ? 'admin' : 'user'}"><div style="font-size:0.7rem; opacity:0.8;">${isAdmin ? 'الدعم' : m.user_name} - ${new Date(m.created_at).toLocaleTimeString('ar-SY')}</div>${m.message}</div>`; });
+    html += `</div><div class="chat-input-area"><input type="text" id="adminReplyInput" placeholder="اكتب رداً..."><button class="btn" onclick="sendAdminReply(${userId})">إرسال</button></div>`;
+    area.innerHTML = html; if (typeof lucide !== 'undefined') lucide.createIcons();
   }
+  window.sendAdminReply = async (userId) => { const input = document.getElementById('adminReplyInput'); const message = input.value.trim(); if (!message) return; await fetch(`${API}/api/admin/support/messages/${userId}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData }, body: JSON.stringify({ message }) }); input.value = ''; loadSupportChat(userId); loadSupportUsers(); };
 
-  window.sendAdminReply = async (userId) => {
-    const input = document.getElementById('adminReplyInput');
-    const message = input.value.trim();
-    if (!message) return;
-    await fetch(`${API}/api/admin/support/messages/${userId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData },
-      body: JSON.stringify({ message })
-    });
-    input.value = '';
-    loadSupportChat(userId);
-    loadSupportUsers(); // لتحديث عدد غير المقروء
-  };
-
-  // تحميل أولي
   loadPending();
 </script>
 </body>
