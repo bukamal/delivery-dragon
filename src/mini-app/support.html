@@ -8,7 +8,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="stylesheet" href="styles.css">
   <style>
-    .chat-container { display: flex; flex-direction: column; height: calc(100vh - 70px); }
+    .chat-container { display: flex; flex-direction: column; height: calc(100vh - 130px); }
     .messages { flex: 1; overflow-y: auto; padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
     .message { max-width: 80%; padding: var(--space-3) var(--space-4); border-radius: var(--radius-xl); word-wrap: break-word; }
     .message.user { align-self: flex-end; background: var(--primary); color: white; border-bottom-right-radius: 4px; }
@@ -16,9 +16,8 @@
     .message-meta { font-size: var(--text-xs); margin-bottom: var(--space-1); opacity: 0.8; }
   </style>
 </head>
-<body>
+<body class="has-bottom-nav">
 <div class="app-header">
-  <button class="back-btn" onclick="history.back()"><i data-lucide="arrow-right"></i></button>
   <h1>🦅 الدعم الفني</h1>
 </div>
 <div class="chat-container">
@@ -28,11 +27,11 @@
     <button class="btn" id="sendBtn" disabled><i data-lucide="send"></i></button>
   </div>
 </div>
+<script src="bottom-nav.js"></script>
 <script>
   (function() {
     const tg = window.Telegram.WebApp;
-    try { tg.ready(); tg.expand(); tg.BackButton.show(); tg.BackButton.onClick(() => history.back()); }
-    catch (e) { document.getElementById('messagesContainer').innerHTML = '<div class="empty-state">⚠️ تعذر الاتصال بتطبيق تيليغرام.</div>'; return; }
+    try { tg.ready(); tg.expand(); } catch (e) { document.getElementById('messagesContainer').innerHTML = '<div class="empty-state">⚠️ تعذر الاتصال بتطبيق تيليغرام.</div>'; return; }
     const API = 'https://delivery-dragon.vercel.app';
     const messagesContainer = document.getElementById('messagesContainer');
     const messageInput = document.getElementById('messageInput');

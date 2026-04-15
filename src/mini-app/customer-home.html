@@ -15,12 +15,11 @@
     .shop-icon { font-size: 44px; background: var(--tg-theme-bg-color, #f0f2f5); width: 70px; height: 70px; border-radius: var(--radius-xl); display: flex; align-items: center; justify-content: center; }
     .shop-info h3 { font-size: var(--text-lg); margin-bottom: var(--space-1); }
     .shop-info p { color: var(--gray-600); font-size: var(--text-sm); display: flex; align-items: center; gap: var(--space-1); }
-    .cart-bar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--tg-theme-secondary-bg-color, var(--secondary)); color: white; padding: var(--space-3) var(--space-6); display: flex; justify-content: space-between; align-items: center; backdrop-filter: blur(10px); border-top: 1px solid rgba(255,255,255,0.1); }
+    .cart-bar { position: fixed; bottom: 80px; left: 0; right: 0; background: var(--tg-theme-secondary-bg-color, var(--secondary)); color: white; padding: var(--space-3) var(--space-6); display: flex; justify-content: space-between; align-items: center; backdrop-filter: blur(10px); border-top: 1px solid rgba(255,255,255,0.1); z-index: 15; }
   </style>
 </head>
-<body>
+<body class="has-bottom-nav">
 <div class="app-header">
-  <button class="back-btn" id="backBtn"><i data-lucide="arrow-right"></i></button>
   <h1>🦅 شاهين</h1>
 </div>
 <div class="container">
@@ -41,10 +40,9 @@
   <span><i data-lucide="shopping-cart"></i> السلة (<span id="cartCount">0</span>)</span>
   <button class="cart-btn" id="viewCartBtn">عرض السلة</button>
 </div>
+<script src="bottom-nav.js"></script>
 <script>
   const tg = window.Telegram.WebApp; tg.ready(); tg.expand();
-  tg.BackButton.show(); tg.BackButton.onClick(() => window.history.back());
-  document.getElementById('backBtn').onclick = () => window.history.back();
   const API = 'https://delivery-dragon.vercel.app';
   let shops = [], cart = JSON.parse(localStorage.getItem('dragon_cart')) || [], currentCityId = null;
   function updateCartCount() { document.getElementById('cartCount').innerText = cart.reduce((s,i) => s + i.quantity, 0); }
