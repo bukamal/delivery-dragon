@@ -372,7 +372,7 @@ app.get('/api/shop/orders', async (req, res) => {
     const { archived } = req.query;
     let statusCondition = archived === 'true' 
       ? `o.status IN ('completed', 'rejected')`
-      : `o.status IN ('paid', 'preparing', 'ready_for_pickup', 'delivering')`; // <-- تم إضافة 'paid'
+      : `o.status IN ('paid', 'preparing', 'ready_for_pickup', 'delivering')`;
     const orders = await pool.query(
       `SELECT o.*, u_customer.name as customer_name, u_customer.phone as customer_phone, u_rider.name as rider_name 
        FROM orders o 
@@ -487,7 +487,28 @@ app.post('/api/rider/online-status', requireAuth, async (req, res) => {
     res.json({ success: true });
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
-app.get('/api/rider/available-orders', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'rider' || !dbUser?.is_approved) return res.status(403).json({ error: 'Forbidden' }); const rider = await pool.query('SELECT is_online FROM rider_details WHERE user_id=$1', [dbUser.id]); if (!rider.rows[0]?.is_online) return res.json([]); const orders = await pool.query(`SELECT o.*, s.shop_name, s.address as shop_address, s.latitude as shop_lat, s.longitude as shop_lng, c.name as category FROM orders o JOIN shops s ON o.shop_id=s.id LEFT JOIN shop_categories c ON s.category_id=c.id WHERE o.status='ready_for_pickup' AND o.rider_id IS NULL`); res.json(orders.rows); } catch(error) { res.status(500).json({ error: error.message }); } });
+app.get('/api/rider/available-orders', async (req, res) => {
+  try {
+    const tgUser = req.tgUser;
+    const dbUser = await getDbUser(tgUser.id);
+    if (dbUser?.role !== 'rider' || !dbUser?.is_approved) return res.status(403).json({ error: 'Forbidden' });
+    
+    // جلب حالة الاتصال، إذا لم تكن موجودة نعتبرها متصل (true)
+    const rider = await pool.query('SELECT is_online FROM rider_details WHERE user_id=$1', [dbUser.id]);
+    const isOnline = rider.rows[0]?.is_online ?? true; // افتراضي متصل
+    
+    if (!isOnline) return res.json([]); // إذا كان غير متصل عمداً
+    
+    const orders = await pool.query(
+      `SELECT o.*, s.shop_name, s.address as shop_address, s.latitude as shop_lat, s.longitude as shop_lng, c.name as category 
+       FROM orders o 
+       JOIN shops s ON o.shop_id = s.id 
+       LEFT JOIN shop_categories c ON s.category_id = c.id 
+       WHERE o.status = 'ready_for_pickup' AND o.rider_id IS NULL`
+    );
+    res.json(orders.rows);
+  } catch(error) { res.status(500).json({ error: error.message }); }
+});
 app.post('/api/rider/accept-order', async (req, res) => {
   try {
     const tgUser = req.tgUser;
