@@ -20,11 +20,7 @@
     .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); margin-bottom: var(--space-4); }
     .stat-item { background: var(--tg-theme-secondary-bg-color, #fff); border-radius: var(--radius-lg); padding: var(--space-2); text-align: center; }
     .stat-value { font-weight: 700; color: var(--primary); }
-    .shop-thumb { width: 40px; height: 40px; border-radius: var(--radius-md); object-fit: cover; }
-    .code-box { background: var(--warning); padding: var(--space-3); border-radius: var(--radius-lg); margin: var(--space-3) 0; display: flex; align-items: center; justify-content: space-between; }
-    .code-value { font-size: var(--text-2xl); font-weight: 700; letter-spacing: 4px; }
-    .map-mini { height: 120px; border-radius: var(--radius-lg); background: var(--gray-200); margin: var(--space-3) 0; }
-    .refresh-btn { margin-left: auto; background: none; border: none; color: var(--primary); cursor: pointer; }
+    .error-message { background: var(--danger); color: white; padding: 12px; border-radius: 12px; margin: 16px 0; }
   </style>
 </head>
 <body>
@@ -71,19 +67,19 @@
   const onlineSwitch = document.getElementById('onlineSwitch');
   const onlineStatus = document.getElementById('onlineStatus');
   
-  // حالة الاتصال
   onlineSwitch.addEventListener('change', async () => {
     const isOnline = onlineSwitch.checked;
     onlineStatus.innerHTML = isOnline ? '🟢 متصل' : '🔴 غير متصل';
-    await fetch(`${API}/api/rider/online-status`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData },
-      body: JSON.stringify({ is_online: isOnline })
-    });
+    try {
+      await fetch(`${API}/api/rider/online-status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData },
+        body: JSON.stringify({ is_online: isOnline })
+      });
+    } catch(e) { console.error('Online status error:', e); }
     if (document.querySelector('.tab.active').dataset.tab === 'available') loadAvailable();
   });
   
-  // الحصول على موقع السائق
   function getCurrentPosition() {
     return new Promise((resolve) => {
       if (!navigator.geolocation) { resolve(null); return; }
@@ -94,7 +90,6 @@
     });
   }
   
-  // حساب المسافة التقريبية
   function calculateDistance(lat1, lon1, lat2, lon2) {
     const R = 6371; const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
@@ -102,7 +97,6 @@
     return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))).toFixed(1);
   }
   
-  // التبويبات
   const tabs = document.querySelectorAll('.tab');
   tabs.forEach(t => t.onclick = () => {
     tabs.forEach(x => x.classList.remove('active')); t.classList.add('active');
@@ -120,7 +114,7 @@
       document.getElementById('todayOrders').innerText = stats.today_orders || 0;
       document.getElementById('todayEarnings').innerText = stats.today_earnings || 0;
       document.getElementById('rating').innerText = stats.rating ? parseFloat(stats.rating).toFixed(1) : '-';
-    } catch(e) {}
+    } catch(e) { console.error('Stats error:', e); }
   }
   
   async function loadAvailable() {
@@ -132,35 +126,50 @@
       return;
     }
     
-    await getCurrentPosition();
-    const r = await fetch(`${API}/api/rider/available-orders`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
-    const orders = await r.json();
-    
-    if(!orders.length) {
-      c.innerHTML = `<div class="empty-state">
-        <i data-lucide="package" style="font-size:48px; opacity:0.5;"></i>
-        <h3>لا توجد طلبات متاحة حالياً</h3>
-        <p>ستظهر هنا الطلبات الجاهزة للتوصيل</p>
-        <button class="btn btn-outline" onclick="loadAvailable()" style="margin-top:16px;"><i data-lucide="refresh-cw"></i> تحديث</button>
-      </div>`;
-      if(typeof lucide !== 'undefined') lucide.createIcons();
-      return;
-    }
-    
-    let html = '';
-    for (const o of orders) {
-      let distance = '-', eta = '-';
-      if (currentPosition && o.shop_lat && o.shop_lng) {
-        const dist = calculateDistance(currentPosition.lat, currentPosition.lng, o.shop_lat, o.shop_lng);
-        distance = `${dist} كم`; eta = `${Math.round(dist * 3)} دقيقة`;
+    try {
+      await getCurrentPosition();
+      const res = await fetch(`${API}/api/rider/available-orders`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
+      
+      if (!res.ok) {
+        const err = await res.json();
+        console.error('Available orders error:', err);
+        c.innerHTML = `<div class="error-message">❌ خطأ ${res.status}: ${err.error || 'تعذر جلب الطلبات'}</div>`;
+        return;
       }
-      html += `<div class="card">
-        <div class="flex-between"><div class="flex"><img src="${o.shop_image || 'https://via.placeholder.com/40'}" class="shop-thumb"><div><b>${o.shop_name}</b><br><span class="badge">${o.category || 'متجر'}</span></div></div><span class="price">${o.delivery_fee} ل.س</span></div>
-        <div class="flex-between" style="margin-top:8px;"><span><i data-lucide="map-pin"></i> ${distance}</span><span><i data-lucide="clock"></i> ${eta}</span></div>
-        <div class="flex" style="margin-top:12px;"><button class="btn btn-block" onclick="accept('${o.id}')">قبول</button><button class="btn btn-outline btn-block" onclick="rejectOrder('${o.id}')">رفض</button></div>
-      </div>`;
+      
+      const orders = await res.json();
+      console.log('Available orders received:', orders.length);
+      
+      if(!orders.length) {
+        c.innerHTML = `<div class="empty-state">
+          <i data-lucide="package" style="font-size:48px; opacity:0.5;"></i>
+          <h3>لا توجد طلبات متاحة حالياً</h3>
+          <p>ستظهر هنا الطلبات الجاهزة للتوصيل</p>
+          <button class="btn btn-outline" onclick="loadAvailable()" style="margin-top:16px;"><i data-lucide="refresh-cw"></i> تحديث</button>
+        </div>`;
+        if(typeof lucide !== 'undefined') lucide.createIcons();
+        return;
+      }
+      
+      let html = '';
+      for (const o of orders) {
+        let distance = '-', eta = '-';
+        if (currentPosition && o.shop_lat && o.shop_lng) {
+          const dist = calculateDistance(currentPosition.lat, currentPosition.lng, o.shop_lat, o.shop_lng);
+          distance = `${dist} كم`; eta = `${Math.round(dist * 3)} دقيقة`;
+        }
+        html += `<div class="card">
+          <div class="flex-between"><div class="flex"><img src="${o.shop_image || 'https://via.placeholder.com/40'}" class="shop-thumb"><div><b>${o.shop_name}</b><br><span class="badge">${o.category || 'متجر'}</span></div></div><span class="price">${o.delivery_fee} ل.س</span></div>
+          <div class="flex-between" style="margin-top:8px;"><span><i data-lucide="map-pin"></i> ${distance}</span><span><i data-lucide="clock"></i> ${eta}</span></div>
+          <div class="flex" style="margin-top:12px;"><button class="btn btn-block" onclick="accept('${o.id}')">قبول</button><button class="btn btn-outline btn-block" onclick="rejectOrder('${o.id}')">رفض</button></div>
+        </div>`;
+      }
+      c.innerHTML = html;
+    } catch(e) {
+      console.error('Load available error:', e);
+      c.innerHTML = `<div class="error-message">❌ خطأ في الاتصال: ${e.message}</div>`;
     }
-    c.innerHTML = html; if(typeof lucide !== 'undefined') lucide.createIcons();
+    if(typeof lucide !== 'undefined') lucide.createIcons();
   }
   
   window.accept = async id => {
@@ -172,28 +181,30 @@
   
   async function loadActive() {
     const c = document.getElementById('activePanel'); c.innerHTML = '<div class="skeleton" style="height:120px;"></div>';
-    const r = await fetch(`${API}/api/rider/active-order`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
-    const o = await r.json();
-    if(!o) { c.innerHTML = '<div class="empty-state"><p>لا يوجد طلب نشط</p></div>'; return; }
-    const statusRes = await fetch(`${API}/api/orders/${o.id}/status`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
-    const statusData = await statusRes.json();
-    const isVerified = statusData.code_verified;
-    c.innerHTML = `<div class="card">
-      <div class="flex-between"><b>#${o.id}</b><span class="badge">${o.shop_name}</span></div>
-      <div class="flex-between"><span>📞 ${o.customer_phone || ''}</span><button class="btn-outline" onclick="tg.openLink('tel:${o.shop_phone}')"><i data-lucide="phone"></i> المتجر</button></div>
-      <div class="map-mini" id="miniMap"></div>
-      <div class="code-box"><span>🔐 كود التأكيد</span><span class="code-value" id="confirmCode">${o.confirmation_code || '----'}</span><button class="btn-outline" onclick="copyCode()"><i data-lucide="copy"></i></button></div>
-      ${isVerified ? '<span class="verified-badge">✅ تم التحقق من الكود</span>' : '<span style="color:var(--primary);">⏳ بانتظار إدخال الزبون للكود</span>'}
-      <button class="btn btn-block" onclick="complete(${o.id})" ${!isVerified ? 'disabled' : ''}><i data-lucide="check-circle"></i> تم التوصيل</button>
-      <button class="btn btn-danger btn-block" onclick="cancelOrder(${o.id})"><i data-lucide="x"></i> تعذر التوصيل</button>
-    </div>`;
-    if(typeof lucide !== 'undefined') lucide.createIcons();
-    if (o.shop_lat && o.shop_lng && o.delivery_lat && o.delivery_lng) {
-      setTimeout(() => {
-        const mapEl = document.getElementById('miniMap');
-        if(mapEl) { const map = L.map(mapEl).setView([o.shop_lat, o.shop_lng], 13); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map); L.marker([o.shop_lat, o.shop_lng]).addTo(map).bindPopup('🏪 المتجر'); L.marker([o.delivery_lat, o.delivery_lng]).addTo(map).bindPopup('📍 الزبون'); }
-      }, 100);
-    }
+    try {
+      const r = await fetch(`${API}/api/rider/active-order`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
+      const o = await r.json();
+      if(!o) { c.innerHTML = '<div class="empty-state"><p>لا يوجد طلب نشط</p></div>'; return; }
+      const statusRes = await fetch(`${API}/api/orders/${o.id}/status`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
+      const statusData = await statusRes.json();
+      const isVerified = statusData.code_verified;
+      c.innerHTML = `<div class="card">
+        <div class="flex-between"><b>#${o.id}</b><span class="badge">${o.shop_name}</span></div>
+        <div class="flex-between"><span>📞 ${o.customer_phone || ''}</span><button class="btn-outline" onclick="tg.openLink('tel:${o.shop_phone}')"><i data-lucide="phone"></i> المتجر</button></div>
+        <div class="map-mini" id="miniMap"></div>
+        <div class="code-box"><span>🔐 كود التأكيد</span><span class="code-value" id="confirmCode">${o.confirmation_code || '----'}</span><button class="btn-outline" onclick="copyCode()"><i data-lucide="copy"></i></button></div>
+        ${isVerified ? '<span class="verified-badge">✅ تم التحقق من الكود</span>' : '<span style="color:var(--primary);">⏳ بانتظار إدخال الزبون للكود</span>'}
+        <button class="btn btn-block" onclick="complete(${o.id})" ${!isVerified ? 'disabled' : ''}><i data-lucide="check-circle"></i> تم التوصيل</button>
+        <button class="btn btn-danger btn-block" onclick="cancelOrder(${o.id})"><i data-lucide="x"></i> تعذر التوصيل</button>
+      </div>`;
+      if(typeof lucide !== 'undefined') lucide.createIcons();
+      if (o.shop_lat && o.shop_lng && o.delivery_lat && o.delivery_lng) {
+        setTimeout(() => {
+          const mapEl = document.getElementById('miniMap');
+          if(mapEl) { const map = L.map(mapEl).setView([o.shop_lat, o.shop_lng], 13); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map); L.marker([o.shop_lat, o.shop_lng]).addTo(map).bindPopup('🏪 المتجر'); L.marker([o.delivery_lat, o.delivery_lng]).addTo(map).bindPopup('📍 الزبون'); }
+        }, 100);
+      }
+    } catch(e) { console.error('Active order error:', e); }
   }
   
   window.copyCode = () => { const code = document.getElementById('confirmCode')?.innerText; if(code) navigator.clipboard?.writeText(code).then(() => tg.showPopup({ message: 'تم نسخ الكود' })); };
@@ -202,10 +213,12 @@
   
   async function loadHistory() {
     const c = document.getElementById('historyPanel'); c.innerHTML = '<div class="skeleton" style="height:120px;"></div>';
-    const r = await fetch(`${API}/api/rider/history`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
-    const orders = await r.json();
-    if(!orders.length) { c.innerHTML = '<div class="empty-state"><p>لا يوجد سجل طلبات</p></div>'; return; }
-    c.innerHTML = orders.map(o => `<div class="card"><div class="flex-between"><b>#${o.id}</b><span>${o.total_price} ل.س</span></div><div>${o.shop_name}</div><div>📅 ${new Date(o.created_at).toLocaleDateString('ar-SY')}</div></div>`).join('');
+    try {
+      const r = await fetch(`${API}/api/rider/history`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
+      const orders = await r.json();
+      if(!orders.length) { c.innerHTML = '<div class="empty-state"><p>لا يوجد سجل طلبات</p></div>'; return; }
+      c.innerHTML = orders.map(o => `<div class="card"><div class="flex-between"><b>#${o.id}</b><span>${o.total_price} ل.س</span></div><div>${o.shop_name}</div><div>📅 ${new Date(o.created_at).toLocaleDateString('ar-SY')}</div></div>`).join('');
+    } catch(e) { console.error('History error:', e); }
   }
   
   loadStats(); loadAvailable();
