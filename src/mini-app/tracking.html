@@ -26,6 +26,7 @@
     .otp-container { display:flex; gap:8px; justify-content:center; margin:16px 0; }
     .otp-input { width:60px; height:60px; text-align:center; font-size:28px; border-radius:12px; border:1px solid #ccc; background:rgba(255,255,255,0.5); }
     .verified-badge { background:#27ae60; color:#fff; padding:8px 16px; border-radius:30px; }
+    .order-items { background:rgba(0,0,0,0.02); padding:12px; border-radius:16px; margin:16px 0; }
   </style>
 </head>
 <body>
@@ -39,6 +40,7 @@
   <div class="progress">
     <div class="step" id="stepPaid">✅ مدفوع</div><div class="step" id="stepPrep">🍳 تحضير</div><div class="step" id="stepReady">📦 جاهز</div><div class="step" id="stepDeliver">🚴 توصيل</div>
   </div>
+  <div id="orderItems" class="order-items"></div>
   <div id="riderInfo" style="display:none;"><div class="rider-info"><i data-lucide="bike"></i><div><b id="riderName"></b><br><span id="riderPhone"></span></div></div></div>
   <div id="etaDisplay" class="eta-badge" style="display:none;"></div>
   <div id="mapContainer"><div id="map"></div></div>
@@ -72,8 +74,17 @@
 
   async function fetchData() {
     try {
-      const statusRes = await fetch(`${API}/api/orders/${orderId}/status`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
+      const [statusRes, detailsRes] = await Promise.all([
+        fetch(`${API}/api/orders/${orderId}/status`, { headers: { 'X-Telegram-Init-Data': tg.initData } }),
+        fetch(`${API}/api/me/orders`, { headers: { 'X-Telegram-Init-Data': tg.initData } })
+      ]);
       const statusData = await statusRes.json();
+      const orders = await detailsRes.json();
+      const order = orders.find(o => o.id == orderId);
+      if (order) {
+        const items = JSON.parse(order.items).map(i => `${i.name} ×${i.quantity}`).join('، ');
+        document.getElementById('orderItems').innerHTML = `<b>📦 الطلب:</b> ${items}<br><b>💰 الإجمالي:</b> ${order.total_price} ل.س`;
+      }
       const status = statusData.status, codeVerified = statusData.code_verified;
       document.getElementById('statusEmoji').innerText = statusEmojis[status] || '⏳';
       document.getElementById('statusMessage').innerText = statusMessages[status] || status;

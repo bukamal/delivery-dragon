@@ -7,32 +7,43 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <style>
+    /* ===== تصميم عصري كامل ===== */
     * { margin:0; padding:0; box-sizing:border-box; font-family:'Tajawal', sans-serif; }
     body { background: var(--tg-theme-bg-color, #f0f2f5); color: var(--tg-theme-text-color, #1e1e2f); }
     .shop-layout { display:flex; height:100vh; }
-    .shop-sidebar { width:260px; background:rgba(255,255,255,0.8); backdrop-filter:blur(12px); border-left:1px solid rgba(0,0,0,0.05); display:flex; flex-direction:column; transition:0.3s; }
-    .sidebar-header { padding:24px 20px; font-size:1.6rem; font-weight:700; color:#e67e22; border-bottom:1px solid rgba(0,0,0,0.05); }
+    .shop-sidebar { width:280px; background:rgba(255,255,255,0.8); backdrop-filter:blur(12px); border-left:1px solid rgba(0,0,0,0.05); display:flex; flex-direction:column; transition:0.3s; }
+    .sidebar-header { padding:24px 20px; font-size:1.8rem; font-weight:700; color:#e67e22; border-bottom:1px solid rgba(0,0,0,0.05); }
     .sidebar-nav { flex:1; padding:16px; }
-    .sidebar-link { display:flex; align-items:center; gap:12px; padding:12px 16px; border-radius:16px; color:#1e1e2f; text-decoration:none; margin-bottom:4px; }
+    .sidebar-link { display:flex; align-items:center; gap:12px; padding:12px 16px; border-radius:16px; color:#1e1e2f; text-decoration:none; margin-bottom:4px; transition:0.2s; }
+    .sidebar-link i { width:22px; height:22px; }
     .sidebar-link.active { background:#e67e22; color:#fff; }
     .shop-main { flex:1; overflow-y:auto; background:rgba(255,255,255,0.4); }
     .shop-main .app-header { display:flex; align-items:center; padding:16px 24px; background:rgba(255,255,255,0.8); backdrop-filter:blur(12px); border-bottom:1px solid rgba(0,0,0,0.05); position:sticky; top:0; z-index:5; }
     .sidebar-toggle { background:none; border:none; margin-left:16px; cursor:pointer; display:none; }
     .shop-content { padding:24px; max-width:1200px; margin:0 auto; }
     .kpi-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:24px; }
-    .kpi-card { background:rgba(255,255,255,0.7); backdrop-filter:blur(8px); border-radius:20px; padding:20px; }
+    .kpi-card { background:rgba(255,255,255,0.7); backdrop-filter:blur(8px); border-radius:20px; padding:20px; border:1px solid rgba(255,255,255,0.5); }
     .kpi-value { font-size:2rem; font-weight:700; color:#e67e22; }
-    .card { background:rgba(255,255,255,0.7); backdrop-filter:blur(8px); border-radius:20px; padding:20px; margin-bottom:16px; }
+    .card { background:rgba(255,255,255,0.7); backdrop-filter:blur(8px); border-radius:20px; padding:20px; margin-bottom:16px; border:1px solid rgba(255,255,255,0.5); }
     .btn { background:#e67e22; color:#fff; border:none; padding:10px 20px; border-radius:30px; cursor:pointer; }
     .btn-danger { background:#e74c3c; }
+    .btn-outline { background:transparent; border:1px solid #e67e22; color:#e67e22; }
+    .badge { padding:4px 12px; border-radius:20px; font-size:0.8rem; }
+    .badge-success { background:#27ae60; color:#fff; }
+    .badge-warning { background:#f1c40f; }
+    .modal { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:1000; }
+    .modal-content { background:#fff; border-radius:28px; padding:24px; width:90%; max-width:500px; max-height:80vh; overflow-y:auto; }
     .order-card { background:rgba(255,255,255,0.7); border-radius:20px; padding:16px; margin-bottom:12px; }
     .order-header { display:flex; justify-content:space-between; cursor:pointer; }
     .order-details { margin-top:12px; padding-top:12px; border-top:1px solid #ddd; display:none; }
     .order-details.open { display:block; }
     .status-badge { padding:4px 12px; border-radius:20px; font-size:0.8rem; }
-    .status-paid{background:#3498db;color:#fff} .status-preparing{background:#e67e22;color:#fff} .status-ready{background:#2ecc71;color:#fff}
-    .modal { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:1000; }
-    .modal-content { background:#fff; border-radius:28px; padding:24px; width:90%; max-width:500px; max-height:80vh; overflow-y:auto; }
+    .status-paid{background:#3498db;color:#fff} .status-preparing{background:#e67e22;color:#fff} .status-ready{background:#2ecc71;color:#fff} .status-delivering{background:#9b59b6;color:#fff}
+    .product-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(250px,1fr)); gap:16px; }
+    .product-card { background:rgba(255,255,255,0.7); border-radius:20px; overflow:hidden; }
+    .product-card img { width:100%; height:160px; object-fit:cover; }
+    .product-info { padding:16px; }
+    .option-row { display:flex; gap:8px; margin-bottom:8px; }
     @media (max-width:768px) {
       .shop-sidebar { position:fixed; top:0; right:0; bottom:0; z-index:100; transform:translateX(100%); }
       .shop-sidebar.open { transform:translateX(0); }
@@ -58,13 +69,38 @@
     <div class="app-header">
       <button class="sidebar-toggle" id="sidebarToggle"><i data-lucide="menu"></i></button>
       <h1 id="pageTitle">نظرة عامة</h1>
+      <div style="width:40px;"></div>
     </div>
     <div class="shop-content" id="shopContent"></div>
   </div>
 </div>
 
-<div id="productModal" class="modal" style="display:none"><div class="modal-content"><h3>إضافة منتج</h3><input type="hidden" id="productId"><div class="form-group"><input type="text" id="productName" placeholder="اسم المنتج"></div><div class="form-group"><input type="number" id="productPrice" placeholder="السعر"></div><div class="form-group"><select id="productCategory"></select></div><div class="form-group"><input type="file" id="productImage" accept="image/*"><img id="imagePreview" style="max-width:100%; display:none;"></div><div class="form-group"><div id="optionsContainer"></div><button type="button" class="btn" onclick="addOptionRow()">➕ إضافة خيار</button></div><button class="btn" onclick="saveProduct()">حفظ</button><button class="btn" onclick="closeProductModal()" style="background:#95a5a6; margin-top:8px;">إلغاء</button></div></div>
-<div id="categoryModal" class="modal" style="display:none"><div class="modal-content"><h3>إضافة تصنيف</h3><input type="hidden" id="categoryId"><input type="text" id="categoryName" placeholder="اسم التصنيف"><input type="number" id="categoryOrder" placeholder="الترتيب" value="0"><button class="btn" onclick="saveCategory()">حفظ</button><button class="btn" onclick="closeCategoryModal()" style="background:#95a5a6;">إلغاء</button></div></div>
+<!-- مودال المنتج -->
+<div id="productModal" class="modal" style="display:none">
+  <div class="modal-content">
+    <h3 id="modalTitle">إضافة منتج</h3>
+    <input type="hidden" id="productId">
+    <div class="form-group"><label>اسم المنتج</label><input type="text" id="productName" placeholder="اسم المنتج"></div>
+    <div class="form-group"><label>السعر (ل.س)</label><input type="number" id="productPrice" placeholder="السعر"></div>
+    <div class="form-group"><label>التصنيف</label><select id="productCategory"></select></div>
+    <div class="form-group"><label>صورة المنتج</label><input type="file" id="productImage" accept="image/*"><img id="imagePreview" style="max-width:100%; display:none; margin-top:8px; border-radius:12px;"></div>
+    <div class="form-group"><label>الخيارات</label><div id="optionsContainer"></div><button type="button" class="btn btn-outline" onclick="addOptionRow()" style="width:100%;">➕ إضافة خيار</button></div>
+    <button class="btn" onclick="saveProduct()" style="width:100%">حفظ</button>
+    <button class="btn" onclick="closeProductModal()" style="background:#95a5a6; margin-top:8px; width:100%">إلغاء</button>
+  </div>
+</div>
+
+<!-- مودال التصنيف -->
+<div id="categoryModal" class="modal" style="display:none">
+  <div class="modal-content">
+    <h3 id="categoryModalTitle">إضافة تصنيف</h3>
+    <input type="hidden" id="categoryId">
+    <div class="form-group"><label>اسم التصنيف</label><input type="text" id="categoryName" placeholder="مثال: مقبلات"></div>
+    <div class="form-group"><label>ترتيب العرض</label><input type="number" id="categoryOrder" placeholder="0" value="0"></div>
+    <button class="btn" onclick="saveCategory()" style="width:100%">حفظ</button>
+    <button class="btn" onclick="closeCategoryModal()" style="background:#95a5a6; margin-top:8px; width:100%">إلغاء</button>
+  </div>
+</div>
 
 <script>
   const tg = Telegram.WebApp; tg.ready();
@@ -72,10 +108,11 @@
   const API = 'https://delivery-dragon.vercel.app';
   const sidebar = document.getElementById('sidebar'), toggleBtn = document.getElementById('sidebarToggle');
   const links = document.querySelectorAll('.sidebar-link'), pageTitle = document.getElementById('pageTitle'), contentArea = document.getElementById('shopContent');
-  
+  let productCategories = [], editingProduct = null;
+
   toggleBtn.onclick = () => sidebar.classList.toggle('open');
   links.forEach(link => { link.onclick = (e) => { e.preventDefault(); links.forEach(l => l.classList.remove('active')); link.classList.add('active'); pageTitle.innerText = link.querySelector('span')?.innerText; loadPage(link.dataset.page); if (window.innerWidth <= 768) sidebar.classList.remove('open'); }; });
-  
+
   async function loadPage(page) {
     switch(page) {
       case 'overview': loadOverview(); break;
@@ -87,31 +124,142 @@
     }
   }
 
+  // نظرة عامة
   async function loadOverview() {
-    contentArea.innerHTML = '<div class="skeleton"></div>';
-    const [statsRes, ordersRes] = await Promise.all([fetch(`${API}/api/shop/stats`,{headers:{'X-Telegram-Init-Data':tg.initData}}), fetch(`${API}/api/shop/orders?archived=false`,{headers:{'X-Telegram-Init-Data':tg.initData}})]);
-    const stats = await statsRes.json(); const orders = await ordersRes.json();
-    contentArea.innerHTML = `<div class="kpi-grid">
-      <div class="kpi-card"><div class="kpi-value">${stats.today_orders||0}</div><div>طلبات اليوم</div></div>
-      <div class="kpi-card"><div class="kpi-value">${stats.today_revenue||0} ل.س</div><div>إيرادات اليوم</div></div>
-      <div class="kpi-card"><div class="kpi-value">${stats.active_orders||0}</div><div>طلبات نشطة</div></div>
-    </div>
-    <div class="card"><h3>آخر الطلبات</h3>${orders.slice(0,5).map(o=>`<div class="flex-between"><span>#${o.id} - ${o.customer_name}</span><span class="status-badge status-${o.status}">${o.status}</span></div>`).join('')}</div>`;
+    contentArea.innerHTML = '<div class="skeleton" style="height:200px;"></div>';
+    try {
+      const [statsRes, ordersRes] = await Promise.all([fetch(`${API}/api/shop/stats`,{headers:{'X-Telegram-Init-Data':tg.initData}}), fetch(`${API}/api/shop/orders?archived=false`,{headers:{'X-Telegram-Init-Data':tg.initData}})]);
+      const stats = await statsRes.json(); const orders = await ordersRes.json();
+      contentArea.innerHTML = `<div class="kpi-grid">
+        <div class="kpi-card"><div class="kpi-value">${stats.today_orders||0}</div><div>طلبات اليوم</div></div>
+        <div class="kpi-card"><div class="kpi-value">${stats.today_revenue||0} ل.س</div><div>إيرادات اليوم</div></div>
+        <div class="kpi-card"><div class="kpi-value">${stats.active_orders||0}</div><div>طلبات نشطة</div></div>
+      </div>
+      <div class="card"><h3>آخر الطلبات النشطة</h3>${orders.slice(0,5).map(o=>`<div class="flex-between"><span>#${o.id} - ${o.customer_name}</span><span class="status-badge status-${o.status}">${o.status}</span></div>`).join('')}</div>`;
+    } catch(e) { contentArea.innerHTML = '<div class="empty-state">تعذر تحميل البيانات</div>'; }
   }
 
-  async function loadOrders(archived) {
+  // الطلبات
+  async function loadOrders(archived = false) {
+    contentArea.innerHTML = '<div class="skeleton" style="height:200px;"></div>';
     const res = await fetch(`${API}/api/shop/orders?archived=${archived}`,{headers:{'X-Telegram-Init-Data':tg.initData}}); const orders = await res.json();
     let html = `<div class="tabs"><button class="tab ${!archived?'active':''}" onclick="loadOrders(false)">النشطة</button><button class="tab ${archived?'active':''}" onclick="loadOrders(true)">المؤرشفة</button></div>`;
-    orders.forEach(o => {
-      let items = JSON.parse(o.items).map(i=>`${i.name} ×${i.quantity}`).join('، ');
-      html += `<div class="order-card"><div class="order-header" onclick="this.nextElementSibling.classList.toggle('open')"><div><b>#${o.id}</b> - ${o.customer_name}</div><span class="status-badge status-${o.status}">${o.status}</span></div>
-        <div class="order-details"><p>📦 ${items}</p><p>💰 ${o.total_price} ل.س</p>${!archived?`<select onchange="updateOrderStatus('${o.id}', this.value)"><option value="preparing" ${o.status==='preparing'?'selected':''}>تحضير</option><option value="ready_for_pickup" ${o.status==='ready_for_pickup'?'selected':''}>جاهز للتوصيل</option></select>`:''}</div></div>`;
-    });
+    if (!orders.length) { html += '<div class="empty-state">لا توجد طلبات</div>'; } else {
+      orders.forEach(o => {
+        let items = []; try { items = typeof o.items === 'string' ? JSON.parse(o.items) : o.items; } catch(e) {}
+        const itemsText = items.map(i => `${i.name} ×${i.quantity}`).join('، ');
+        html += `<div class="order-card"><div class="order-header" onclick="this.nextElementSibling.classList.toggle('open')"><div><b>#${o.id}</b> - ${o.customer_name||'زبون'}</div><span class="status-badge status-${o.status}">${o.status}</span></div>
+          <div class="order-details"><p>📦 ${itemsText}</p><p>💰 ${o.total_price} ل.س</p><p>📍 ${o.address||''}</p>${o.rider_name?`<p>🛵 ${o.rider_name}</p>`:''}
+          ${!archived && o.status !== 'completed' && o.status !== 'rejected' ? `<div style="display:flex; gap:8px; margin-top:12px;"><select id="status-${o.id}"><option value="preparing" ${o.status==='preparing'?'selected':''}>تحضير</option><option value="ready_for_pickup" ${o.status==='ready_for_pickup'?'selected':''}>جاهز للتوصيل</option></select><button class="btn" onclick="updateOrderStatus('${o.id}')">تحديث</button></div>`:''}
+          </div></div>`;
+      });
+    }
     contentArea.innerHTML = html;
+    window.updateOrderStatus = async (orderId) => { const sel = document.getElementById(`status-${orderId}`); await fetch(`${API}/api/shop/orders/${orderId}/status`,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify({status:sel.value})}); loadOrders(archived); };
   }
-  window.updateOrderStatus = async (id, status) => { await fetch(`${API}/api/shop/orders/${id}/status`,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify({status})}); loadOrders(false); };
-  
-  // المنتجات والتصنيفات والإعدادات (موجودة في النسخ السابقة، سيتم دمجها في الرفع النهائي)
+
+  // المنتجات
+  async function loadProducts() {
+    contentArea.innerHTML = '<div class="skeleton" style="height:200px;"></div>';
+    const res = await fetch(`${API}/api/shop/products`,{headers:{'X-Telegram-Init-Data':tg.initData}}); const products = await res.json();
+    let html = `<div class="flex-between"><div class="search-bar"><input type="text" id="productSearch" placeholder="بحث عن منتج..."></div><button class="btn" onclick="openProductModal()"><i data-lucide="plus"></i> إضافة</button></div><div class="product-grid" id="productGrid">`;
+    products.forEach(p => {
+      html += `<div class="product-card">
+        ${p.image_url ? `<img src="${p.image_url}">` : '<div style="height:160px; background:#ddd; display:flex; align-items:center; justify-content:center;">📷</div>'}
+        <div class="product-info"><b>${p.name}</b><div class="price">${p.price} ل.س</div>
+          <div class="flex" style="margin-top:8px;"><button class="btn" onclick="editProduct(${p.id})">✏️</button><button class="btn btn-danger" onclick="deleteProduct(${p.id})">🗑️</button></div>
+        </div></div>`;
+    });
+    html += '</div>'; contentArea.innerHTML = html;
+    document.getElementById('productSearch')?.addEventListener('input', e => { const term = e.target.value.toLowerCase(); document.querySelectorAll('.product-card').forEach(c => c.style.display = c.innerText.toLowerCase().includes(term) ? 'block' : 'none'); });
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
+
+  function addOptionRow(optName='', optPrice='') {
+    const div = document.createElement('div'); div.className = 'option-row';
+    div.innerHTML = `<input type="text" placeholder="اسم الخيار" value="${optName}" class="opt-name" style="flex:2"><input type="number" placeholder="السعر الإضافي" value="${optPrice}" class="opt-price" style="flex:1"><button type="button" class="btn btn-danger" onclick="this.parentElement.remove()">🗑️</button>`;
+    document.getElementById('optionsContainer').appendChild(div);
+  }
+
+  function openProductModal(product=null) {
+    editingProduct = product;
+    document.getElementById('modalTitle').innerText = product ? 'تعديل منتج' : 'إضافة منتج';
+    document.getElementById('productId').value = product?.id || '';
+    document.getElementById('productName').value = product?.name || '';
+    document.getElementById('productPrice').value = product?.price || '';
+    document.getElementById('optionsContainer').innerHTML = '';
+    if (product?.options) { try { const opts = typeof product.options === 'string' ? JSON.parse(product.options) : product.options; if (Array.isArray(opts)) opts.forEach(o => addOptionRow(o.name, o.price)); } catch(e) {} }
+    const preview = document.getElementById('imagePreview');
+    if (product?.image_url) { preview.src = product.image_url; preview.style.display = 'block'; } else { preview.style.display = 'none'; }
+    loadProductCategoriesForSelect(product?.category_id);
+    document.getElementById('productModal').style.display = 'flex';
+  }
+
+  async function loadProductCategoriesForSelect(selectedId = null) {
+    const res = await fetch(`${API}/api/shop/product-categories`,{headers:{'X-Telegram-Init-Data':tg.initData}}); productCategories = await res.json();
+    const sel = document.getElementById('productCategory'); sel.innerHTML = '<option value="">بدون تصنيف</option>';
+    productCategories.forEach(c => { const opt = new Option(c.name, c.id); if (c.id === selectedId) opt.selected = true; sel.add(opt); });
+  }
+
+  function closeProductModal() { document.getElementById('productModal').style.display = 'none'; editingProduct = null; }
+
+  async function saveProduct() {
+    const id = document.getElementById('productId').value, name = document.getElementById('productName').value.trim(), price = parseFloat(document.getElementById('productPrice').value), category_id = document.getElementById('productCategory').value;
+    if (!name || isNaN(price)) return tg.showAlert('يرجى إدخال اسم المنتج وسعر صحيح');
+    const options = []; document.querySelectorAll('.option-row').forEach(row => { const n = row.querySelector('.opt-name')?.value.trim(); const p = parseFloat(row.querySelector('.opt-price')?.value)||0; if(n) options.push({name:n, price:p}); });
+    let image = null; const file = document.getElementById('productImage').files[0];
+    if (file) {
+      if (file.size > 5*1024*1024) return tg.showAlert('حجم الصورة كبير جداً');
+      const reader = new FileReader(); reader.onload = async (e) => { image = e.target.result; await submitProduct({name, price, category_id: category_id||null, image, options: options.length?JSON.stringify(options):null}); }; reader.readAsDataURL(file); return;
+    } else if (editingProduct?.image_url) image = editingProduct.image_url;
+    await submitProduct({name, price, category_id: category_id||null, image, options: options.length?JSON.stringify(options):null});
+  }
+
+  async function submitProduct(data) {
+    const id = document.getElementById('productId').value, url = id ? `${API}/api/shop/products/${id}` : `${API}/api/shop/products`, method = id ? 'PUT' : 'POST';
+    try { const res = await fetch(url, {method, headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData}, body:JSON.stringify(data)}); if(!res.ok) throw new Error((await res.json()).error); closeProductModal(); loadProducts(); }
+    catch(e) { tg.showAlert('❌ '+e.message); }
+  }
+
+  window.editProduct = async (id) => { const res = await fetch(`${API}/api/shop/products/${id}`,{headers:{'X-Telegram-Init-Data':tg.initData}}); if(res.ok) openProductModal(await res.json()); else tg.showAlert('تعذر تحميل المنتج'); };
+  window.deleteProduct = async (id) => { tg.showConfirm('حذف المنتج؟', async ok => { if(!ok) return; await fetch(`${API}/api/shop/products/${id}`,{method:'DELETE',headers:{'X-Telegram-Init-Data':tg.initData}}); loadProducts(); }); };
+  document.getElementById('productImage')?.addEventListener('change', (e) => { const file = e.target.files[0]; if(file) { const reader = new FileReader(); reader.onload = ev => { document.getElementById('imagePreview').src = ev.target.result; document.getElementById('imagePreview').style.display = 'block'; }; reader.readAsDataURL(file); } });
+
+  // التصنيفات
+  async function loadCategoriesList() {
+    const res = await fetch(`${API}/api/shop/product-categories`,{headers:{'X-Telegram-Init-Data':tg.initData}}); const cats = await res.json();
+    let html = `<button class="btn btn-block" onclick="openCategoryModal()">➕ إضافة تصنيف</button><div id="categoryList" style="margin-top:16px;">`;
+    cats.forEach(c => { html += `<div class="card flex-between"><div><b>${c.name}</b> (ترتيب: ${c.display_order})</div><div><button class="btn" onclick="editCategory(${c.id},'${c.name}',${c.display_order})">✏️</button><button class="btn btn-danger" onclick="deleteCategory(${c.id})">🗑️</button></div></div>`; });
+    html += '</div>'; contentArea.innerHTML = html;
+  }
+  function openCategoryModal(id=null, name='', order=0) { document.getElementById('categoryModalTitle').innerText = id ? 'تعديل تصنيف' : 'إضافة تصنيف'; document.getElementById('categoryId').value = id||''; document.getElementById('categoryName').value = name; document.getElementById('categoryOrder').value = order; document.getElementById('categoryModal').style.display = 'flex'; }
+  window.editCategory = (id, name, order) => openCategoryModal(id, name, order);
+  window.closeCategoryModal = () => document.getElementById('categoryModal').style.display = 'none';
+  async function saveCategory() {
+    const id = document.getElementById('categoryId').value, name = document.getElementById('categoryName').value.trim(), display_order = parseInt(document.getElementById('categoryOrder').value)||0;
+    if(!name) return tg.showAlert('اسم التصنيف مطلوب');
+    const url = id ? `${API}/api/shop/product-categories/${id}` : `${API}/api/shop/product-categories`, method = id ? 'PUT' : 'POST';
+    try { const res = await fetch(url, {method, headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData}, body:JSON.stringify({name, display_order})}); if(!res.ok) throw new Error((await res.json()).error); closeCategoryModal(); loadCategoriesList(); }
+    catch(e) { tg.showAlert('❌ '+e.message); }
+  }
+  window.deleteCategory = async (id) => { tg.showConfirm('حذف التصنيف؟', async ok => { if(!ok) return; await fetch(`${API}/api/shop/product-categories/${id}`,{method:'DELETE',headers:{'X-Telegram-Init-Data':tg.initData}}); loadCategoriesList(); }); };
+  document.getElementById('addCategoryBtn')?.addEventListener('click', ()=>openCategoryModal());
+  document.getElementById('addProductBtn')?.addEventListener('click', ()=>openProductModal());
+
+  // الإعدادات
+  async function loadSettings() {
+    const res = await fetch(`${API}/api/shop/profile`,{headers:{'X-Telegram-Init-Data':tg.initData}}); const shop = await res.json();
+    contentArea.innerHTML = `<div class="card"><h3>📍 موقع المتجر</h3><p id="currentLocation">${shop.latitude ? `✅ ${shop.latitude}, ${shop.longitude}` : '❌ غير محدد'}</p><button class="btn btn-block" onclick="updateShopLocation()"><i data-lucide="map-pin"></i> تحديث الموقع</button></div>`;
+  }
+  window.updateShopLocation = () => {
+    if (!navigator.geolocation) return tg.showAlert('متصفحك لا يدعم تحديد الموقع');
+    navigator.geolocation.getCurrentPosition(async pos => {
+      const {latitude, longitude} = pos.coords;
+      const res = await fetch(`${API}/api/shop/location`,{method:'PUT',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify({latitude, longitude})});
+      if(res.ok) { tg.showAlert('✅ تم تحديث الموقع'); loadSettings(); }
+      else { const err = await res.json(); tg.showAlert('❌ '+ (err.error||'فشل')); }
+    }, err => tg.showAlert('❌ فشل تحديد الموقع: '+err.message));
+  };
 
   loadOverview();
   if (typeof lucide !== 'undefined') lucide.createIcons();

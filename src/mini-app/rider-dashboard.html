@@ -11,7 +11,7 @@
   <style>
     * { margin:0; padding:0; box-sizing:border-box; font-family:'Tajawal', sans-serif; }
     body { background: var(--tg-theme-bg-color, #f0f2f5); color: var(--tg-theme-text-color, #1e1e2f); }
-    .app-header { display:flex; align-items:center; padding:16px 20px; background:rgba(255,255,255,0.8); backdrop-filter:blur(12px); border-bottom:1px solid rgba(0,0,0,0.05); }
+    .app-header { display:flex; align-items:center; padding:16px 20px; background:rgba(255,255,255,0.8); backdrop-filter:blur(12px); border-bottom:1px solid rgba(0,0,0,0.05); position:sticky; top:0; z-index:10; }
     .app-header h1 { font-size:1.8rem; color:#e67e22; margin-right:12px; }
     .back-btn { background:none; border:none; color:#e67e22; font-size:2rem; cursor:pointer; }
     .online-toggle { display:flex; align-items:center; gap:8px; margin-right:auto; }
@@ -26,18 +26,22 @@
     .stat-item { background:rgba(255,255,255,0.7); backdrop-filter:blur(8px); border-radius:16px; padding:12px; text-align:center; }
     .stat-value { font-size:1.5rem; font-weight:700; color:#e67e22; }
     .tabs { display:flex; gap:8px; margin-bottom:16px; }
-    .tab { flex:1; padding:12px; background:rgba(255,255,255,0.5); border-radius:30px; text-align:center; cursor:pointer; }
+    .tab { flex:1; padding:12px; background:rgba(255,255,255,0.5); border-radius:30px; text-align:center; cursor:pointer; border:1px solid rgba(0,0,0,0.05); }
     .tab.active { background:#e67e22; color:#fff; }
     .panel { display:none; }
     .panel.active { display:block; }
-    .order-card { background:rgba(255,255,255,0.7); backdrop-filter:blur(8px); border-radius:20px; padding:16px; margin-bottom:12px; }
+    .order-card { background:rgba(255,255,255,0.7); backdrop-filter:blur(8px); border-radius:20px; padding:16px; margin-bottom:12px; border:1px solid rgba(255,255,255,0.5); }
     .btn { background:#e67e22; color:#fff; border:none; padding:12px; border-radius:30px; cursor:pointer; }
     .btn-danger { background:#e74c3c; }
+    .btn-outline { background:transparent; border:1px solid #e67e22; color:#e67e22; }
+    .btn:disabled { background:#95a5a6; cursor:not-allowed; }
     .code-box { background:#f1c40f; padding:16px; border-radius:20px; margin:16px 0; text-align:center; }
     .code-value { font-size:2.5rem; font-weight:700; letter-spacing:8px; }
+    .verified-badge { background:#27ae60; color:#fff; padding:4px 12px; border-radius:30px; font-size:0.8rem; display:inline-block; }
     .map-mini { height:120px; border-radius:16px; background:#e9ecef; margin:12px 0; }
     .skeleton { height:120px; background:linear-gradient(90deg,#eee 25%,#ddd 50%,#eee 75%); background-size:200% 100%; animation:loading 1.5s infinite; border-radius:20px; }
     @keyframes loading { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+    .error-message { background:#e74c3c; color:#fff; padding:12px; border-radius:12px; margin:16px 0; }
   </style>
 </head>
 <body>
@@ -50,7 +54,7 @@
   </div>
 </div>
 <div class="container">
-  <div class="stats-grid">
+  <div class="stats-grid" id="statsContainer">
     <div class="stat-item"><span class="stat-value" id="todayOrders">0</span><br>طلبات اليوم</div>
     <div class="stat-item"><span class="stat-value" id="todayEarnings">0</span><br>ل.س اليوم</div>
     <div class="stat-item"><span class="stat-value" id="rating">-</span><br>التقييم</div>
@@ -75,7 +79,7 @@
   const onlineSwitch = document.getElementById('onlineSwitch'), onlineStatus = document.getElementById('onlineStatus');
   
   async function setOnlineStatus(isOnline) {
-    await fetch(`${API}/api/rider/online-status`,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify({is_online:isOnline})});
+    try { await fetch(`${API}/api/rider/online-status`,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify({is_online:isOnline})}); } catch(e){}
   }
   
   (async function init() {
@@ -100,52 +104,72 @@
   tabs.forEach(t => t.onclick = () => { tabs.forEach(x=>x.classList.remove('active')); t.classList.add('active'); document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active')); document.getElementById(t.dataset.tab+'Panel').classList.add('active'); if(t.dataset.tab==='available') loadAvailable(); else if(t.dataset.tab==='active') loadActive(); else if(t.dataset.tab==='history') loadHistory(); });
   
   async function loadStats() {
-    const r = await fetch(`${API}/api/rider/stats`,{headers:{'X-Telegram-Init-Data':tg.initData}}); const s = await r.json();
-    document.getElementById('todayOrders').innerText = s.today_orders||0;
-    document.getElementById('todayEarnings').innerText = s.today_earnings||0;
-    document.getElementById('rating').innerText = s.rating ? parseFloat(s.rating).toFixed(1) : '-';
+    try { const r = await fetch(`${API}/api/rider/stats`,{headers:{'X-Telegram-Init-Data':tg.initData}}); const s = await r.json(); document.getElementById('todayOrders').innerText = s.today_orders||0; document.getElementById('todayEarnings').innerText = s.today_earnings||0; document.getElementById('rating').innerText = s.rating ? parseFloat(s.rating).toFixed(1) : '-'; } catch(e){}
   }
   
   async function loadAvailable() {
     const c = document.getElementById('availablePanel'); c.innerHTML = '<div class="skeleton"></div>';
-    if (!onlineSwitch.checked) { c.innerHTML = '<div style="text-align:center;padding:40px"><h3>🔴 غير متصل</h3></div>'; return; }
+    if (!onlineSwitch.checked) { c.innerHTML = '<div style="text-align:center;padding:40px"><h3>🔴 غير متصل</h3><p>فعّل حالة الاتصال لاستقبال الطلبات</p></div>'; return; }
     try {
       await getCurrentPosition();
-      const res = await fetch(`${API}/api/rider/available-orders`,{headers:{'X-Telegram-Init-Data':tg.initData}}); const orders = await res.json();
-      if(!orders.length) { c.innerHTML = '<div style="text-align:center;padding:40px">لا توجد طلبات متاحة</div>'; return; }
+      const res = await fetch(`${API}/api/rider/available-orders`,{headers:{'X-Telegram-Init-Data':tg.initData}});
+      if(!res.ok) { c.innerHTML = `<div class="error-message">❌ خطأ ${res.status}</div>`; return; }
+      const orders = await res.json();
+      if(!orders.length) { c.innerHTML = '<div style="text-align:center;padding:40px"><h3>لا توجد طلبات متاحة</h3><p>ستظهر هنا الطلبات الجاهزة للتوصيل</p><button class="btn btn-outline" onclick="loadAvailable()">🔄 تحديث</button></div>'; return; }
       let html = '';
       orders.forEach(o => {
-        let dist = '-', eta = '-';
-        if (currentPosition && o.shop_lat && o.shop_lng) { const d = calculateDistance(currentPosition.lat, currentPosition.lng, o.shop_lat, o.shop_lng); dist = `${d} كم`; eta = `${Math.round(d*3)} دقيقة`; }
-        html += `<div class="order-card"><div class="flex-between"><div><b>#${o.id}</b> - ${o.shop_name}</div><span>${o.delivery_fee} ل.س</span></div><div>📍 ${o.address||o.shop_address}</div><div class="flex-between"><span>${dist}</span><span>${eta}</span></div><div class="flex" style="margin-top:12px;"><button class="btn" onclick="accept('${o.id}')">قبول</button><button class="btn btn-danger" onclick="reject('${o.id}')">رفض</button></div></div>`;
+        const shopName = o.shop_name || 'متجر'; const deliveryFee = o.delivery_fee || 0; const address = o.address || o.shop_address || ''; const category = o.category || ''; const shopLat = o.shop_lat || o.latitude; const shopLng = o.shop_lng || o.longitude;
+        let distance = '-', eta = '-';
+        if (currentPosition && shopLat && shopLng) { const dist = calculateDistance(currentPosition.lat, currentPosition.lng, shopLat, shopLng); distance = `${dist} كم`; eta = `${Math.round(dist*3)} دقيقة`; }
+        html += `<div class="order-card">
+          <div class="flex-between"><div><b>#${o.id}</b> - ${shopName}</div>${category?`<span class="badge">${category}</span>`:''}</div>
+          <div style="margin:8px 0;"><i data-lucide="map-pin"></i> ${address}</div>
+          <div class="flex-between"><span>💰 ${deliveryFee} ل.س</span><span><i data-lucide="clock"></i> ${eta} (${distance})</span></div>
+          <div class="flex" style="margin-top:12px;"><button class="btn" onclick="accept('${o.id}')" style="flex:1;">قبول</button><button class="btn btn-danger" onclick="rejectOrder('${o.id}')" style="flex:1;">رفض</button></div>
+        </div>`;
       });
       c.innerHTML = html;
-    } catch(e) { c.innerHTML = `<div class="error">❌ ${e.message}</div>`; }
+    } catch(e) { c.innerHTML = `<div class="error-message">❌ ${e.message}</div>`; }
     if(typeof lucide !== 'undefined') lucide.createIcons();
   }
   
   window.accept = async id => { tg.HapticFeedback.impactOccurred('heavy'); await fetch(`${API}/api/rider/accept-order`,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify({order_id:id})}); loadAvailable(); loadActive(); loadStats(); document.querySelector('[data-tab="active"]').click(); };
-  window.reject = async id => { tg.showConfirm('رفض الطلب؟', async ok => { if(ok) await fetch(`${API}/api/rider/reject-order`,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify({order_id:id})}); loadAvailable(); }); };
+  window.rejectOrder = async id => { tg.showConfirm('رفض الطلب؟', async ok => { if(ok) await fetch(`${API}/api/rider/reject-order`,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify({order_id:id})}); loadAvailable(); }); };
   
   async function loadActive() {
     const c = document.getElementById('activePanel'); c.innerHTML = '<div class="skeleton"></div>';
-    const r = await fetch(`${API}/api/rider/active-order`,{headers:{'X-Telegram-Init-Data':tg.initData}}); const o = await r.json();
-    if(!o) { c.innerHTML = '<div style="text-align:center;padding:40px">لا يوجد طلب نشط</div>'; return; }
-    const s = await fetch(`${API}/api/orders/${o.id}/status`,{headers:{'X-Telegram-Init-Data':tg.initData}}); const st = await s.json();
-    c.innerHTML = `<div class="order-card"><b>#${o.id}</b> - ${o.shop_name}<br>📞 ${o.customer_phone||''}<br>📍 ${o.address}<br>💰 ${o.delivery_fee} ل.س
-      <div class="code-box"><div>🔐 كود التأكيد</div><div class="code-value">${o.confirmation_code||'----'}</div>${st.code_verified?'<span class="verified-badge">✅ تم التحقق</span>':'<span>⏳ بانتظار الكود</span>'}</div>
-      <button class="btn" onclick="complete(${o.id})" ${!st.code_verified?'disabled':''}>تم التوصيل</button>
-      <button class="btn btn-danger" onclick="cancelOrder(${o.id})">تعذر التوصيل</button>
-    </div>`;
-    if(o.shop_lat&&o.shop_lng&&o.delivery_lat&&o.delivery_lng){ setTimeout(()=>{ const mapEl=document.createElement('div'); mapEl.className='map-mini'; c.querySelector('.order-card').appendChild(mapEl); const map=L.map(mapEl).setView([o.shop_lat,o.shop_lng],13); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map); L.marker([o.shop_lat,o.shop_lng]).addTo(map).bindPopup('🏪'); L.marker([o.delivery_lat,o.delivery_lng]).addTo(map).bindPopup('📍'); },100); }
+    try {
+      const r = await fetch(`${API}/api/rider/active-order`,{headers:{'X-Telegram-Init-Data':tg.initData}}); const o = await r.json();
+      if(!o) { c.innerHTML = '<div style="text-align:center;padding:40px">لا يوجد طلب نشط</div>'; return; }
+      const s = await fetch(`${API}/api/orders/${o.id}/status`,{headers:{'X-Telegram-Init-Data':tg.initData}}); const st = await s.json();
+      const isVerified = st.code_verified;
+      c.innerHTML = `<div class="order-card">
+        <div class="flex-between"><b>#${o.id}</b><span class="badge">${o.shop_name||'متجر'}</span></div>
+        <div class="flex-between"><span>📞 ${o.customer_phone||''}</span><button class="btn-outline" onclick="tg.openLink('tel:${o.shop_phone}')"><i data-lucide="phone"></i> المتجر</button></div>
+        <div class="map-mini" id="miniMap"></div>
+        <div class="code-box"><span>🔐 كود التأكيد</span><span class="code-value" id="confirmCode">${o.confirmation_code||'----'}</span><button class="btn-outline" onclick="copyCode()"><i data-lucide="copy"></i></button></div>
+        ${isVerified ? '<span class="verified-badge">✅ تم التحقق من الكود</span>' : '<span style="color:#e67e22;">⏳ بانتظار إدخال الزبون للكود</span>'}
+        <button class="btn" onclick="complete(${o.id})" ${!isVerified ? 'disabled' : ''} style="width:100%; margin-top:8px;">تم التوصيل</button>
+        <button class="btn btn-danger" onclick="cancelOrder(${o.id})" style="width:100%; margin-top:4px;">تعذر التوصيل</button>
+        ${!isVerified ? '<p style="margin-top:8px; color:#e74c3c;">⚠️ لا يمكن إنهاء الطلب حتى يدخل الزبون الكود</p>' : ''}
+      </div>`;
+      if (o.shop_lat && o.shop_lng && o.delivery_lat && o.delivery_lng) {
+        setTimeout(() => { const mapEl = document.getElementById('miniMap'); if(mapEl) { const map = L.map(mapEl).setView([o.shop_lat, o.shop_lng], 13); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map); L.marker([o.shop_lat, o.shop_lng]).addTo(map).bindPopup('🏪 المتجر'); L.marker([o.delivery_lat, o.delivery_lng]).addTo(map).bindPopup('📍 الزبون'); } }, 100);
+      }
+    } catch(e) { c.innerHTML = `<div class="error-message">❌ ${e.message}</div>`; }
+    if(typeof lucide !== 'undefined') lucide.createIcons();
   }
+  
+  window.copyCode = () => { const code = document.getElementById('confirmCode')?.innerText; if(code) navigator.clipboard?.writeText(code).then(() => tg.showPopup({ message: 'تم نسخ الكود' })); };
   window.complete = async id => { await fetch(`${API}/api/rider/complete-order`,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify({order_id:id})}); loadActive(); loadStats(); document.querySelector('[data-tab="available"]').click(); };
-  window.cancelOrder = async id => { tg.showConfirm('تعذر التوصيل؟', async ok => { if(ok) await fetch(`${API}/api/rider/cancel-order`,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify({order_id:id})}); loadActive(); loadAvailable(); }); };
+  window.cancelOrder = async id => { tg.showConfirm('تعذر التوصيل؟', async ok => { if(ok){ const reason = prompt('سبب الإلغاء:'); await fetch(`${API}/api/rider/cancel-order`,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify({order_id:id, reason})}); loadActive(); loadAvailable(); } }); };
   
   async function loadHistory() {
     const c = document.getElementById('historyPanel'); c.innerHTML = '<div class="skeleton"></div>';
-    const r = await fetch(`${API}/api/rider/history`,{headers:{'X-Telegram-Init-Data':tg.initData}}); const orders = await r.json();
-    c.innerHTML = orders.length ? orders.map(o=>`<div class="order-card"><b>#${o.id}</b> - ${o.shop_name}<br>💰 ${o.total_price} ل.س<br>📅 ${new Date(o.created_at).toLocaleDateString('ar-SY')}</div>`).join('') : '<div style="text-align:center;padding:40px">لا سجل</div>';
+    try {
+      const r = await fetch(`${API}/api/rider/history`,{headers:{'X-Telegram-Init-Data':tg.initData}}); const orders = await r.json();
+      c.innerHTML = orders.length ? orders.map(o=>`<div class="order-card"><div class="flex-between"><b>#${o.id}</b><span>${o.total_price} ل.س</span></div><div>${o.shop_name}</div><div>📅 ${new Date(o.created_at).toLocaleDateString('ar-SY')}</div></div>`).join('') : '<div style="text-align:center;padding:40px">لا يوجد سجل طلبات</div>';
+    } catch(e) { c.innerHTML = `<div class="error-message">❌ ${e.message}</div>`; }
   }
 </script>
 </body>
