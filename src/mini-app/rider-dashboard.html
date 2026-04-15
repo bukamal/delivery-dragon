@@ -6,7 +6,7 @@
   <title>شاهين | لوحة السائق</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=2.0.0">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
@@ -56,7 +56,7 @@
       <i data-lucide="message-circle" style="font-size:48px; color:var(--primary);"></i>
       <h3 style="margin:16px 0;">الدعم الفني</h3>
       <p>تواصل مع فريق الدعم للإبلاغ عن مشكلة أو طرح استفسار.</p>
-      <button class="btn btn-block" onclick="location.href='support.html'" style="margin-top:20px;">💬 فتح المحادثة</button>
+      <button class="btn btn-block" onclick="location.href='support.html'">💬 فتح المحادثة</button>
     </div>
   </div>
 </div>
@@ -77,7 +77,7 @@
         headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData },
         body: JSON.stringify({ is_online: isOnline })
       });
-    } catch(e) { console.error('Online status error:', e); }
+    } catch(e) { console.error(e); }
     if (document.querySelector('.tab.active').dataset.tab === 'available') loadAvailable();
   });
   
@@ -115,7 +115,7 @@
       document.getElementById('todayOrders').innerText = stats.today_orders || 0;
       document.getElementById('todayEarnings').innerText = stats.today_earnings || 0;
       document.getElementById('rating').innerText = stats.rating ? parseFloat(stats.rating).toFixed(1) : '-';
-    } catch(e) { console.error('Stats error:', e); }
+    } catch(e) {}
   }
   
   async function loadAvailable() {
@@ -132,62 +132,43 @@
       const res = await fetch(`${API}/api/rider/available-orders`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
       
       if (!res.ok) {
-        const err = await res.json();
-        console.error('Available orders error:', err);
-        c.innerHTML = `<div class="error-message">❌ خطأ ${res.status}: ${err.error || 'تعذر جلب الطلبات'}</div>`;
+        const err = await res.text();
+        c.innerHTML = `<div class="error-message">❌ خطأ ${res.status}: ${err}</div>`;
         return;
       }
       
       const orders = await res.json();
-      console.log('Available orders received:', orders.length, orders);
       
       if(!orders.length) {
-        c.innerHTML = `<div class="empty-state">
-          <i data-lucide="package" style="font-size:48px; opacity:0.5;"></i>
-          <h3>لا توجد طلبات متاحة حالياً</h3>
-          <p>ستظهر هنا الطلبات الجاهزة للتوصيل</p>
-          <button class="btn btn-outline" onclick="loadAvailable()" style="margin-top:16px;"><i data-lucide="refresh-cw"></i> تحديث</button>
-        </div>`;
+        c.innerHTML = `<div class="empty-state"><i data-lucide="package"></i><h3>لا توجد طلبات متاحة</h3><button class="btn btn-outline" onclick="loadAvailable()">🔄 تحديث</button></div>`;
         if(typeof lucide !== 'undefined') lucide.createIcons();
         return;
       }
       
       let html = '';
-      for (const o of orders) {
+      orders.forEach(o => {
+        // التعامل مع جميع أسماء الحقول المحتملة
+        const shopName = o.shop_name || o.name || 'متجر';
+        const deliveryFee = o.delivery_fee || o.fee || 0;
+        const category = o.category || o.category_name || '';
+        const shopLat = o.shop_lat || o.latitude;
+        const shopLng = o.shop_lng || o.longitude;
+        
         let distance = '-', eta = '-';
-        if (currentPosition && o.shop_lat && o.shop_lng) {
-          const dist = calculateDistance(currentPosition.lat, currentPosition.lng, o.shop_lat, o.shop_lng);
+        if (currentPosition && shopLat && shopLng) {
+          const dist = calculateDistance(currentPosition.lat, currentPosition.lng, shopLat, shopLng);
           distance = `${dist} كم`; eta = `${Math.round(dist * 3)} دقيقة`;
         }
-        // التعامل مع الحقول المختلفة المحتملة (category / category_name)
-        const categoryName = o.category || o.category_name || 'متجر';
-        const shopImage = o.shop_image || o.image_url || 'https://via.placeholder.com/40';
         
         html += `<div class="order-card">
-          <div class="flex-between">
-            <div class="flex">
-              <img src="${shopImage}" style="width:40px; height:40px; border-radius:12px; object-fit:cover;" onerror="this.src='https://via.placeholder.com/40'">
-              <div>
-                <b>${o.shop_name || 'متجر'}</b><br>
-                <span class="badge">${categoryName}</span>
-              </div>
-            </div>
-            <span class="price">${o.delivery_fee || 0} ل.س</span>
-          </div>
-          <div class="flex-between" style="margin-top:8px;">
-            <span><i data-lucide="map-pin"></i> ${distance}</span>
-            <span><i data-lucide="clock"></i> ${eta}</span>
-          </div>
-          <div class="flex" style="margin-top:12px;">
-            <button class="btn btn-block" onclick="accept('${o.id}')">قبول</button>
-            <button class="btn btn-outline btn-block" onclick="rejectOrder('${o.id}')">رفض</button>
-          </div>
+          <div class="flex-between"><div class="flex"><div style="width:40px; height:40px; background:var(--gray-200); border-radius:12px; display:flex; align-items:center; justify-content:center;">🏪</div><div><b>${shopName}</b>${category ? `<br><span class="badge">${category}</span>` : ''}</div></div><span class="price">${deliveryFee} ل.س</span></div>
+          <div class="flex-between"><span><i data-lucide="map-pin"></i> ${distance}</span><span><i data-lucide="clock"></i> ${eta}</span></div>
+          <div class="flex"><button class="btn btn-block" onclick="accept('${o.id}')">قبول</button><button class="btn btn-outline btn-block" onclick="rejectOrder('${o.id}')">رفض</button></div>
         </div>`;
-      }
+      });
       c.innerHTML = html;
     } catch(e) {
-      console.error('Load available error:', e);
-      c.innerHTML = `<div class="error-message">❌ خطأ في الاتصال: ${e.message}</div>`;
+      c.innerHTML = `<div class="error-message">❌ استثناء: ${e.message}</div>`;
     }
     if(typeof lucide !== 'undefined') lucide.createIcons();
   }
@@ -213,9 +194,9 @@
         <div class="flex-between"><span>📞 ${o.customer_phone || ''}</span><button class="btn-outline" onclick="tg.openLink('tel:${o.shop_phone}')"><i data-lucide="phone"></i> المتجر</button></div>
         <div class="map-mini" id="miniMap"></div>
         <div class="code-box"><span>🔐 كود التأكيد</span><span class="code-value" id="confirmCode">${o.confirmation_code || '----'}</span><button class="btn-outline" onclick="copyCode()"><i data-lucide="copy"></i></button></div>
-        ${isVerified ? '<span class="verified-badge">✅ تم التحقق من الكود</span>' : '<span style="color:var(--primary);">⏳ بانتظار إدخال الزبون للكود</span>'}
-        <button class="btn btn-block" onclick="complete(${o.id})" ${!isVerified ? 'disabled' : ''}><i data-lucide="check-circle"></i> تم التوصيل</button>
-        <button class="btn btn-danger btn-block" onclick="cancelOrder(${o.id})"><i data-lucide="x"></i> تعذر التوصيل</button>
+        ${isVerified ? '<span class="verified-badge">✅ تم التحقق</span>' : '<span>⏳ بانتظار الكود</span>'}
+        <button class="btn btn-block" onclick="complete(${o.id})" ${!isVerified ? 'disabled' : ''}>تم التوصيل</button>
+        <button class="btn btn-danger btn-block" onclick="cancelOrder(${o.id})">تعذر التوصيل</button>
       </div>`;
       if(typeof lucide !== 'undefined') lucide.createIcons();
       if (o.shop_lat && o.shop_lng && o.delivery_lat && o.delivery_lng) {
@@ -224,7 +205,7 @@
           if(mapEl) { const map = L.map(mapEl).setView([o.shop_lat, o.shop_lng], 13); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map); L.marker([o.shop_lat, o.shop_lng]).addTo(map).bindPopup('🏪 المتجر'); L.marker([o.delivery_lat, o.delivery_lng]).addTo(map).bindPopup('📍 الزبون'); }
         }, 100);
       }
-    } catch(e) { console.error('Active order error:', e); }
+    } catch(e) { c.innerHTML = `<div class="error-message">❌ ${e.message}</div>`; }
   }
   
   window.copyCode = () => { const code = document.getElementById('confirmCode')?.innerText; if(code) navigator.clipboard?.writeText(code).then(() => tg.showPopup({ message: 'تم نسخ الكود' })); };
@@ -238,7 +219,7 @@
       const orders = await r.json();
       if(!orders.length) { c.innerHTML = '<div class="empty-state"><p>لا يوجد سجل طلبات</p></div>'; return; }
       c.innerHTML = orders.map(o => `<div class="card"><div class="flex-between"><b>#${o.id}</b><span>${o.total_price} ل.س</span></div><div>${o.shop_name}</div><div>📅 ${new Date(o.created_at).toLocaleDateString('ar-SY')}</div></div>`).join('');
-    } catch(e) { console.error('History error:', e); }
+    } catch(e) { c.innerHTML = `<div class="error-message">❌ ${e.message}</div>`; }
   }
   
   loadStats(); loadAvailable();
