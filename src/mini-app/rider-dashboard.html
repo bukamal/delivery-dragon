@@ -72,15 +72,30 @@
   const onlineSwitch = document.getElementById('onlineSwitch');
   const onlineStatus = document.getElementById('onlineStatus');
   
-  // حالة الاتصال
+  // دالة لضبط حالة الاتصال
+  async function setOnlineStatus(isOnline) {
+    try {
+      await fetch(`${API}/api/rider/online-status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData },
+        body: JSON.stringify({ is_online: isOnline })
+      });
+    } catch(e) { console.error('Online status error:', e); }
+  }
+  
+  // عند تحميل الصفحة، نضمن أن السائق متصل
+  (async function initialize() {
+    onlineStatus.innerHTML = '🟢 متصل';
+    onlineSwitch.checked = true;
+    await setOnlineStatus(true);
+    loadStats();
+    loadAvailable();
+  })();
+  
   onlineSwitch.addEventListener('change', async () => {
     const isOnline = onlineSwitch.checked;
     onlineStatus.innerHTML = isOnline ? '🟢 متصل' : '🔴 غير متصل';
-    await fetch(`${API}/api/rider/online-status`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData },
-      body: JSON.stringify({ is_online: isOnline })
-    }).catch(e => console.error(e));
+    await setOnlineStatus(isOnline);
     if (document.querySelector('.tab.active').dataset.tab === 'available') loadAvailable();
   });
   
@@ -250,9 +265,6 @@
       c.innerHTML = orders.map(o => `<div class="card"><b>#${o.id}</b> - ${o.shop_name}<br>💰 ${o.total_price} ل.س<br>📅 ${new Date(o.created_at).toLocaleDateString('ar-SY')}</div>`).join('');
     } catch(e) { c.innerHTML = `<div class="error-message">❌ ${e.message}</div>`; }
   }
-  
-  loadStats(); loadAvailable();
-  setInterval(() => { if (document.querySelector('.tab.active')?.dataset.tab === 'available') loadAvailable(); else if (document.querySelector('.tab.active')?.dataset.tab === 'active') loadActive(); }, 15000);
 </script>
 </body>
 </html>
