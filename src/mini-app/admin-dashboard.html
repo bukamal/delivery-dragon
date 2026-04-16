@@ -549,9 +549,24 @@
     await fetch(`${API}/api/admin/orders/${id}/reject`, { method: 'POST', headers: { 'X-Telegram-Init-Data': tg.initData } });
     loadPendingOrders();
   };
-  window.viewScreenshot = (orderId) => {
-    const url = `${API}/api/admin/orders/${orderId}/screenshot`;
-    window.open(url, '_blank');
+  // دالة عرض الإيصال مع المصادقة
+  window.viewScreenshot = async (orderId) => {
+    tg.showPopup({ title: '⏳ جاري تحميل الإيصال...', message: 'يرجى الانتظار' });
+    try {
+      const response = await fetch(`${API}/api/admin/orders/${orderId}/screenshot`, {
+        headers: { 'X-Telegram-Init-Data': tg.initData }
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'فشل تحميل الإيصال');
+      }
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      window.open(blobUrl, '_blank');
+      tg.showPopup({ title: '✅ تم فتح الإيصال', message: 'إذا لم يظهر، تأكد من عدم حظر النوافذ المنبثقة.' });
+    } catch (error) {
+      tg.showAlert(`❌ ${error.message}`);
+    }
   };
 
   async function loadShops() {
