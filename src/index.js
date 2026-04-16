@@ -124,7 +124,7 @@ async function notifyRiders(orderId) {
   } catch(e){ console.error('Notify riders error:',e); }
 }
 
-// 🆕 إشعار الأدمن عند اكتمال الطلب
+// إشعار الأدمن عند اكتمال الطلب
 async function notifyAdmin(orderId, status) {
   try {
     if (!ADMIN_ID) return;
@@ -151,7 +151,7 @@ async function notifyAdmin(orderId, status) {
   }
 }
 
-// 🆕 إشعار السائق إذا ألغي الطلب من قبل الأدمن أو المتجر
+// إشعار السائق إذا ألغي الطلب من قبل الأدمن أو المتجر
 async function notifyRiderIfCancelled(orderId, reason = '') {
   try {
     const order = await pool.query(
@@ -611,7 +611,7 @@ app.post('/api/rider/complete-order', async (req, res) => {
     await pool.query(`UPDATE orders SET platform_commission=$1, shop_net=$2, rider_fee=$3 WHERE id=$4`, [platformCommission, shopNet, riderFee, order_id]);
     await pool.query(`INSERT INTO financial_transactions (order_id, transaction_type, amount) VALUES ($1,'platform_fee',$2),($1,'shop_payout',$3),($1,'rider_payout',$4)`, [order_id, platformCommission, shopNet, riderFee]);
     await notifyCustomer(order_id, 'completed');
-    await notifyAdmin(order_id, 'completed');   // 🆕 إشعار الأدمن
+    await notifyAdmin(order_id, 'completed');   // إشعار الأدمن
     const shopOwner = await pool.query(`SELECT u.chat_id FROM users u JOIN shops s ON u.id = s.owner_id WHERE s.id = (SELECT shop_id FROM orders WHERE id = $1)`, [order_id]);
     if (shopOwner.rows[0]?.chat_id) { await bot.api.sendMessage(shopOwner.rows[0].chat_id, `✅ *تم توصيل الطلب #${order_id} بنجاح*\nصافي المبلغ المستحق لك: ${shopNet} ل.س`, { parse_mode: 'Markdown' }); }
     res.json({ success: true });
@@ -627,7 +627,7 @@ app.post('/api/rider/cancel-order', async (req, res) => {
     if (result.rowCount === 0) return res.status(400).json({ error: 'Order not found or not yours' });
     if (reason) await pool.query(`UPDATE orders SET cancel_reason=$1 WHERE id=$2`, [reason, order_id]);
     await notifyCustomer(order_id, 'ready_for_pickup');
-    await notifyRiders(order_id); // 🆕 إعلام باقي السائقين بالطلب المتاح مجدداً
+    await notifyRiders(order_id); // إعلام باقي السائقين بالطلب المتاح مجدداً
     res.json({ success: true });
   } catch(error) { res.status(500).json({ error: error.message }); }
 });
@@ -661,23 +661,45 @@ app.post('/api/admin/orders/:orderId/reject', async (req, res) => {
     const { orderId } = req.params;
     await pool.query(`UPDATE orders SET status='rejected' WHERE id=$1`, [orderId]);
     await notifyCustomer(orderId, 'rejected');
-    await notifyRiderIfCancelled(orderId, 'تم رفض الطلب من قبل الإدارة'); // 🆕 إشعار السائق
+    await notifyRiderIfCancelled(orderId, 'تم رفض الطلب من قبل الإدارة'); // إشعار السائق
     res.json({ success: true });
   } catch(error) { res.status(500).json({ error: error.message }); }
 });
+// مسار عرض لقطة الإيصال - يقوم الخادم بجلب الصورة من تيليجرام وإعادتها لتجنب CORS
 app.get('/api/admin/orders/:orderId/screenshot', requireAuth, async (req, res) => {
   try {
     const tgUser = req.tgUser;
     const dbUser = await getDbUser(tgUser.id);
     if (dbUser?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+
     const { orderId } = req.params;
     const order = await pool.query('SELECT screenshot_file_id FROM orders WHERE id = $1', [orderId]);
-    if (!order.rows[0] || !order.rows[0].screenshot_file_id) return res.status(404).json({ error: 'No screenshot found' });
+    if (!order.rows[0] || !order.rows[0].screenshot_file_id) {
+      return res.status(404).json({ error: 'No screenshot found' });
+    }
+
     const fileId = order.rows[0].screenshot_file_id;
+    await ensureBotInitialized();
     const file = await bot.api.getFile(fileId);
     const fileUrl = `https://api.telegram.org/file/bot${process.env.BOT_TOKEN}/${file.file_path}`;
-    res.redirect(fileUrl);
-  } catch (error) { console.error('Screenshot fetch error:', error); res.status(500).json({ error: error.message }); }
+
+    // جلب الصورة من تيليجرام
+    const response = await fetch(fileUrl);
+    if (!response.ok) {
+      return res.status(502).json({ error: 'Failed to fetch image from Telegram' });
+    }
+
+    const buffer = await response.buffer();
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Length', buffer.length);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.send(buffer);
+  } catch (error) {
+    console.error('Screenshot fetch error:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 app.get('/api/admin/finance', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' }); const summary = await pool.query(`SELECT (SELECT COALESCE(SUM(platform_commission),0) FROM orders WHERE status='completed') as total_platform_fees, (SELECT COALESCE(SUM(amount),0) FROM financial_transactions WHERE transaction_type='shop_payout' AND status='pending') as pending_shop_payouts, (SELECT COALESCE(SUM(amount),0) FROM financial_transactions WHERE transaction_type='rider_payout' AND status='pending') as pending_rider_payouts`); res.json(summary.rows[0]); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.get('/api/admin/shops', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' }); const shops = await pool.query(`SELECT s.*, u.name as owner_name, u.phone as owner_phone, c.name as category_name, ct.name as city_name FROM shops s JOIN users u ON s.owner_id=u.id LEFT JOIN shop_categories c ON s.category_id=c.id LEFT JOIN cities ct ON s.city_id=ct.id ORDER BY s.created_at DESC`); res.json(shops.rows); } catch(error) { res.status(500).json({ error: error.message }); } });
