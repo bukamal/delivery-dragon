@@ -439,7 +439,90 @@ app.get('/api/shop/orders', async (req, res) => {
     res.json(orders.rows);
   } catch(error) { res.status(500).json({ error: error.message }); }
 });
-app.post('/api/shop/orders/:orderId/status', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' }); const { status } = req.body; const { orderId } = req.params; await pool.query(`UPDATE orders SET status=$1 WHERE id=$2 AND shop_id=(SELECT id FROM shops WHERE owner_id=$3)`,[status, orderId, dbUser.id]); if (status==='ready_for_pickup') await notifyRiders(orderId); await notifyCustomer(orderId, status); res.json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
+
+// ==== مسار التحقق من كود استلام المتجر ====
+app.post('/api/shop/orders/:orderId/verify-pickup', requireAuth, async (req, res) => {
+  try {
+    const tgUser = req.tgUser;
+    const dbUser = await getDbUser(tgUser.id);
+    if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' });
+    
+    const { orderId } = req.params;
+    const { code } = req.body;
+    if (!code) return res.status(400).json({ error: 'الكود مطلوب' });
+    
+    // التحقق من أن الطلب يخص هذا المتجر
+    const shopCheck = await pool.query(
+      `SELECT o.id FROM orders o 
+       JOIN shops s ON o.shop_id = s.id 
+       WHERE o.id = $1 AND s.owner_id = $2`,
+      [orderId, dbUser.id]
+    );
+    if (!shopCheck.rows[0]) return res.status(403).json({ error: 'الطلب لا يخص متجرك' });
+    
+    const order = await pool.query(
+      `SELECT pickup_code, pickup_verified, status FROM orders WHERE id = $1`,
+      [orderId]
+    );
+    if (!order.rows[0]) return res.status(404).json({ error: 'الطلب غير موجود' });
+    if (order.rows[0].status !== 'delivering') {
+      return res.status(400).json({ error: 'الطلب ليس قيد التوصيل' });
+    }
+    if (order.rows[0].pickup_verified) {
+      return res.status(400).json({ error: 'تم التحقق من الكود مسبقاً' });
+    }
+    if (order.rows[0].pickup_code !== code) {
+      return res.status(400).json({ error: 'الكود غير صحيح' });
+    }
+    
+    await pool.query(
+      `UPDATE orders SET pickup_verified = true WHERE id = $1`,
+      [orderId]
+    );
+    
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/shop/orders/:orderId/status', async (req, res) => {
+  try {
+    const tgUser = req.tgUser;
+    const dbUser = await getDbUser(tgUser.id);
+    if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' });
+    const { status } = req.body;
+    const { orderId } = req.params;
+    
+    // إذا كانت الحالة المطلوبة هي ready_for_pickup، تأكد من أن pickup_verified = true
+    if (status === 'ready_for_pickup') {
+      const orderCheck = await pool.query(
+        `SELECT pickup_verified, status FROM orders WHERE id = $1`,
+        [orderId]
+      );
+      if (!orderCheck.rows[0]) return res.status(404).json({ error: 'الطلب غير موجود' });
+      if (orderCheck.rows[0].status !== 'delivering') {
+        return res.status(400).json({ error: 'يجب أن يكون الطلب قيد التوصيل أولاً' });
+      }
+      if (!orderCheck.rows[0].pickup_verified) {
+        return res.status(400).json({ error: 'يجب التحقق من كود الاستلام أولاً' });
+      }
+    }
+    
+    await pool.query(
+      `UPDATE orders SET status=$1 WHERE id=$2 AND shop_id=(SELECT id FROM shops WHERE owner_id=$3)`,
+      [status, orderId, dbUser.id]
+    );
+    
+    if (status === 'ready_for_pickup') {
+      await notifyRiders(orderId);
+    }
+    await notifyCustomer(orderId, status);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // ========== PRODUCT CATEGORIES ==========
 app.get('/api/shop/product-categories', async (req, res) => {
@@ -562,27 +645,67 @@ app.get('/api/rider/available-orders', async (req, res) => {
     res.json(orders.rows);
   } catch(error) { res.status(500).json({ error: error.message }); }
 });
+
+// ==== قبول الطلب من السائق (مع إنشاء كودين: للزبون وللمتجر) ====
 app.post('/api/rider/accept-order', async (req, res) => {
   try {
     const tgUser = req.tgUser;
     const dbUser = await getDbUser(tgUser.id);
     if (dbUser?.role !== 'rider') return res.status(403).json({ error: 'Forbidden' });
     const { order_id } = req.body;
-    const confirmationCode = Math.floor(1000 + Math.random() * 9000).toString();
+    
+    // إنشاء كودين منفصلين
+    const customerCode = Math.floor(1000 + Math.random() * 9000).toString();
+    const pickupCode = Math.floor(1000 + Math.random() * 9000).toString();
+    
     const result = await pool.query(
-      `UPDATE orders SET rider_id=$1, status='delivering', rider_accepted_at=NOW(), confirmation_code=$2, code_verified=false WHERE id=$3 AND rider_id IS NULL AND status='ready_for_pickup'`,
-      [dbUser.id, confirmationCode, order_id]
+      `UPDATE orders SET 
+        rider_id = $1, 
+        status = 'delivering', 
+        rider_accepted_at = NOW(), 
+        confirmation_code = $2, 
+        code_verified = false,
+        pickup_code = $3,
+        pickup_verified = false
+       WHERE id = $4 AND rider_id IS NULL AND status = 'ready_for_pickup'`,
+      [dbUser.id, customerCode, pickupCode, order_id]
     );
     if (result.rowCount === 0) return res.status(409).json({ error: 'Order already taken' });
+    
     await notifyCustomer(order_id, 'delivering');
-    const shopOwner = await pool.query(`SELECT u.chat_id FROM users u JOIN shops s ON u.id = s.owner_id WHERE s.id = (SELECT shop_id FROM orders WHERE id = $1)`, [order_id]);
+    
+    // إشعار المتجر بالكود
+    const shopOwner = await pool.query(
+      `SELECT u.chat_id, u.name FROM users u 
+       JOIN shops s ON u.id = s.owner_id 
+       WHERE s.id = (SELECT shop_id FROM orders WHERE id = $1)`,
+      [order_id]
+    );
     if (shopOwner.rows[0]?.chat_id) {
-      await bot.api.sendMessage(shopOwner.rows[0].chat_id, `🛵 *السائق ${dbUser.name} قبل طلبك #${order_id}*\nسيقوم بتوصيله قريباً.`, { parse_mode: 'Markdown' });
+      await bot.api.sendMessage(
+        shopOwner.rows[0].chat_id,
+        `🛵 *السائق ${dbUser.name} قبل طلبك #${order_id}*\n` +
+        `سيصل إلى المتجر قريباً لاستلام الطلب.\n\n` +
+        `🔐 *كود تأكيد الاستلام (للمتجر):* \`${pickupCode}\`\n\n` +
+        `⚠️ *لا تعطِ الكود للسائق إلا بعد أن تستلم الطلب فعلياً.*`,
+        { parse_mode: 'Markdown' }
+      );
     }
-    await bot.api.sendMessage(dbUser.chat_id, `✅ *تم قبول الطلب #${order_id}*\n\n🔐 *كود التأكيد:* \`${confirmationCode}\`\n\n📍 الرجاء مشاركة موقعك الحي (Live Location) من قائمة المرفقات 📎 لمدة 8 ساعات.\n\n⚠️ *لا تشارك الكود مع الزبون قبل استلام الطلب.*`, { parse_mode: 'Markdown' });
-    res.json({ success: true, confirmation_code: confirmationCode });
+    
+    // إشعار السائق بكود العميل
+    await bot.api.sendMessage(
+      dbUser.chat_id,
+      `✅ *تم قبول الطلب #${order_id}*\n\n` +
+      `🔐 *كود التأكيد (للعميل):* \`${customerCode}\`\n\n` +
+      `📍 الرجاء مشاركة موقعك المباشر.\n\n` +
+      `⚠️ *لا تشارك الكود مع العميل قبل استلام الطلب.*`,
+      { parse_mode: 'Markdown' }
+    );
+    
+    res.json({ success: true, confirmation_code: customerCode });
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
+
 app.post('/api/rider/reject-order', requireAuth, async (req, res) => {
   try {
     const tgUser = req.tgUser;
@@ -611,7 +734,7 @@ app.post('/api/rider/complete-order', async (req, res) => {
     await pool.query(`UPDATE orders SET platform_commission=$1, shop_net=$2, rider_fee=$3 WHERE id=$4`, [platformCommission, shopNet, riderFee, order_id]);
     await pool.query(`INSERT INTO financial_transactions (order_id, transaction_type, amount) VALUES ($1,'platform_fee',$2),($1,'shop_payout',$3),($1,'rider_payout',$4)`, [order_id, platformCommission, shopNet, riderFee]);
     await notifyCustomer(order_id, 'completed');
-    await notifyAdmin(order_id, 'completed');   // إشعار الأدمن
+    await notifyAdmin(order_id, 'completed');
     const shopOwner = await pool.query(`SELECT u.chat_id FROM users u JOIN shops s ON u.id = s.owner_id WHERE s.id = (SELECT shop_id FROM orders WHERE id = $1)`, [order_id]);
     if (shopOwner.rows[0]?.chat_id) { await bot.api.sendMessage(shopOwner.rows[0].chat_id, `✅ *تم توصيل الطلب #${order_id} بنجاح*\nصافي المبلغ المستحق لك: ${shopNet} ل.س`, { parse_mode: 'Markdown' }); }
     res.json({ success: true });
@@ -627,7 +750,7 @@ app.post('/api/rider/cancel-order', async (req, res) => {
     if (result.rowCount === 0) return res.status(400).json({ error: 'Order not found or not yours' });
     if (reason) await pool.query(`UPDATE orders SET cancel_reason=$1 WHERE id=$2`, [reason, order_id]);
     await notifyCustomer(order_id, 'ready_for_pickup');
-    await notifyRiders(order_id); // إعلام باقي السائقين بالطلب المتاح مجدداً
+    await notifyRiders(order_id);
     res.json({ success: true });
   } catch(error) { res.status(500).json({ error: error.message }); }
 });
@@ -661,11 +784,10 @@ app.post('/api/admin/orders/:orderId/reject', async (req, res) => {
     const { orderId } = req.params;
     await pool.query(`UPDATE orders SET status='rejected' WHERE id=$1`, [orderId]);
     await notifyCustomer(orderId, 'rejected');
-    await notifyRiderIfCancelled(orderId, 'تم رفض الطلب من قبل الإدارة'); // إشعار السائق
+    await notifyRiderIfCancelled(orderId, 'تم رفض الطلب من قبل الإدارة');
     res.json({ success: true });
   } catch(error) { res.status(500).json({ error: error.message }); }
 });
-// مسار عرض لقطة الإيصال - يقوم الخادم بجلب الصورة من تيليجرام وإعادتها لتجنب CORS
 app.get('/api/admin/orders/:orderId/screenshot', requireAuth, async (req, res) => {
   try {
     const tgUser = req.tgUser;
@@ -683,7 +805,6 @@ app.get('/api/admin/orders/:orderId/screenshot', requireAuth, async (req, res) =
     const file = await bot.api.getFile(fileId);
     const fileUrl = `https://api.telegram.org/file/bot${process.env.BOT_TOKEN}/${file.file_path}`;
 
-    // جلب الصورة من تيليجرام
     const response = await fetch(fileUrl);
     if (!response.ok) {
       return res.status(502).json({ error: 'Failed to fetch image from Telegram' });

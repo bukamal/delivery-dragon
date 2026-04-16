@@ -44,6 +44,12 @@
     @keyframes loading { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
     .error-message { color: #e74c3c; text-align: center; padding: 20px; }
     .loading-indicator { text-align: center; padding: 40px; }
+    .product-card { background:rgba(255,255,255,0.7); backdrop-filter:blur(16px); border-radius:20px; overflow:hidden; }
+    .product-card img { width:100%; height:140px; object-fit:cover; }
+    .product-info { padding:16px; }
+    .product-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(200px,1fr)); gap:20px; }
+    .form-group { margin-bottom:16px; }
+    input, select { width:100%; padding:14px; border-radius:40px; border:1px solid #ddd; background:rgba(255,255,255,0.5); }
   </style>
 </head>
 <body>
@@ -69,6 +75,20 @@
   </div>
 </div>
 
+<!-- Modal إدخال كود الاستلام -->
+<div id="pickupCodeModal" class="modal" style="display:none;">
+  <div class="modal-content">
+    <h3>🔐 أدخل كود الاستلام</h3>
+    <p>أدخل الكود المكون من 4 أرقام الذي وصلك من السائق</p>
+    <input type="text" id="pickupCodeInput" placeholder="مثال: 1234" maxlength="4" inputmode="numeric" style="width:100%; padding:16px; font-size:24px; text-align:center; letter-spacing:8px;">
+    <div style="display:flex; gap:10px; margin-top:20px;">
+      <button class="btn" onclick="verifyPickupCode()">تحقق</button>
+      <button class="btn" onclick="closePickupModal()" style="background:#95a5a6;">إلغاء</button>
+    </div>
+    <p id="pickupCodeError" class="error-message"></p>
+  </div>
+</div>
+
 <div id="productModal" class="modal" style="display:none"><div class="modal-content"><h3>إضافة منتج</h3><input type="hidden" id="productId"><div class="form-group"><input type="text" id="productName" placeholder="اسم المنتج"></div><div class="form-group"><input type="number" id="productPrice" placeholder="السعر"></div><div class="form-group"><select id="productCategory"></select></div><div class="form-group"><input type="file" id="productImage" accept="image/*"><img id="imagePreview" style="max-width:100%; display:none;"></div><div class="form-group"><div id="optionsContainer"></div><button type="button" class="btn" onclick="addOptionRow()">➕ إضافة خيار</button></div><button class="btn" onclick="saveProduct()">حفظ</button><button class="btn" onclick="closeProductModal()" style="background:#95a5a6;">إلغاء</button></div></div>
 <div id="categoryModal" class="modal" style="display:none"><div class="modal-content"><h3>إضافة تصنيف</h3><input type="hidden" id="categoryId"><input type="text" id="categoryName" placeholder="اسم التصنيف"><input type="number" id="categoryOrder" placeholder="الترتيب" value="0"><button class="btn" onclick="saveCategory()">حفظ</button><button class="btn" onclick="closeCategoryModal()" style="background:#95a5a6;">إلغاء</button></div></div>
 
@@ -80,13 +100,12 @@
   const links = document.querySelectorAll('.sidebar-link'), pageTitle = document.getElementById('pageTitle'), contentArea = document.getElementById('shopContent');
   let productCategories = [], editingProduct = null;
   let currentPage = 'overview', currentArchived = false;
+  let pendingOrderIdForPickup = null;
 
   toggleBtn.onclick = () => sidebar.classList.toggle('open');
   links.forEach(link => { link.onclick = (e) => { e.preventDefault(); links.forEach(l => l.classList.remove('active')); link.classList.add('active'); pageTitle.innerText = link.querySelector('span')?.innerText; currentPage = link.dataset.page; loadPage(currentPage); if (window.innerWidth <= 768) sidebar.classList.remove('open'); }; });
 
-  function refreshCurrentPage() {
-    loadPage(currentPage);
-  }
+  function refreshCurrentPage() { loadPage(currentPage); }
 
   async function loadPage(page) {
     contentArea.innerHTML = '<div class="loading-indicator"><div class="skeleton" style="height:80px;"></div><p>جاري التحميل...</p></div>';
@@ -126,10 +145,7 @@
     currentArchived = archived;
     try {
       const res = await fetch(`${API}/api/shop/orders?archived=${archived}`,{headers:{'X-Telegram-Init-Data':tg.initData}});
-      if (!res.ok) {
-        const err = await res.json().catch(()=>({error:'تعذر الاتصال بالخادم'}));
-        throw new Error(err.error || `خطأ ${res.status}`);
-      }
+      if (!res.ok) throw new Error((await res.json()).error || `خطأ ${res.status}`);
       const orders = await res.json();
       let html = `<div class="tabs"><button class="tab ${!archived?'active':''}" onclick="loadOrders(false)">النشطة</button><button class="tab ${archived?'active':''}" onclick="loadOrders(true)">المؤرشفة</button></div>`;
       if (!orders.length) {
@@ -149,15 +165,61 @@
     if (typeof lucide !== 'undefined') lucide.createIcons();
   }
 
-  window.updateOrderStatus = async (id, status) => {
-    try {
-      const res = await fetch(`${API}/api/shop/orders/${id}/status`,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify({status})});
-      if (!res.ok) throw new Error((await res.json()).error);
-      await loadOrders(currentArchived);
-    } catch(e) {
-      tg.showAlert('❌ ' + e.message);
+  window.updateOrderStatus = async (id, newStatus) => {
+    if (newStatus === 'ready_for_pickup') {
+      openPickupModal(id);
+    } else {
+      await submitStatusChange(id, newStatus);
     }
   };
+
+  async function submitStatusChange(orderId, status) {
+    try {
+      const res = await fetch(`${API}/api/shop/orders/${orderId}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData },
+        body: JSON.stringify({ status })
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      await loadOrders(currentArchived);
+    } catch (e) {
+      tg.showAlert('❌ ' + e.message);
+    }
+  }
+
+  function openPickupModal(orderId) {
+    pendingOrderIdForPickup = orderId;
+    document.getElementById('pickupCodeInput').value = '';
+    document.getElementById('pickupCodeError').innerText = '';
+    document.getElementById('pickupCodeModal').style.display = 'flex';
+  }
+  function closePickupModal() {
+    document.getElementById('pickupCodeModal').style.display = 'none';
+    pendingOrderIdForPickup = null;
+  }
+  async function verifyPickupCode() {
+    const code = document.getElementById('pickupCodeInput').value.trim();
+    if (!code || code.length !== 4) {
+      document.getElementById('pickupCodeError').innerText = 'الكود يجب أن يكون 4 أرقام';
+      return;
+    }
+    const orderId = pendingOrderIdForPickup;
+    if (!orderId) return;
+    try {
+      const verifyRes = await fetch(`${API}/api/shop/orders/${orderId}/verify-pickup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData },
+        body: JSON.stringify({ code })
+      });
+      if (!verifyRes.ok) throw new Error((await verifyRes.json()).error);
+      closePickupModal();
+      await submitStatusChange(orderId, 'ready_for_pickup');
+    } catch (e) {
+      document.getElementById('pickupCodeError').innerText = e.message;
+    }
+  }
+  window.verifyPickupCode = verifyPickupCode;
+  window.closePickupModal = closePickupModal;
 
   async function loadProducts() {
     try {
