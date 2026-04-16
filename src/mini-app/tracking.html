@@ -23,8 +23,23 @@
     .rider-info { background:rgba(0,0,0,0.02); padding:18px; border-radius:24px; margin:20px 0; display:flex; align-items:center; gap:18px; }
     .eta-badge { background:#e67e22; color:#fff; padding:10px 20px; border-radius:60px; text-align:center; font-weight:600; }
     .code-section { margin-top:24px; padding:20px; background:rgba(0,0,0,0.02); border-radius:24px; }
-    .otp-container { display:flex; gap:10px; justify-content:center; margin:18px 0; }
-    .otp-input { width:65px; height:65px; text-align:center; font-size:32px; border-radius:16px; border:1px solid #cbd5e1; background:rgba(255,255,255,0.5); }
+    .otp-container {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin: 18px 0;
+      direction: ltr;  /* يجعل ترتيب الصناديق من اليسار إلى اليمين */
+    }
+    .otp-input {
+      width: 65px;
+      height: 65px;
+      text-align: center;
+      font-size: 32px;
+      border-radius: 16px;
+      border: 1px solid #cbd5e1;
+      background: rgba(255,255,255,0.5);
+      direction: ltr;  /* إضافي لضمان ظهور المؤشر من اليسار */
+    }
     .verified-badge { background:#27ae60; color:#fff; padding:10px 20px; border-radius:40px; }
     .order-items { background:rgba(0,0,0,0.02); padding:16px; border-radius:20px; margin:18px 0; }
     .skeleton { height:120px; background:linear-gradient(90deg, #e0e4e8 25%, #f0f2f5 50%, #e0e4e8 75%); background-size:200% 100%; animation:loading 1.5s infinite; border-radius:24px; }
@@ -54,10 +69,10 @@
   <div id="codeSection" class="code-section" style="display:none;">
     <label style="font-weight:600;">🔐 أدخل كود التأكيد (من السائق)</label>
     <div class="otp-container">
-      <input type="text" class="otp-input" maxlength="1" id="otp1">
-      <input type="text" class="otp-input" maxlength="1" id="otp2">
-      <input type="text" class="otp-input" maxlength="1" id="otp3">
-      <input type="text" class="otp-input" maxlength="1" id="otp4">
+      <input type="text" class="otp-input" maxlength="1" id="otp1" inputmode="numeric">
+      <input type="text" class="otp-input" maxlength="1" id="otp2" inputmode="numeric">
+      <input type="text" class="otp-input" maxlength="1" id="otp3" inputmode="numeric">
+      <input type="text" class="otp-input" maxlength="1" id="otp4" inputmode="numeric">
     </div>
     <button class="btn" onclick="verifyCode()">تحقق من الكود</button>
     <p id="codeError" style="color:#e74c3c; margin-top:10px;"></p>
@@ -100,19 +115,16 @@
     const orderItemsDiv = document.getElementById('orderItems');
     
     try {
-      // 1. جلب حالة الطلب
       const statusRes = await fetch(`${API}/api/orders/${orderId}/status`, {
         headers: { 'X-Telegram-Init-Data': tg.initData }
       });
       if (!statusRes.ok) throw new Error('فشل جلب حالة الطلب');
       const statusData = await statusRes.json();
       
-      // تحديث الحالة العامة
       const status = statusData.status;
       statusEmoji.innerText = statusEmojis[status] || '⏳';
       statusMsg.innerText = statusMessages[status] || status;
       
-      // تحديث شريط التقدم
       document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
       if (status === 'paid') document.getElementById('stepPaid').classList.add('active');
       if (status === 'preparing') { document.getElementById('stepPaid').classList.add('active'); document.getElementById('stepPrep').classList.add('active'); }
@@ -120,7 +132,6 @@
       if (status === 'delivering') { document.getElementById('stepPaid').classList.add('active'); document.getElementById('stepPrep').classList.add('active'); document.getElementById('stepReady').classList.add('active'); document.getElementById('stepDeliver').classList.add('active'); }
       if (status === 'completed') document.querySelectorAll('.step').forEach(el => el.classList.add('active'));
 
-      // 2. محاولة جلب تفاصيل الطلب (اختياري، ولن يؤثر على عرض التتبع)
       try {
         const detailsRes = await fetch(`${API}/api/me/orders`, {
           headers: { 'X-Telegram-Init-Data': tg.initData }
@@ -141,7 +152,6 @@
         orderItemsDiv.innerHTML = '<p>تعذر تحميل تفاصيل الطلب</p>';
       }
 
-      // 3. التعامل مع حالة "التوصيل"
       if (status === 'delivering') {
         document.getElementById('codeSection').style.display = 'block';
         document.getElementById('riderInfo').style.display = 'block';
@@ -153,9 +163,13 @@
           document.querySelectorAll('.otp-input').forEach(i => i.style.display = 'none');
           document.querySelector('#codeSection .btn').style.display = 'none';
           document.getElementById('codeVerifiedMessage').style.display = 'block';
+        } else {
+          // إظهار الحقول إذا لم يتم التحقق
+          document.querySelectorAll('.otp-input').forEach(i => i.style.display = 'inline-block');
+          document.querySelector('#codeSection .btn').style.display = 'block';
+          document.getElementById('codeVerifiedMessage').style.display = 'none';
         }
 
-        // جلب الموقع و ETA
         const [locationRes, etaRes] = await Promise.all([
           fetch(`${API}/api/orders/${orderId}/location`, { headers: { 'X-Telegram-Init-Data': tg.initData } }),
           fetch(`${API}/api/orders/${orderId}/eta`, { headers: { 'X-Telegram-Init-Data': tg.initData } })
@@ -210,14 +224,31 @@
     else tg.showAlert('رقم السائق غير متوفر');
   };
 
-  // ربط مدخلات OTP
   const otpInputs = document.querySelectorAll('.otp-input');
   otpInputs.forEach((input, index) => {
-    input.oninput = (e) => { if (e.target.value && index < 3) otpInputs[index+1].focus(); };
-    input.onkeydown = (e) => { if (e.key === 'Backspace' && !e.target.value && index > 0) otpInputs[index-1].focus(); };
+    input.addEventListener('input', (e) => {
+      const value = e.target.value;
+      if (value && value.length === 1) {
+        if (index < otpInputs.length - 1) {
+          otpInputs[index + 1].focus();
+        }
+      }
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Backspace' && !e.target.value) {
+        if (index > 0) {
+          otpInputs[index - 1].focus();
+        }
+      }
+    });
+    // منع إدخال غير الأرقام
+    input.addEventListener('beforeinput', (e) => {
+      if (e.data && !/^\d+$/.test(e.data)) {
+        e.preventDefault();
+      }
+    });
   });
 
-  // بدء التحميل والتحديث التلقائي
   fetchData();
   setInterval(fetchData, 10000);
   document.getElementById('refreshBtn').onclick = fetchData;
