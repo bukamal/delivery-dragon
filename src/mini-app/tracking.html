@@ -27,67 +27,92 @@
     .otp-input { width:65px; height:65px; text-align:center; font-size:32px; border-radius:16px; border:1px solid #cbd5e1; background:rgba(255,255,255,0.5); }
     .verified-badge { background:#27ae60; color:#fff; padding:10px 20px; border-radius:40px; }
     .order-items { background:rgba(0,0,0,0.02); padding:16px; border-radius:20px; margin:18px 0; }
+    .skeleton { height:120px; background:linear-gradient(90deg, #e0e4e8 25%, #f0f2f5 50%, #e0e4e8 75%); background-size:200% 100%; animation:loading 1.5s infinite; border-radius:24px; }
+    @keyframes loading { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+    .error-message { color:#e74c3c; text-align:center; padding:20px; }
   </style>
 </head>
 <body>
 <div class="card">
   <div style="display:flex; justify-content:space-between;">
     <span style="font-weight:600;">طلب #<span id="orderId"></span></span>
-    <button class="btn-outline" id="refreshBtn" style="padding:8px 16px;"><i data-lucide="refresh-cw"></i></button>
+    <button class="btn-outline" id="refreshBtn" style="padding:8px 16px;" onclick="fetchData()"><i data-lucide="refresh-cw"></i></button>
   </div>
   <div class="status-icon" id="statusEmoji">⏳</div>
   <div class="status-text" id="statusMessage">جاري التحميل...</div>
   <div class="progress">
-    <div class="step" id="stepPaid">✅ مدفوع</div><div class="step" id="stepPrep">🍳 تحضير</div><div class="step" id="stepReady">📦 جاهز</div><div class="step" id="stepDeliver">🚴 توصيل</div>
+    <div class="step" id="stepPaid">✅ مدفوع</div>
+    <div class="step" id="stepPrep">🍳 تحضير</div>
+    <div class="step" id="stepReady">📦 جاهز</div>
+    <div class="step" id="stepDeliver">🚴 توصيل</div>
   </div>
-  <div id="orderItems" class="order-items"></div>
+  <div id="orderItems" class="order-items"><div class="skeleton"></div></div>
   <div id="riderInfo" style="display:none;"><div class="rider-info"><i data-lucide="bike"></i><div><b id="riderName"></b><br><span id="riderPhone"></span></div></div></div>
   <div id="etaDisplay" class="eta-badge" style="display:none;"></div>
   <div id="mapContainer"><div id="map"></div></div>
-  
+
   <div id="codeSection" class="code-section" style="display:none;">
     <label style="font-weight:600;">🔐 أدخل كود التأكيد (من السائق)</label>
     <div class="otp-container">
-      <input type="text" class="otp-input" maxlength="1" id="otp1"><input type="text" class="otp-input" maxlength="1" id="otp2"><input type="text" class="otp-input" maxlength="1" id="otp3"><input type="text" class="otp-input" maxlength="1" id="otp4">
+      <input type="text" class="otp-input" maxlength="1" id="otp1">
+      <input type="text" class="otp-input" maxlength="1" id="otp2">
+      <input type="text" class="otp-input" maxlength="1" id="otp3">
+      <input type="text" class="otp-input" maxlength="1" id="otp4">
     </div>
     <button class="btn" onclick="verifyCode()">تحقق من الكود</button>
     <p id="codeError" style="color:#e74c3c; margin-top:10px;"></p>
     <div id="codeVerifiedMessage" class="verified-badge" style="display:none;">✅ تم التحقق من الكود - شكراً لثقتك!</div>
   </div>
-  
-  <button class="btn" id="callDriverBtn" style="background:#3498db;"><i data-lucide="phone"></i> اتصال بالسائق</button>
+
+  <button class="btn" id="callDriverBtn" style="background:#3498db;" onclick="callDriver()"><i data-lucide="phone"></i> اتصال بالسائق</button>
 </div>
+
 <script>
-  const tg = Telegram.WebApp; tg.ready();
+  const tg = Telegram.WebApp;
+  tg.ready();
+  tg.expand();
   if (tg.BackButton) { tg.BackButton.show(); tg.BackButton.onClick(() => history.back()); }
   const API = 'https://delivery-dragon.vercel.app';
   const orderId = new URLSearchParams(location.search).get('order_id');
-  document.getElementById('orderId').innerText = orderId;
-  let map, marker, riderPhone;
+  document.getElementById('orderId').innerText = orderId || 'غير معروف';
+  if (!orderId) {
+    document.getElementById('statusMessage').innerText = 'رقم الطلب مفقود';
+  }
+
+  let map, marker, riderPhone = '';
   const statusEmojis = { paid:'💰', preparing:'👨‍🍳', ready_for_pickup:'📦', delivering:'🛵', completed:'✅' };
   const statusMessages = { paid:'مدفوع', preparing:'تحضير', ready_for_pickup:'جاهز', delivering:'توصيل', completed:'مكتمل' };
 
   function initMap(lat, lng) {
+    if (!lat || !lng) return;
+    const mapEl = document.getElementById('map');
     if (map) { map.setView([lat, lng], 15); marker.setLatLng([lat, lng]); }
-    else { document.getElementById('map').innerHTML = ''; map = L.map('map').setView([lat, lng], 15); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map); marker = L.marker([lat, lng]).addTo(map).bindPopup('📍 موقع السائق').openPopup(); }
+    else {
+      map = L.map('map').setView([lat, lng], 15);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+      marker = L.marker([lat, lng]).addTo(map).bindPopup('📍 موقع السائق').openPopup();
+    }
   }
 
   async function fetchData() {
+    const statusMsg = document.getElementById('statusMessage');
+    const statusEmoji = document.getElementById('statusEmoji');
+    const orderItemsDiv = document.getElementById('orderItems');
+    
     try {
-      const [statusRes, detailsRes] = await Promise.all([
-        fetch(`${API}/api/orders/${orderId}/status`, { headers: { 'X-Telegram-Init-Data': tg.initData } }),
-        fetch(`${API}/api/me/orders`, { headers: { 'X-Telegram-Init-Data': tg.initData } })
-      ]);
+      // 1. جلب حالة الطلب
+      const statusRes = await fetch(`${API}/api/orders/${orderId}/status`, {
+        headers: { 'X-Telegram-Init-Data': tg.initData }
+      });
+      if (!statusRes.ok) throw new Error('فشل جلب حالة الطلب');
       const statusData = await statusRes.json();
-      const orders = await detailsRes.json();
-      const order = orders.find(o => o.id == orderId);
-      if (order) {
-        const items = JSON.parse(order.items).map(i => `${i.name} ×${i.quantity}`).join('، ');
-        document.getElementById('orderItems').innerHTML = `<b>📦 الطلب:</b> ${items}<br><b>💰 الإجمالي:</b> ${order.total_price} ل.س`;
-      }
-      const status = statusData.status, codeVerified = statusData.code_verified;
-      document.getElementById('statusEmoji').innerText = statusEmojis[status] || '⏳';
-      document.getElementById('statusMessage').innerText = statusMessages[status] || status;
+      
+      // تحديث الحالة العامة
+      const status = statusData.status;
+      statusEmoji.innerText = statusEmojis[status] || '⏳';
+      statusMsg.innerText = statusMessages[status] || status;
+      
+      // تحديث شريط التقدم
       document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
       if (status === 'paid') document.getElementById('stepPaid').classList.add('active');
       if (status === 'preparing') { document.getElementById('stepPaid').classList.add('active'); document.getElementById('stepPrep').classList.add('active'); }
@@ -95,47 +120,107 @@
       if (status === 'delivering') { document.getElementById('stepPaid').classList.add('active'); document.getElementById('stepPrep').classList.add('active'); document.getElementById('stepReady').classList.add('active'); document.getElementById('stepDeliver').classList.add('active'); }
       if (status === 'completed') document.querySelectorAll('.step').forEach(el => el.classList.add('active'));
 
+      // 2. محاولة جلب تفاصيل الطلب (اختياري، ولن يؤثر على عرض التتبع)
+      try {
+        const detailsRes = await fetch(`${API}/api/me/orders`, {
+          headers: { 'X-Telegram-Init-Data': tg.initData }
+        });
+        if (detailsRes.ok) {
+          const orders = await detailsRes.json();
+          const order = orders.find(o => o.id == orderId);
+          if (order) {
+            let items = [];
+            try { items = JSON.parse(order.items); } catch(e) {}
+            const itemsText = items.map(i => `${i.name} ×${i.quantity}`).join('، ');
+            orderItemsDiv.innerHTML = `<b>📦 الطلب:</b> ${itemsText}<br><b>💰 الإجمالي:</b> ${order.total_price} ل.س`;
+          } else {
+            orderItemsDiv.innerHTML = '<p>تفاصيل الطلب غير متوفرة</p>';
+          }
+        }
+      } catch (e) {
+        orderItemsDiv.innerHTML = '<p>تعذر تحميل تفاصيل الطلب</p>';
+      }
+
+      // 3. التعامل مع حالة "التوصيل"
       if (status === 'delivering') {
         document.getElementById('codeSection').style.display = 'block';
-        if (codeVerified) {
+        document.getElementById('riderInfo').style.display = 'block';
+        document.getElementById('riderName').innerText = statusData.rider_name || 'غير معروف';
+        document.getElementById('riderPhone').innerText = statusData.rider_phone || '';
+        riderPhone = statusData.rider_phone;
+        
+        if (statusData.code_verified) {
           document.querySelectorAll('.otp-input').forEach(i => i.style.display = 'none');
           document.querySelector('#codeSection .btn').style.display = 'none';
           document.getElementById('codeVerifiedMessage').style.display = 'block';
         }
-        const [locationRes, etaRes] = await Promise.all([fetch(`${API}/api/orders/${orderId}/location`, { headers: { 'X-Telegram-Init-Data': tg.initData } }), fetch(`${API}/api/orders/${orderId}/eta`, { headers: { 'X-Telegram-Init-Data': tg.initData } })]);
-        const locationData = await locationRes.json(), etaData = await etaRes.json();
-        if (locationData.latitude) initMap(locationData.latitude, locationData.longitude);
-        if (statusData.rider_name) { document.getElementById('riderInfo').style.display = 'block'; document.getElementById('riderName').innerText = statusData.rider_name; document.getElementById('riderPhone').innerText = statusData.rider_phone || ''; riderPhone = statusData.rider_phone; }
-        document.getElementById('etaDisplay').style.display = 'block';
-        document.getElementById('etaDisplay').innerHTML = etaData.eta_minutes ? `⏱️ الوقت المقدر: ${etaData.eta_minutes} دقيقة (${Math.round(etaData.distance_km)} كم)` : etaData.message || 'جاري حساب الوقت...';
+
+        // جلب الموقع و ETA
+        const [locationRes, etaRes] = await Promise.all([
+          fetch(`${API}/api/orders/${orderId}/location`, { headers: { 'X-Telegram-Init-Data': tg.initData } }),
+          fetch(`${API}/api/orders/${orderId}/eta`, { headers: { 'X-Telegram-Init-Data': tg.initData } })
+        ]);
+        const locationData = await locationRes.json();
+        const etaData = await etaRes.json();
+        
+        if (locationData.latitude && locationData.longitude) {
+          initMap(locationData.latitude, locationData.longitude);
+          document.getElementById('mapContainer').style.display = 'block';
+        }
+        
+        const etaEl = document.getElementById('etaDisplay');
+        etaEl.style.display = 'block';
+        etaEl.innerHTML = etaData.eta_minutes ? 
+          `⏱️ الوقت المقدر: ${etaData.eta_minutes} دقيقة (${Math.round(etaData.distance_km)} كم)` : 
+          etaData.message || 'جاري حساب الوقت...';
       } else {
         document.getElementById('codeSection').style.display = 'none';
         document.getElementById('riderInfo').style.display = 'none';
         document.getElementById('etaDisplay').style.display = 'none';
+        document.getElementById('mapContainer').style.display = 'none';
       }
+
+    } catch (error) {
+      statusMsg.innerText = 'تعذر التحديث';
+      orderItemsDiv.innerHTML = `<div class="error-message">❌ ${error.message}</div>`;
+    } finally {
       if (typeof lucide !== 'undefined') lucide.createIcons();
-    } catch(e) {}
+    }
   }
 
   window.verifyCode = async () => {
     const code = Array.from(document.querySelectorAll('.otp-input')).map(i => i.value).join('');
     if (code.length !== 4) return tg.showAlert('أدخل الكود كاملاً');
     try {
-      const res = await fetch(`${API}/api/orders/${orderId}/verify-code`, { method:'POST', headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData}, body:JSON.stringify({ code }) });
+      const res = await fetch(`${API}/api/orders/${orderId}/verify-code`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},
+        body:JSON.stringify({ code })
+      });
       if (!res.ok) throw new Error((await res.json()).error);
-      tg.showAlert('✅ الكود صحيح!'); fetchData();
-    } catch(e) { document.getElementById('codeError').innerText = e.message; }
+      tg.showAlert('✅ الكود صحيح!');
+      fetchData();
+    } catch(e) {
+      document.getElementById('codeError').innerText = e.message;
+    }
   };
 
+  window.callDriver = () => {
+    if (riderPhone) tg.openLink(`tel:${riderPhone}`);
+    else tg.showAlert('رقم السائق غير متوفر');
+  };
+
+  // ربط مدخلات OTP
   const otpInputs = document.querySelectorAll('.otp-input');
   otpInputs.forEach((input, index) => {
     input.oninput = (e) => { if (e.target.value && index < 3) otpInputs[index+1].focus(); };
     input.onkeydown = (e) => { if (e.key === 'Backspace' && !e.target.value && index > 0) otpInputs[index-1].focus(); };
   });
 
-  fetchData(); setInterval(fetchData, 10000);
+  // بدء التحميل والتحديث التلقائي
+  fetchData();
+  setInterval(fetchData, 10000);
   document.getElementById('refreshBtn').onclick = fetchData;
-  document.getElementById('callDriverBtn').onclick = () => { if(riderPhone) tg.openLink(`tel:${riderPhone}`); else tg.showAlert('الرقم غير متوفر'); };
 </script>
 </body>
 </html>
