@@ -1,7 +1,37 @@
-<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><title>شاهين | تسجيل سائق</title><script src="https://telegram.org/js/telegram-web-app.js"></script><script src="https://unpkg.com/lucide@latest"></script><style>
-*{margin:0;padding:0;box-sizing:border-box;font-family:'Tajawal',sans-serif}body{background:var(--tg-theme-bg-color,#f0f2f5);color:var(--tg-theme-text-color,#1e1e2f);padding:16px}.app-header{display:flex;align-items:center;margin-bottom:24px}.back-btn{background:none;border:none;color:#e67e22;font-size:2rem;cursor:pointer}.container{max-width:500px;margin:0 auto}.form-group{margin-bottom:20px}label{display:block;margin-bottom:8px;font-weight:500}input,select{width:100%;padding:16px;border-radius:16px;border:1px solid #ccc;background:rgba(255,255,255,0.7);backdrop-filter:blur(4px)}.btn{background:#e67e22;color:#fff;border:none;padding:18px;border-radius:60px;width:100%;font-size:1.2rem;font-weight:700;cursor:pointer;margin-top:20px}
-</style></head><body><div class="app-header"><button class="back-btn" onclick="history.back()"><i data-lucide="arrow-right"></i></button><h1>🦅 تسجيل سائق</h1></div><div class="container"><form id="f"><div class="form-group"><label>اسمك</label><input id="name" required></div><div class="form-group"><label>رقم الهاتف</label><input type="tel" id="phone" required></div><div class="form-group"><label>نوع المركبة</label><select id="vehicle"><option value="دراجة">🚲 دراجة</option><option value="سيارة">🚗 سيارة</option></select></div><div class="form-group"><label>رقم اللوحة</label><input id="plate"></div><button type="submit" class="btn">تقديم الطلب</button></form></div><script>
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <title>شاهين | تسجيل سائق</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;font-family:'Tajawal',sans-serif}
+    body{background: linear-gradient(145deg, #f5f7fa 0%, #e9ecf2 100%);color:#1e1e2f;padding:20px}
+    .app-header{display:flex;align-items:center;margin-bottom:28px}
+    .back-btn{background:none;border:none;color:#e67e22;font-size:2rem;cursor:pointer}
+    h1{font-size:2rem;font-weight:800;background: linear-gradient(135deg, #e67e22, #f39c12);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-right:12px}
+    .container{max-width:500px;margin:0 auto}
+    .form-group{margin-bottom:22px}
+    label{display:block;margin-bottom:8px;font-weight:600}
+    input,select{width:100%;padding:16px;border-radius:60px;border:1px solid rgba(0,0,0,0.08);background:rgba(255,255,255,0.7);backdrop-filter:blur(8px)}
+    .btn{background:#e67e22;color:#fff;border:none;padding:18px;border-radius:60px;width:100%;font-size:1.2rem;font-weight:700;cursor:pointer;box-shadow:0 12px 20px rgba(230,126,34,0.2);margin-top:24px}
+  </style>
+</head>
+<body>
+<div class="app-header"><button class="back-btn" onclick="history.back()"><i data-lucide="arrow-right"></i></button><h1>🦅 تسجيل سائق</h1></div>
+<div class="container"><form id="f">
+  <div class="form-group"><label>اسمك</label><input id="name" required></div>
+  <div class="form-group"><label>رقم الهاتف</label><input type="tel" id="12" required></div>
+  <div class="form-group"><label>نوع المركبة</label><select id="vehicle"><option value="دراجة">🚲 دراجة</option><option value="سيارة">🚗 سيارة</option></select></div>
+  <div class="form-group"><label>رقم اللوحة</label><input id="plate"></div>
+  <button type="submit" class="btn">تقديم الطلب</button>
+</form></div>
+<script>
 const tg=Telegram.WebApp;tg.ready();tg.BackButton.show();tg.BackButton.onClick(()=>history.back());
 const API='https://delivery-dragon.vercel.app';
 document.getElementById('f').onsubmit=async e=>{ e.preventDefault(); const d={ name:document.getElementById('name').value, phone:document.getElementById('phone').value, vehicle_type:document.getElementById('vehicle').value, vehicle_number:document.getElementById('plate').value }; tg.MainButton.showProgress(); try{ const r=await fetch(`${API}/api/register/rider`,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify(d)}); if(!r.ok) throw new Error((await r.json()).error); tg.showAlert('✅ تم تقديم الطلب!'); tg.close(); }catch(e){ tg.MainButton.hideProgress(); tg.showAlert('❌ '+e.message); } };
-</script></body></html>
+</script>
+</body>
+</html>

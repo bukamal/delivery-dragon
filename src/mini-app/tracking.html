@@ -10,29 +10,29 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; font-family:'Tajawal', sans-serif; }
-    body { background: var(--tg-theme-bg-color, #f0f2f5); color: var(--tg-theme-text-color, #1e1e2f); padding:16px; }
-    .card { background:rgba(255,255,255,0.7); backdrop-filter:blur(12px); border-radius:28px; padding:24px 20px; border:1px solid rgba(255,255,255,0.5); box-shadow:0 8px 24px rgba(0,0,0,0.02); }
-    .status-icon { font-size:56px; text-align:center; }
-    .status-text { font-size:2rem; font-weight:700; text-align:center; margin:12px 0; }
-    .progress { display:flex; justify-content:space-between; margin:28px 0; }
-    .step { flex:1; text-align:center; font-size:0.9rem; color:#95a5a6; }
+    body { background: linear-gradient(145deg, #f5f7fa 0%, #e9ecf2 100%); color: #1e1e2f; padding:16px; }
+    .card { background:rgba(255,255,255,0.7); backdrop-filter:blur(20px); border-radius:32px; padding:26px 22px; border:1px solid rgba(255,255,255,0.5); box-shadow:0 16px 32px -12px rgba(0,0,0,0.06); }
+    .status-icon { font-size:64px; text-align:center; }
+    .status-text { font-size:2.2rem; font-weight:800; text-align:center; margin:14px 0; }
+    .progress { display:flex; justify-content:space-between; margin:32px 0; }
+    .step { flex:1; text-align:center; font-size:0.9rem; color:#64748b; }
     .step.active { color:#e67e22; font-weight:700; }
-    #map { height:260px; border-radius:20px; margin-top:20px; background:#e9ecef; }
-    .btn { background:#e67e22; color:#fff; border:none; padding:16px; border-radius:60px; width:100%; margin-top:16px; font-weight:700; cursor:pointer; }
+    #map { height:280px; border-radius:24px; margin-top:22px; background:#e0e4e8; }
+    .btn { background:#e67e22; color:#fff; border:none; padding:18px; border-radius:60px; width:100%; margin-top:18px; font-weight:700; cursor:pointer; box-shadow:0 12px 20px rgba(230,126,34,0.2); }
     .btn-outline { background:transparent; border:1px solid #e67e22; color:#e67e22; }
-    .rider-info { background:rgba(0,0,0,0.02); padding:16px; border-radius:20px; margin:16px 0; display:flex; align-items:center; gap:16px; }
-    .eta-badge { background:#e67e22; color:#fff; padding:8px 16px; border-radius:40px; text-align:center; }
-    .code-section { margin-top:20px; padding:16px; background:rgba(0,0,0,0.02); border-radius:20px; }
-    .otp-container { display:flex; gap:8px; justify-content:center; margin:16px 0; }
-    .otp-input { width:60px; height:60px; text-align:center; font-size:28px; border-radius:12px; border:1px solid #ccc; background:rgba(255,255,255,0.5); }
-    .verified-badge { background:#27ae60; color:#fff; padding:8px 16px; border-radius:30px; }
-    .order-items { background:rgba(0,0,0,0.02); padding:12px; border-radius:16px; margin:16px 0; }
+    .rider-info { background:rgba(0,0,0,0.02); padding:18px; border-radius:24px; margin:20px 0; display:flex; align-items:center; gap:18px; }
+    .eta-badge { background:#e67e22; color:#fff; padding:10px 20px; border-radius:60px; text-align:center; font-weight:600; }
+    .code-section { margin-top:24px; padding:20px; background:rgba(0,0,0,0.02); border-radius:24px; }
+    .otp-container { display:flex; gap:10px; justify-content:center; margin:18px 0; }
+    .otp-input { width:65px; height:65px; text-align:center; font-size:32px; border-radius:16px; border:1px solid #cbd5e1; background:rgba(255,255,255,0.5); }
+    .verified-badge { background:#27ae60; color:#fff; padding:10px 20px; border-radius:40px; }
+    .order-items { background:rgba(0,0,0,0.02); padding:16px; border-radius:20px; margin:18px 0; }
   </style>
 </head>
 <body>
 <div class="card">
   <div style="display:flex; justify-content:space-between;">
-    <span>طلب #<span id="orderId"></span></span>
+    <span style="font-weight:600;">طلب #<span id="orderId"></span></span>
     <button class="btn-outline" id="refreshBtn" style="padding:8px 16px;"><i data-lucide="refresh-cw"></i></button>
   </div>
   <div class="status-icon" id="statusEmoji">⏳</div>
@@ -46,12 +46,12 @@
   <div id="mapContainer"><div id="map"></div></div>
   
   <div id="codeSection" class="code-section" style="display:none;">
-    <label>🔐 أدخل كود التأكيد (من السائق)</label>
+    <label style="font-weight:600;">🔐 أدخل كود التأكيد (من السائق)</label>
     <div class="otp-container">
       <input type="text" class="otp-input" maxlength="1" id="otp1"><input type="text" class="otp-input" maxlength="1" id="otp2"><input type="text" class="otp-input" maxlength="1" id="otp3"><input type="text" class="otp-input" maxlength="1" id="otp4">
     </div>
     <button class="btn" onclick="verifyCode()">تحقق من الكود</button>
-    <p id="codeError" style="color:#e74c3c; margin-top:8px;"></p>
+    <p id="codeError" style="color:#e74c3c; margin-top:10px;"></p>
     <div id="codeVerifiedMessage" class="verified-badge" style="display:none;">✅ تم التحقق من الكود - شكراً لثقتك!</div>
   </div>
   

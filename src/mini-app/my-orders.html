@@ -8,24 +8,24 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; font-family:'Tajawal', sans-serif; }
-    body { background: var(--tg-theme-bg-color, #f0f2f5); color: var(--tg-theme-text-color, #1e1e2f); padding-bottom:20px; }
-    .app-header { display:flex; align-items:center; padding:16px 20px; background:rgba(255,255,255,0.8); backdrop-filter:blur(12px); border-bottom:1px solid rgba(0,0,0,0.05); position:sticky; top:0; z-index:10; }
-    .app-header h1 { font-size:2rem; font-weight:700; color:#e67e22; margin-right:12px; }
+    body { background: linear-gradient(145deg, #f5f7fa 0%, #e9ecf2 100%); color: #1e1e2f; padding-bottom:24px; }
+    .app-header { display:flex; align-items:center; padding:20px 24px; background: rgba(255,255,255,0.7); backdrop-filter: blur(20px); border-bottom:1px solid rgba(0,0,0,0.04); position:sticky; top:0; z-index:10; }
+    .app-header h1 { font-size:2.2rem; font-weight:800; background: linear-gradient(135deg, #e67e22, #f39c12); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-right:12px; }
     .back-btn { background:none; border:none; color:#e67e22; font-size:2rem; cursor:pointer; }
-    .container { padding:16px; max-width:600px; margin:0 auto; }
-    .filter-tabs { display:flex; gap:8px; margin-bottom:20px; }
-    .tab { flex:1; padding:12px; background:rgba(255,255,255,0.5); border-radius:30px; text-align:center; cursor:pointer; border:1px solid rgba(0,0,0,0.05); }
+    .container { padding:20px 16px; max-width:600px; margin:0 auto; }
+    .filter-tabs { display:flex; gap:10px; margin-bottom:24px; }
+    .tab { flex:1; padding:14px; background:rgba(255,255,255,0.5); border-radius:60px; text-align:center; cursor:pointer; border:1px solid rgba(0,0,0,0.04); font-weight:500; }
     .tab.active { background:#e67e22; color:#fff; }
-    .order-card { background:rgba(255,255,255,0.7); backdrop-filter:blur(8px); border-radius:20px; padding:16px; margin-bottom:12px; border:1px solid rgba(255,255,255,0.5); }
-    .status { display:inline-block; padding:4px 12px; border-radius:30px; font-size:0.8rem; }
+    .order-card { background:rgba(255,255,255,0.7); backdrop-filter:blur(16px); border-radius:24px; padding:18px; margin-bottom:14px; border:1px solid rgba(255,255,255,0.5); box-shadow:0 8px 16px -6px rgba(0,0,0,0.04); }
+    .status { display:inline-block; padding:6px 16px; border-radius:40px; font-size:0.85rem; font-weight:600; }
     .status-paid{background:#3498db;color:#fff} .status-preparing{background:#e67e22;color:#fff} .status-ready{background:#2ecc71;color:#fff} .status-delivering{background:#9b59b6;color:#fff} .status-completed{background:#27ae60;color:#fff} .status-rejected{background:#e74c3c;color:#fff}
-    .btn { background:#e67e22; color:#fff; border:none; padding:10px 20px; border-radius:30px; cursor:pointer; }
+    .btn { background:#e67e22; color:#fff; border:none; padding:12px 24px; border-radius:40px; cursor:pointer; font-weight:600; box-shadow:0 6px 12px rgba(230,126,34,0.15); }
     .btn-outline { background:transparent; border:1px solid #e67e22; color:#e67e22; }
     .modal { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:1000; }
-    .modal-content { background:#fff; border-radius:28px; padding:24px; width:90%; max-width:400px; }
-    .stars { display:flex; justify-content:center; gap:12px; margin:20px 0; font-size:36px; cursor:pointer; }
-    .star { color:#ccc; } .star.active { color:#f1c40f; }
-    .skeleton { height:120px; background:linear-gradient(90deg, #eee 25%, #ddd 50%, #eee 75%); background-size:200% 100%; animation:loading 1.5s infinite; border-radius:20px; }
+    .modal-content { background:#fff; border-radius:32px; padding:28px; width:90%; max-width:420px; }
+    .stars { display:flex; justify-content:center; gap:14px; margin:24px 0; font-size:40px; cursor:pointer; }
+    .star { color:#cbd5e1; } .star.active { color:#f1c40f; }
+    .skeleton { height:140px; background:linear-gradient(90deg, #e0e4e8 25%, #f0f2f5 50%, #e0e4e8 75%); background-size:200% 100%; animation:loading 1.5s infinite; border-radius:24px; }
     @keyframes loading { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
   </style>
 </head>
@@ -35,7 +35,7 @@
   <h1>🦅 شاهين</h1>
 </div>
 <div class="container">
-  <h2><i data-lucide="clipboard-list"></i> طلباتي</h2>
+  <h2 style="margin-bottom:20px;"><i data-lucide="clipboard-list"></i> طلباتي</h2>
   <div class="filter-tabs">
     <div class="tab active" data-filter="all">الكل</div>
     <div class="tab" data-filter="active">النشطة</div>
@@ -43,7 +43,7 @@
   </div>
   <div id="ordersContainer"><div class="skeleton"></div></div>
 </div>
-<div id="ratingModal" class="modal" style="display:none"><div class="modal-content"><h3>تقييم #<span id="modalOrderId"></span></h3><p>المطعم</p><div class="stars" id="shopStars"><span class="star" data-rating="1">★</span><span class="star" data-rating="2">★</span><span class="star" data-rating="3">★</span><span class="star" data-rating="4">★</span><span class="star" data-rating="5">★</span></div><p>السائق</p><div class="stars" id="riderStars"><span class="star" data-rating="1">★</span><span class="star" data-rating="2">★</span><span class="star" data-rating="3">★</span><span class="star" data-rating="4">★</span><span class="star" data-rating="5">★</span></div><textarea id="commentInput" placeholder="ملاحظاتك"></textarea><button class="btn" onclick="submitRating()" style="width:100%">إرسال</button><button class="btn" onclick="closeModal()" style="background:#95a5a6; margin-top:8px;">إلغاء</button></div></div>
+<div id="ratingModal" class="modal" style="display:none"><div class="modal-content"><h3>تقييم #<span id="modalOrderId"></span></h3><p>المطعم</p><div class="stars" id="shopStars"><span class="star" data-rating="1">★</span><span class="star" data-rating="2">★</span><span class="star" data-rating="3">★</span><span class="star" data-rating="4">★</span><span class="star" data-rating="5">★</span></div><p>السائق</p><div class="stars" id="riderStars"><span class="star" data-rating="1">★</span><span class="star" data-rating="2">★</span><span class="star" data-rating="3">★</span><span class="star" data-rating="4">★</span><span class="star" data-rating="5">★</span></div><textarea id="commentInput" placeholder="ملاحظاتك" style="width:100%; padding:14px; border-radius:20px; border:1px solid #ccc;"></textarea><button class="btn" onclick="submitRating()" style="width:100%">إرسال</button><button class="btn" onclick="closeModal()" style="background:#95a5a6; margin-top:10px; width:100%">إلغاء</button></div></div>
 <script>
   const tg = Telegram.WebApp; tg.ready();
   if (tg.BackButton) { tg.BackButton.show(); tg.BackButton.onClick(() => history.back()); }
@@ -64,8 +64,8 @@
       const itemsText = items.map(i => `${i.name} ×${i.quantity}`).join('، ');
       return `<div class="order-card">
         <div style="display:flex; justify-content:space-between;"><b>#${o.id}</b><span class="status status-${o.status}">${o.status}</span></div>
-        <div>${o.shop_name}</div><div>💰 ${o.total_price} ل.س</div><div>${itemsText}</div>
-        <div style="margin-top:12px;">
+        <div style="margin:8px 0;">${o.shop_name}</div><div>💰 ${o.total_price} ل.س</div><div style="font-size:0.9rem; color:#64748b;">${itemsText}</div>
+        <div style="margin-top:16px; display:flex; gap:8px; flex-wrap:wrap;">
           ${o.status==='completed'?`<button class="btn" onclick="reorder(${o.id})">🔄 أعد الطلب</button>`:''}
           ${o.status==='completed'?`<button class="btn btn-outline" onclick="openModal(${o.id})"><i data-lucide="star"></i> تقييم</button>`:''}
           ${(o.status==='verifying'||o.status==='pending')?`<button class="btn" onclick="cancel(${o.id})" style="background:#e74c3c;">إلغاء</button>`:''}
@@ -73,7 +73,7 @@
         </div>
       </div>`;
     }).join('');
-    document.getElementById('ordersContainer').innerHTML = html || '<div style="text-align:center;padding:40px">لا طلبات</div>';
+    document.getElementById('ordersContainer').innerHTML = html || '<div style="text-align:center;padding:48px;color:#64748b;">لا طلبات</div>';
     if (typeof lucide !== 'undefined') lucide.createIcons();
   }
 

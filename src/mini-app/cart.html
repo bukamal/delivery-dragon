@@ -8,22 +8,22 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; font-family:'Tajawal', sans-serif; }
-    body { background: var(--tg-theme-bg-color, #f0f2f5); color: var(--tg-theme-text-color, #1e1e2f); padding-bottom:20px; }
-    .app-header { display:flex; align-items:center; padding:16px 20px; background:rgba(255,255,255,0.8); backdrop-filter:blur(12px); border-bottom:1px solid rgba(0,0,0,0.05); position:sticky; top:0; z-index:10; }
-    .app-header h1 { font-size:2rem; font-weight:700; color:#e67e22; margin-right:12px; }
+    body { background: linear-gradient(145deg, #f5f7fa 0%, #e9ecf2 100%); color: #1e1e2f; padding-bottom:24px; }
+    .app-header { display:flex; align-items:center; padding:20px 24px; background: rgba(255,255,255,0.7); backdrop-filter: blur(20px); border-bottom:1px solid rgba(0,0,0,0.04); position:sticky; top:0; z-index:10; }
+    .app-header h1 { font-size:2.2rem; font-weight:800; background: linear-gradient(135deg, #e67e22, #f39c12); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-right:12px; }
     .back-btn { background:none; border:none; color:#e67e22; font-size:2rem; cursor:pointer; }
-    .container { padding:16px; max-width:600px; margin:0 auto; }
-    .cart-item { background:rgba(255,255,255,0.7); backdrop-filter:blur(8px); border-radius:20px; padding:16px; margin-bottom:12px; display:flex; gap:12px; border:1px solid rgba(255,255,255,0.5); }
-    .cart-item-img { width:60px; height:60px; border-radius:16px; object-fit:cover; background:#eee; }
+    .container { padding:20px 16px; max-width:600px; margin:0 auto; }
+    .cart-item { background:rgba(255,255,255,0.7); backdrop-filter:blur(16px); border-radius:24px; padding:18px; margin-bottom:14px; display:flex; gap:14px; border:1px solid rgba(255,255,255,0.5); box-shadow:0 8px 16px -6px rgba(0,0,0,0.04); }
+    .cart-item-img { width:70px; height:70px; border-radius:18px; object-fit:cover; background:#e0e4e8; }
     .cart-item-info { flex:1; }
-    .cart-item-actions { display:flex; align-items:center; gap:12px; margin-top:8px; }
-    .qty-btn { background:#e67e22; color:#fff; border:none; width:36px; height:36px; border-radius:50%; font-size:20px; cursor:pointer; }
-    .summary { background:rgba(255,255,255,0.7); backdrop-filter:blur(8px); border-radius:24px; padding:24px; margin:24px 0; border:1px solid rgba(255,255,255,0.5); }
-    input, select { width:100%; padding:16px; border-radius:16px; border:1px solid rgba(0,0,0,0.1); background:rgba(255,255,255,0.5); margin:12px 0; }
-    .locate-btn { background:#3498db; color:#fff; border:none; padding:16px; border-radius:60px; width:100%; cursor:pointer; }
-    .order-btn { background:#27ae60; color:#fff; border:none; padding:18px; border-radius:60px; width:100%; font-size:1.2rem; font-weight:700; cursor:pointer; }
-    .readonly-field { background:#f5f5f5; color:#666; }
-    .skeleton { height:80px; background:linear-gradient(90deg, #eee 25%, #ddd 50%, #eee 75%); background-size:200% 100%; animation:loading 1.5s infinite; border-radius:20px; }
+    .cart-item-actions { display:flex; align-items:center; gap:14px; margin-top:10px; }
+    .qty-btn { background:#e67e22; color:#fff; border:none; width:40px; height:40px; border-radius:50%; font-size:22px; cursor:pointer; box-shadow:0 6px 12px rgba(230,126,34,0.2); }
+    .summary { background:rgba(255,255,255,0.7); backdrop-filter:blur(16px); border-radius:28px; padding:26px; margin:28px 0; border:1px solid rgba(255,255,255,0.5); box-shadow:0 12px 24px -8px rgba(0,0,0,0.06); }
+    input, select { width:100%; padding:16px; border-radius:60px; border:1px solid rgba(0,0,0,0.08); background:rgba(255,255,255,0.5); margin:12px 0; }
+    .locate-btn { background:#3498db; color:#fff; border:none; padding:18px; border-radius:60px; width:100%; cursor:pointer; font-weight:600; box-shadow:0 8px 16px rgba(52,152,219,0.2); }
+    .order-btn { background:#27ae60; color:#fff; border:none; padding:20px; border-radius:60px; width:100%; font-size:1.2rem; font-weight:700; cursor:pointer; box-shadow:0 12px 20px rgba(39,174,96,0.2); }
+    .readonly-field { background:#f0f2f5; color:#64748b; }
+    .skeleton { height:90px; background:linear-gradient(90deg, #e0e4e8 25%, #f0f2f5 50%, #e0e4e8 75%); background-size:200% 100%; animation:loading 1.5s infinite; border-radius:24px; }
     @keyframes loading { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
   </style>
 </head>
@@ -33,17 +33,17 @@
   <h1>🦅 شاهين</h1>
 </div>
 <div class="container">
-  <h2 style="margin-bottom:16px;"><i data-lucide="shopping-cart"></i> سلة المشتريات</h2>
+  <h2 style="margin-bottom:20px;"><i data-lucide="shopping-cart"></i> سلة المشتريات</h2>
   <div id="itemsContainer"><div class="skeleton"></div></div>
   <div class="summary">
     <div style="display:flex; justify-content:space-between;"><span>المجموع</span><span id="subtotal">0</span> ل.س</div>
-    <div style="display:flex; justify-content:space-between; margin-top:8px;"><span>التوصيل (يحسب آلياً)</span><span id="deliveryFee">0</span> ل.س</div>
-    <div style="display:flex; justify-content:space-between; font-weight:700; margin-top:16px;"><span>الإجمالي</span><span id="total">0</span> ل.س</div>
+    <div style="display:flex; justify-content:space-between; margin-top:10px;"><span>التوصيل (يحسب آلياً)</span><span id="deliveryFee">0</span> ل.س</div>
+    <div style="display:flex; justify-content:space-between; font-weight:800; margin-top:18px;"><span>الإجمالي</span><span id="total">0</span> ل.س</div>
     <input type="text" id="addressInput" placeholder="العنوان التفصيلي">
     <button type="button" id="locateBtn" class="locate-btn"><i data-lucide="map-pin"></i> تحديد موقع التسليم (إجباري)</button>
     <input type="hidden" id="deliveryLat"><input type="hidden" id="deliveryLng">
     <input type="text" id="cityDisplay" placeholder="المدينة" readonly class="readonly-field">
-    <div id="locationStatus" style="font-size:0.9rem; margin-top:4px; color:#e67e22;"></div>
+    <div id="locationStatus" style="font-size:0.9rem; margin-top:6px; color:#e67e22;"></div>
   </div>
   <button class="order-btn" id="orderBtn"><i data-lucide="check-circle"></i> تأكيد الطلب</button>
 </div>
@@ -123,13 +123,13 @@
       cart = []; localStorage.removeItem('dragon_cart');
       let paymentHtml = '';
       if (data.payment?.name && data.payment?.wallet) {
-        paymentHtml = `<div style="background:#f8f9fa; border-radius:20px; padding:20px; margin:20px 0; text-align:left; direction:ltr;">
+        paymentHtml = `<div style="background:#f8f9fa; border-radius:24px; padding:22px; margin:24px 0; text-align:left; direction:ltr;">
           <p><strong>اسم المستلم:</strong> ${data.payment.name}</p>
-          <p><strong>رقم المحفظة:</strong> <span id="walletNumber">${data.payment.wallet}</span> <button onclick="copyWallet()" style="background:#e67e22; color:#fff; border:none; padding:6px 12px; border-radius:20px;">📋 نسخ</button></p>
+          <p><strong>رقم المحفظة:</strong> <span id="walletNumber">${data.payment.wallet}</span> <button onclick="copyWallet()" style="background:#e67e22; color:#fff; border:none; padding:8px 16px; border-radius:30px;">📋 نسخ</button></p>
           <p style="color:#e67e22;">${data.payment.instructions}</p>
         </div>`;
       }
-      document.body.innerHTML = `<div style="text-align:center;padding:40px"><h2>✅ تم إنشاء الطلب #${data.order_id}</h2><p>المبلغ: ${currentTotal} ل.س</p>${paymentHtml}<p>📸 أرسل لقطة الدفع في البوت</p><button class="order-btn" onclick="Telegram.WebApp.close()">فتح البوت</button></div>`;
+      document.body.innerHTML = `<div style="text-align:center;padding:48px"><h2>✅ تم إنشاء الطلب #${data.order_id}</h2><p>المبلغ: ${currentTotal} ل.س</p>${paymentHtml}<p>📸 أرسل لقطة الدفع في البوت</p><button class="order-btn" onclick="Telegram.WebApp.close()">فتح البوت</button></div>`;
       window.copyWallet = function() { const wallet = document.getElementById('walletNumber').innerText; navigator.clipboard?.writeText(wallet).then(() => tg.showPopup({ title:'✅ تم النسخ', message:'رقم المحفظة جاهز للصق' })).catch(() => tg.showAlert('تعذر النسخ')); };
     } catch(e) { tg.MainButton.hideProgress(); tg.showAlert('❌ ' + e.message); }
   };
