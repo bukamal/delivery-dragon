@@ -549,9 +549,14 @@
     await fetch(`${API}/api/admin/orders/${id}/reject`, { method: 'POST', headers: { 'X-Telegram-Init-Data': tg.initData } });
     loadPendingOrders();
   };
-  // دالة عرض الإيصال مع المصادقة واحتياط عند حظر النوافذ المنبثقة
+  // دالة عرض الإيصال - تظهر الصورة في نافذة منبثقة دائمًا مع خيار فتحها في نافذة جديدة
   window.viewScreenshot = async (orderId) => {
-    tg.showPopup({ title: '⏳ جاري تحميل الإيصال...', message: 'يرجى الانتظار' });
+    // إنشاء عنصر تحميل مؤقت
+    const loadingModal = document.createElement('div');
+    loadingModal.style.cssText = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:9998; display:flex; align-items:center; justify-content:center;';
+    loadingModal.innerHTML = '<div style="background:white; border-radius:24px; padding:24px; text-align:center;"><div style="margin-bottom:16px;">⏳ جاري تحميل الإيصال...</div></div>';
+    document.body.appendChild(loadingModal);
+
     try {
       const response = await fetch(`${API}/api/admin/orders/${orderId}/screenshot`, {
         headers: { 'X-Telegram-Init-Data': tg.initData }
@@ -562,30 +567,39 @@
       }
       const blob = await response.blob();
       const blobUrl = URL.createObjectURL(blob);
-      
-      // محاولة فتح نافذة جديدة
-      const newWindow = window.open(blobUrl, '_blank');
-      
-      if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-        // تم حظر النافذة المنبثقة - نعرض الصورة في Modal
-        const modal = document.createElement('div');
-        modal.style.cssText = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.8); z-index:9999; display:flex; align-items:center; justify-content:center; padding:20px;';
-        modal.innerHTML = `
-          <div style="max-width:90%; max-height:90%; background:white; border-radius:24px; padding:16px; position:relative;">
-            <button style="position:absolute; top:10px; right:10px; background:#e74c3c; color:white; border:none; border-radius:50%; width:40px; height:40px; font-size:20px; cursor:pointer;">✕</button>
-            <img src="${blobUrl}" style="max-width:100%; max-height:70vh; border-radius:16px;" />
-            <div style="margin-top:16px; display:flex; gap:8px;">
-              <a href="${blobUrl}" download="receipt_${orderId}.jpg" style="background:#e67e22; color:white; padding:12px 20px; border-radius:40px; text-decoration:none; text-align:center; flex:1;">⬇️ تحميل الصورة</a>
-            </div>
+
+      // إزالة مؤشر التحميل
+      loadingModal.remove();
+
+      // إنشاء نافذة منبثقة للصورة
+      const modal = document.createElement('div');
+      modal.style.cssText = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.8); z-index:9999; display:flex; align-items:center; justify-content:center; padding:20px;';
+      modal.innerHTML = `
+        <div style="max-width:90%; max-height:90%; background:white; border-radius:24px; padding:16px; position:relative;">
+          <button id="closeReceiptModal" style="position:absolute; top:10px; right:10px; background:#e74c3c; color:white; border:none; border-radius:50%; width:40px; height:40px; font-size:20px; cursor:pointer; z-index:10;">✕</button>
+          <img src="${blobUrl}" style="max-width:100%; max-height:70vh; border-radius:16px; display:block; margin:0 auto;" />
+          <div style="margin-top:16px; display:flex; gap:8px; flex-wrap:wrap;">
+            <a href="${blobUrl}" download="receipt_${orderId}.jpg" style="background:#e67e22; color:white; padding:12px 20px; border-radius:40px; text-decoration:none; text-align:center; flex:1;">⬇️ تحميل الصورة</a>
+            <button id="openInNewWindow" style="background:#3498db; color:white; border:none; padding:12px 20px; border-radius:40px; cursor:pointer; flex:1;">🔗 فتح في نافذة جديدة</button>
           </div>
-        `;
-        document.body.appendChild(modal);
-        modal.querySelector('button').onclick = () => modal.remove();
-        modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
-      }
-      
-      tg.showPopup({ title: '✅ تم تحميل الإيصال', message: newWindow ? 'تم فتحه في نافذة جديدة' : 'يُعرض أدناه' });
+        </div>
+      `;
+      document.body.appendChild(modal);
+
+      // إغلاق النافذة
+      document.getElementById('closeReceiptModal').onclick = () => modal.remove();
+      modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+
+      // زر فتح في نافذة جديدة
+      document.getElementById('openInNewWindow').onclick = () => {
+        const win = window.open(blobUrl, '_blank');
+        if (!win || win.closed) {
+          tg.showAlert('تعذر فتح نافذة جديدة. قد يكون المتصفح يمنع النوافذ المنبثقة.');
+        }
+      };
+
     } catch (error) {
+      loadingModal.remove();
       tg.showAlert(`❌ ${error.message}`);
     }
   };
