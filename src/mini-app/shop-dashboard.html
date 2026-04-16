@@ -40,6 +40,10 @@
       .sidebar-toggle { display:block; }
       .kpi-grid { grid-template-columns:1fr; }
     }
+    .skeleton { height:140px; background:linear-gradient(90deg,#e0e4e8 25%,#f0f2f5 50%,#e0e4e8 75%); background-size:200% 100%; animation:loading 1.5s infinite; border-radius:24px; }
+    @keyframes loading { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+    .error-message { color: #e74c3c; text-align: center; padding: 20px; }
+    .loading-indicator { text-align: center; padding: 40px; }
   </style>
 </head>
 <body>
@@ -59,6 +63,7 @@
     <div class="app-header">
       <button class="sidebar-toggle" id="sidebarToggle"><i data-lucide="menu"></i></button>
       <h1 id="pageTitle">نظرة عامة</h1>
+      <button class="btn" id="refreshBtn" style="margin-right: auto;" onclick="refreshCurrentPage()"><i data-lucide="refresh-cw"></i> تحديث</button>
     </div>
     <div class="shop-content" id="shopContent"></div>
   </div>
@@ -74,51 +79,98 @@
   const sidebar = document.getElementById('sidebar'), toggleBtn = document.getElementById('sidebarToggle');
   const links = document.querySelectorAll('.sidebar-link'), pageTitle = document.getElementById('pageTitle'), contentArea = document.getElementById('shopContent');
   let productCategories = [], editingProduct = null;
+  let currentPage = 'overview', currentArchived = false;
 
   toggleBtn.onclick = () => sidebar.classList.toggle('open');
-  links.forEach(link => { link.onclick = (e) => { e.preventDefault(); links.forEach(l => l.classList.remove('active')); link.classList.add('active'); pageTitle.innerText = link.querySelector('span')?.innerText; loadPage(link.dataset.page); if (window.innerWidth <= 768) sidebar.classList.remove('open'); }; });
+  links.forEach(link => { link.onclick = (e) => { e.preventDefault(); links.forEach(l => l.classList.remove('active')); link.classList.add('active'); pageTitle.innerText = link.querySelector('span')?.innerText; currentPage = link.dataset.page; loadPage(currentPage); if (window.innerWidth <= 768) sidebar.classList.remove('open'); }; });
+
+  function refreshCurrentPage() {
+    loadPage(currentPage);
+  }
 
   async function loadPage(page) {
+    contentArea.innerHTML = '<div class="loading-indicator"><div class="skeleton" style="height:80px;"></div><p>جاري التحميل...</p></div>';
     switch(page) {
-      case 'overview': loadOverview(); break;
-      case 'orders': loadOrders(false); break;
-      case 'products': loadProducts(); break;
-      case 'categories': loadCategoriesList(); break;
-      case 'settings': loadSettings(); break;
+      case 'overview': await loadOverview(); break;
+      case 'orders': await loadOrders(currentArchived); break;
+      case 'products': await loadProducts(); break;
+      case 'categories': await loadCategoriesList(); break;
+      case 'settings': await loadSettings(); break;
       case 'support': contentArea.innerHTML = '<div class="card" style="text-align:center"><h3>الدعم الفني</h3><button class="btn" onclick="location.href=\'support.html\'">فتح الدعم</button></div>'; break;
+      default: contentArea.innerHTML = '<div class="error-message">الصفحة غير موجودة</div>';
     }
+    if (typeof lucide !== 'undefined') lucide.createIcons();
   }
 
   async function loadOverview() {
-    contentArea.innerHTML = '<div class="skeleton"></div>';
-    const [statsRes, ordersRes] = await Promise.all([fetch(`${API}/api/shop/stats`,{headers:{'X-Telegram-Init-Data':tg.initData}}), fetch(`${API}/api/shop/orders?archived=false`,{headers:{'X-Telegram-Init-Data':tg.initData}})]);
-    const stats = await statsRes.json(); const orders = await ordersRes.json();
-    contentArea.innerHTML = `<div class="kpi-grid">
-      <div class="kpi-card"><div class="kpi-value">${stats.today_orders||0}</div><div>طلبات اليوم</div></div>
-      <div class="kpi-card"><div class="kpi-value">${stats.today_revenue||0} ل.س</div><div>إيرادات اليوم</div></div>
-      <div class="kpi-card"><div class="kpi-value">${stats.active_orders||0}</div><div>طلبات نشطة</div></div>
-    </div>
-    <div class="card"><h3>آخر الطلبات</h3>${orders.slice(0,5).map(o=>`<div class="flex-between"><span>#${o.id} - ${o.customer_name}</span><span class="status-badge status-${o.status}">${o.status}</span></div>`).join('')}</div>`;
+    try {
+      const [statsRes, ordersRes] = await Promise.all([
+        fetch(`${API}/api/shop/stats`,{headers:{'X-Telegram-Init-Data':tg.initData}}),
+        fetch(`${API}/api/shop/orders?archived=false`,{headers:{'X-Telegram-Init-Data':tg.initData}})
+      ]);
+      if (!statsRes.ok) throw new Error('فشل تحميل الإحصائيات');
+      const stats = await statsRes.json();
+      const orders = await ordersRes.json();
+      contentArea.innerHTML = `<div class="kpi-grid">
+        <div class="kpi-card"><div class="kpi-value">${stats.today_orders||0}</div><div>طلبات اليوم</div></div>
+        <div class="kpi-card"><div class="kpi-value">${stats.today_revenue||0} ل.س</div><div>إيرادات اليوم</div></div>
+        <div class="kpi-card"><div class="kpi-value">${stats.active_orders||0}</div><div>طلبات نشطة</div></div>
+      </div>
+      <div class="card"><h3>آخر الطلبات</h3>${orders.length ? orders.slice(0,5).map(o=>`<div class="flex-between"><span>#${o.id} - ${o.customer_name}</span><span class="status-badge status-${o.status}">${o.status}</span></div>`).join('') : '<p>لا توجد طلبات نشطة</p>'}</div>`;
+    } catch(e) {
+      contentArea.innerHTML = `<div class="error-message">❌ ${e.message}</div>`;
+    }
   }
 
   async function loadOrders(archived) {
-    const res = await fetch(`${API}/api/shop/orders?archived=${archived}`,{headers:{'X-Telegram-Init-Data':tg.initData}}); const orders = await res.json();
-    let html = `<div class="tabs"><button class="tab ${!archived?'active':''}" onclick="loadOrders(false)">النشطة</button><button class="tab ${archived?'active':''}" onclick="loadOrders(true)">المؤرشفة</button></div>`;
-    orders.forEach(o => {
-      let items = JSON.parse(o.items).map(i=>`${i.name} ×${i.quantity}`).join('، ');
-      html += `<div class="order-card"><div class="order-header" onclick="this.nextElementSibling.classList.toggle('open')"><div><b>#${o.id}</b> - ${o.customer_name}</div><span class="status-badge status-${o.status}">${o.status}</span></div>
-        <div class="order-details"><p>📦 ${items}</p><p>💰 ${o.total_price} ل.س</p>${!archived?`<select onchange="updateOrderStatus('${o.id}', this.value)"><option value="preparing" ${o.status==='preparing'?'selected':''}>تحضير</option><option value="ready_for_pickup" ${o.status==='ready_for_pickup'?'selected':''}>جاهز للتوصيل</option></select>`:''}</div></div>`;
-    });
-    contentArea.innerHTML = html;
+    currentArchived = archived;
+    try {
+      const res = await fetch(`${API}/api/shop/orders?archived=${archived}`,{headers:{'X-Telegram-Init-Data':tg.initData}});
+      if (!res.ok) {
+        const err = await res.json().catch(()=>({error:'تعذر الاتصال بالخادم'}));
+        throw new Error(err.error || `خطأ ${res.status}`);
+      }
+      const orders = await res.json();
+      let html = `<div class="tabs"><button class="tab ${!archived?'active':''}" onclick="loadOrders(false)">النشطة</button><button class="tab ${archived?'active':''}" onclick="loadOrders(true)">المؤرشفة</button></div>`;
+      if (!orders.length) {
+        html += '<p class="empty-state">لا توجد طلبات</p>';
+      } else {
+        orders.forEach(o => {
+          let items = []; try { items = JSON.parse(o.items); } catch(e){}
+          const itemsText = items.map(i=>`${i.name} ×${i.quantity}`).join('، ');
+          html += `<div class="order-card"><div class="order-header" onclick="this.nextElementSibling.classList.toggle('open')"><div><b>#${o.id}</b> - ${o.customer_name}</div><span class="status-badge status-${o.status}">${o.status}</span></div>
+            <div class="order-details"><p>📦 ${itemsText}</p><p>💰 ${o.total_price} ل.س</p>${!archived?`<select onchange="updateOrderStatus('${o.id}', this.value)"><option value="preparing" ${o.status==='preparing'?'selected':''}>تحضير</option><option value="ready_for_pickup" ${o.status==='ready_for_pickup'?'selected':''}>جاهز للتوصيل</option></select>`:''}</div></div>`;
+        });
+      }
+      contentArea.innerHTML = html;
+    } catch(e) {
+      contentArea.innerHTML = `<div class="error-message">❌ ${e.message}<br><button class="btn" onclick="refreshCurrentPage()">إعادة المحاولة</button></div>`;
+    }
+    if (typeof lucide !== 'undefined') lucide.createIcons();
   }
-  window.updateOrderStatus = async (id, status) => { await fetch(`${API}/api/shop/orders/${id}/status`,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify({status})}); loadOrders(false); };
+
+  window.updateOrderStatus = async (id, status) => {
+    try {
+      const res = await fetch(`${API}/api/shop/orders/${id}/status`,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify({status})});
+      if (!res.ok) throw new Error((await res.json()).error);
+      await loadOrders(currentArchived);
+    } catch(e) {
+      tg.showAlert('❌ ' + e.message);
+    }
+  };
 
   async function loadProducts() {
-    const res = await fetch(`${API}/api/shop/products`,{headers:{'X-Telegram-Init-Data':tg.initData}}); const products = await res.json();
-    let html = `<div class="flex-between"><input type="text" id="productSearch" placeholder="بحث..."><button class="btn" onclick="openProductModal()">➕ إضافة</button></div><div class="product-grid" id="productGrid">`;
-    products.forEach(p => { html += `<div class="product-card"><img src="${p.image_url||'https://via.placeholder.com/150'}"><div class="product-info"><b>${p.name}</b><div class="price">${p.price} ل.س</div><div class="flex"><button class="btn" onclick="editProduct(${p.id})">✏️</button><button class="btn btn-danger" onclick="deleteProduct(${p.id})">🗑️</button></div></div></div>`; });
-    html += '</div>'; contentArea.innerHTML = html;
-    document.getElementById('productSearch')?.addEventListener('input', e => { const term = e.target.value.toLowerCase(); document.querySelectorAll('.product-card').forEach(c => c.style.display = c.innerText.toLowerCase().includes(term) ? 'block' : 'none'); });
+    try {
+      const res = await fetch(`${API}/api/shop/products`,{headers:{'X-Telegram-Init-Data':tg.initData}});
+      if (!res.ok) throw new Error('فشل تحميل المنتجات');
+      const products = await res.json();
+      let html = `<div class="flex-between"><input type="text" id="productSearch" placeholder="بحث..."><button class="btn" onclick="openProductModal()">➕ إضافة</button></div><div class="product-grid" id="productGrid">`;
+      products.forEach(p => { html += `<div class="product-card"><img src="${p.image_url||'https://via.placeholder.com/150'}"><div class="product-info"><b>${p.name}</b><div class="price">${p.price} ل.س</div><div class="flex"><button class="btn" onclick="editProduct(${p.id})">✏️</button><button class="btn btn-danger" onclick="deleteProduct(${p.id})">🗑️</button></div></div></div>`; });
+      html += '</div>'; contentArea.innerHTML = html;
+      document.getElementById('productSearch')?.addEventListener('input', e => { const term = e.target.value.toLowerCase(); document.querySelectorAll('.product-card').forEach(c => c.style.display = c.innerText.toLowerCase().includes(term) ? 'block' : 'none'); });
+    } catch(e) {
+      contentArea.innerHTML = `<div class="error-message">❌ ${e.message}</div>`;
+    }
     if (typeof lucide !== 'undefined') lucide.createIcons();
   }
 
