@@ -440,7 +440,7 @@ app.get('/api/shop/orders', async (req, res) => {
   } catch(error) { res.status(500).json({ error: error.message }); }
 });
 
-// ==== مسار التحقق من كود استلام المتجر ====
+// مسار التحقق من كود استلام المتجر (مع إشعار للسائق)
 app.post('/api/shop/orders/:orderId/verify-pickup', requireAuth, async (req, res) => {
   try {
     const tgUser = req.tgUser;
@@ -451,7 +451,6 @@ app.post('/api/shop/orders/:orderId/verify-pickup', requireAuth, async (req, res
     const { code } = req.body;
     if (!code) return res.status(400).json({ error: 'الكود مطلوب' });
     
-    // التحقق من أن الطلب يخص هذا المتجر
     const shopCheck = await pool.query(
       `SELECT o.id FROM orders o 
        JOIN shops s ON o.shop_id = s.id 
@@ -461,24 +460,35 @@ app.post('/api/shop/orders/:orderId/verify-pickup', requireAuth, async (req, res
     if (!shopCheck.rows[0]) return res.status(403).json({ error: 'الطلب لا يخص متجرك' });
     
     const order = await pool.query(
-      `SELECT pickup_code, pickup_verified, status FROM orders WHERE id = $1`,
+      `SELECT pickup_code, pickup_verified, status, rider_id FROM orders WHERE id = $1`,
       [orderId]
     );
-    if (!order.rows[0]) return res.status(404).json({ error: 'الطلب غير موجود' });
-    if (order.rows[0].status !== 'delivering') {
+    const o = order.rows[0];
+    if (!o) return res.status(404).json({ error: 'الطلب غير موجود' });
+    if (o.status !== 'delivering') {
       return res.status(400).json({ error: 'الطلب ليس قيد التوصيل' });
     }
-    if (order.rows[0].pickup_verified) {
+    if (o.pickup_verified) {
       return res.status(400).json({ error: 'تم التحقق من الكود مسبقاً' });
     }
-    if (order.rows[0].pickup_code !== code) {
+    if (o.pickup_code !== code) {
       return res.status(400).json({ error: 'الكود غير صحيح' });
     }
     
-    await pool.query(
-      `UPDATE orders SET pickup_verified = true WHERE id = $1`,
-      [orderId]
-    );
+    await pool.query(`UPDATE orders SET pickup_verified = true WHERE id = $1`, [orderId]);
+    
+    // إشعار السائق بأنه تم تأكيد الاستلام
+    if (o.rider_id) {
+      const rider = await pool.query('SELECT chat_id FROM users WHERE id = $1', [o.rider_id]);
+      if (rider.rows[0]?.chat_id) {
+        await bot.api.sendMessage(
+          rider.rows[0].chat_id,
+          `✅ *تم تأكيد استلامك للطلب #${orderId}*\n\n` +
+          `تم تأكيد الكود من قبل المتجر. يمكنك الآن التوجه إلى العميل.`,
+          { parse_mode: 'Markdown' }
+        );
+      }
+    }
     
     res.json({ success: true });
   } catch (error) {
@@ -493,21 +503,6 @@ app.post('/api/shop/orders/:orderId/status', async (req, res) => {
     if (dbUser?.role !== 'shop') return res.status(403).json({ error: 'Forbidden' });
     const { status } = req.body;
     const { orderId } = req.params;
-    
-    // إذا كانت الحالة المطلوبة هي ready_for_pickup، تأكد من أن pickup_verified = true
-    if (status === 'ready_for_pickup') {
-      const orderCheck = await pool.query(
-        `SELECT pickup_verified, status FROM orders WHERE id = $1`,
-        [orderId]
-      );
-      if (!orderCheck.rows[0]) return res.status(404).json({ error: 'الطلب غير موجود' });
-      if (orderCheck.rows[0].status !== 'delivering') {
-        return res.status(400).json({ error: 'يجب أن يكون الطلب قيد التوصيل أولاً' });
-      }
-      if (!orderCheck.rows[0].pickup_verified) {
-        return res.status(400).json({ error: 'يجب التحقق من كود الاستلام أولاً' });
-      }
-    }
     
     await pool.query(
       `UPDATE orders SET status=$1 WHERE id=$2 AND shop_id=(SELECT id FROM shops WHERE owner_id=$3)`,
@@ -646,7 +641,6 @@ app.get('/api/rider/available-orders', async (req, res) => {
   } catch(error) { res.status(500).json({ error: error.message }); }
 });
 
-// ==== قبول الطلب من السائق (مع إنشاء كودين: للزبون وللمتجر) ====
 app.post('/api/rider/accept-order', async (req, res) => {
   try {
     const tgUser = req.tgUser;
@@ -654,7 +648,6 @@ app.post('/api/rider/accept-order', async (req, res) => {
     if (dbUser?.role !== 'rider') return res.status(403).json({ error: 'Forbidden' });
     const { order_id } = req.body;
     
-    // إنشاء كودين منفصلين
     const customerCode = Math.floor(1000 + Math.random() * 9000).toString();
     const pickupCode = Math.floor(1000 + Math.random() * 9000).toString();
     
@@ -674,7 +667,6 @@ app.post('/api/rider/accept-order', async (req, res) => {
     
     await notifyCustomer(order_id, 'delivering');
     
-    // إشعار المتجر بالكود
     const shopOwner = await pool.query(
       `SELECT u.chat_id, u.name FROM users u 
        JOIN shops s ON u.id = s.owner_id 
@@ -692,7 +684,6 @@ app.post('/api/rider/accept-order', async (req, res) => {
       );
     }
     
-    // إشعار السائق بكود العميل
     await bot.api.sendMessage(
       dbUser.chat_id,
       `✅ *تم قبول الطلب #${order_id}*\n\n` +
