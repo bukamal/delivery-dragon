@@ -15,23 +15,135 @@
     .container{max-width:500px;margin:0 auto}
     .form-group{margin-bottom:22px}
     label{display:block;margin-bottom:8px;font-weight:600}
-    input,select{width:100%;padding:16px;border-radius:60px;border:1px solid rgba(0,0,0,0.08);background:rgba(255,255,255,0.7);backdrop-filter:blur(8px)}
-    .btn{background:#e67e22;color:#fff;border:none;padding:18px;border-radius:60px;width:100%;font-size:1.2rem;font-weight:700;cursor:pointer;box-shadow:0 12px 20px rgba(230,126,34,0.2);margin-top:24px}
+    input,select{width:100%;padding:16px;border-radius:60px;border:1px solid rgba(0,0,0,0.08);background:rgba(255,255,255,0.7);backdrop-filter:blur(8px);font-size:16px;}
+    input:focus, select:focus{outline:none;border-color:#e67e22;box-shadow:0 0 0 3px rgba(230,126,34,0.2);}
+    .btn{background:#e67e22;color:#fff;border:none;padding:18px;border-radius:60px;width:100%;font-size:1.2rem;font-weight:700;cursor:pointer;box-shadow:0 12px 20px rgba(230,126,34,0.2);margin-top:24px;transition:0.2s;}
+    .btn:active{transform:scale(0.98);}
+    .btn:disabled{opacity:0.6;cursor:not-allowed;}
+    .error-message{color:#e74c3c;font-size:0.9rem;margin-top:6px;}
+    .note{font-size:0.8rem;color:#64748b;margin-top:6px;}
   </style>
 </head>
 <body>
 <div class="app-header"><button class="back-btn" onclick="history.back()"><i data-lucide="arrow-right"></i></button><h1>🦅 تسجيل سائق</h1></div>
-<div class="container"><form id="f">
-  <div class="form-group"><label>اسمك</label><input id="name" required></div>
-  <div class="form-group"><label>رقم الهاتف</label><input type="tel" id="12" required></div>
-  <div class="form-group"><label>نوع المركبة</label><select id="vehicle"><option value="دراجة">🚲 دراجة</option><option value="سيارة">🚗 سيارة</option></select></div>
-  <div class="form-group"><label>رقم اللوحة</label><input id="plate"></div>
-  <button type="submit" class="btn">تقديم الطلب</button>
+<div class="container"><form id="registrationForm">
+  <div class="form-group"><label>اسمك الكامل</label><input type="text" id="name" placeholder="مثال: أحمد محمد" required></div>
+  <div class="form-group"><label>رقم الهاتف</label><input type="tel" id="phone" placeholder="09xxxxxxxx" inputmode="numeric" required><div class="note">يجب أن يكون 10 أرقام</div><div id="phoneError" class="error-message"></div></div>
+  <div class="form-group"><label>نوع المركبة</label><select id="vehicle"><option value="دراجة نارية">🏍️ دراجة نارية</option><option value="سيارة">🚗 سيارة</option><option value="دراجة هوائية">🚲 دراجة هوائية</option></select></div>
+  <div class="form-group"><label>رقم اللوحة</label><input type="text" id="plateNumber" placeholder="مثال: 123456 أو أ ب ج 123" required><div class="note">أرقام وحروف عربية/إنجليزية</div><div id="plateError" class="error-message"></div></div>
+  <button type="submit" class="btn" id="submitBtn">تقديم الطلب</button>
 </form></div>
 <script>
-const tg=Telegram.WebApp;tg.ready();tg.BackButton.show();tg.BackButton.onClick(()=>history.back());
-const API='https://delivery-dragon.vercel.app';
-document.getElementById('f').onsubmit=async e=>{ e.preventDefault(); const d={ name:document.getElementById('name').value, phone:document.getElementById('phone').value, vehicle_type:document.getElementById('vehicle').value, vehicle_number:document.getElementById('plate').value }; tg.MainButton.showProgress(); try{ const r=await fetch(`${API}/api/register/rider`,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:JSON.stringify(d)}); if(!r.ok) throw new Error((await r.json()).error); tg.showAlert('✅ تم تقديم الطلب!'); tg.close(); }catch(e){ tg.MainButton.hideProgress(); tg.showAlert('❌ '+e.message); } };
+  const tg = Telegram.WebApp;
+  tg.ready();
+  tg.expand();
+  if (tg.BackButton) {
+    tg.BackButton.show();
+    tg.BackButton.onClick(() => history.back());
+  }
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+
+  const API = 'https://delivery-dragon.vercel.app';
+  const form = document.getElementById('registrationForm');
+  const submitBtn = document.getElementById('submitBtn');
+  const phoneInput = document.getElementById('phone');
+  const plateInput = document.getElementById('plateNumber');
+  const phoneError = document.getElementById('phoneError');
+  const plateError = document.getElementById('plateError');
+
+  function validatePhone(phone) {
+    const phoneRegex = /^\d{10}$/;
+    return phoneRegex.test(phone);
+  }
+
+  function validatePlate(plate) {
+    const plateRegex = /^[\u0621-\u064A\u0660-\u0669a-zA-Z0-9\s]{4,20}$/;
+    return plateRegex.test(plate.trim());
+  }
+
+  phoneInput.addEventListener('input', () => {
+    const phone = phoneInput.value.trim();
+    if (phone && !validatePhone(phone)) {
+      phoneError.textContent = 'رقم الهاتف يجب أن يكون 10 أرقام';
+    } else {
+      phoneError.textContent = '';
+    }
+  });
+
+  plateInput.addEventListener('input', () => {
+    const plate = plateInput.value.trim();
+    if (plate && !validatePlate(plate)) {
+      plateError.textContent = 'رقم اللوحة يجب أن يحتوي على 4 محارف على الأقل (أرقام وحروف)';
+    } else {
+      plateError.textContent = '';
+    }
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const name = document.getElementById('name').value.trim();
+    const phone = phoneInput.value.trim();
+    const vehicleType = document.getElementById('vehicle').value;
+    const plateNumber = plateInput.value.trim();
+
+    if (!name) {
+      tg.showAlert('يرجى إدخال الاسم');
+      return;
+    }
+    if (!validatePhone(phone)) {
+      phoneError.textContent = 'رقم الهاتف غير صحيح (يجب أن يكون 10 أرقام)';
+      tg.showAlert('رقم الهاتف غير صحيح');
+      return;
+    }
+    if (!validatePlate(plateNumber)) {
+      plateError.textContent = 'رقم اللوحة غير صحيح';
+      tg.showAlert('رقم اللوحة غير صحيح');
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'جاري التقديم...';
+    tg.MainButton.showProgress();
+
+    try {
+      const response = await fetch(`${API}/api/register/rider`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Telegram-Init-Data': tg.initData
+        },
+        body: JSON.stringify({
+          name: name,
+          phone: phone,
+          vehicle_type: vehicleType,
+          vehicle_number: plateNumber
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'فشل تسجيل الطلب');
+      }
+
+      tg.HapticFeedback.notificationOccurred('success');
+      tg.showPopup({
+        title: '✅ تم تقديم الطلب',
+        message: 'سيراجع الأدمن طلبك وسيتم إعلامك عند الموافقة.'
+      }, (buttonId) => {
+        tg.close();
+      });
+
+    } catch (error) {
+      console.error('Registration error:', error);
+      tg.HapticFeedback.notificationOccurred('error');
+      tg.showAlert(`❌ ${error.message}`);
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'تقديم الطلب';
+      tg.MainButton.hideProgress();
+    }
+  });
 </script>
 </body>
 </html>
