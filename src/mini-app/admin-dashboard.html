@@ -527,7 +527,16 @@
     const o = await r.json();
     let html = '<div class="shop-grid">';
     o.forEach(x => {
-      html += `<div class="card"><b>#${x.id}</b> - ${x.customer_name}<br>🏪 ${x.shop_name}<br>💰 ${x.total_price} ل.س<div class="flex" style="margin-top:16px;"><button class="btn" onclick="approveOrder(${x.id})">قبول</button><button class="btn btn-danger" onclick="rejectOrder(${x.id})">رفض</button></div></div>`;
+      html += `<div class="card">
+          <b>#${x.id}</b> - ${x.customer_name}<br>
+          🏪 ${x.shop_name}<br>
+          💰 ${x.total_price} ل.س
+          <div class="flex" style="margin-top:16px; flex-wrap: wrap; gap: 8px;">
+              <button class="btn" onclick="approveOrder(${x.id})">✅ قبول</button>
+              <button class="btn btn-danger" onclick="rejectOrder(${x.id})">❌ رفض</button>
+              <button class="btn btn-outline" onclick="viewScreenshot(${x.id})">📷 عرض الإيصال</button>
+          </div>
+      </div>`;
     });
     html += o.length ? '' : '<p class="empty-state">لا طلبات بانتظار المراجعة</p></div>';
     contentArea.innerHTML = html;
@@ -539,6 +548,10 @@
   window.rejectOrder = async (id) => {
     await fetch(`${API}/api/admin/orders/${id}/reject`, { method: 'POST', headers: { 'X-Telegram-Init-Data': tg.initData } });
     loadPendingOrders();
+  };
+  window.viewScreenshot = (orderId) => {
+    const url = `${API}/api/admin/orders/${orderId}/screenshot`;
+    window.open(url, '_blank');
   };
 
   async function loadShops() {

@@ -124,6 +124,60 @@ async function notifyRiders(orderId) {
   } catch(e){ console.error('Notify riders error:',e); }
 }
 
+// 🆕 إشعار الأدمن عند اكتمال الطلب
+async function notifyAdmin(orderId, status) {
+  try {
+    if (!ADMIN_ID) return;
+    const order = await pool.query(
+      `SELECT o.*, u_customer.name as customer_name, s.shop_name, u_rider.name as rider_name
+       FROM orders o
+       JOIN users u_customer ON o.customer_id = u_customer.id
+       JOIN shops s ON o.shop_id = s.id
+       LEFT JOIN users u_rider ON o.rider_id = u_rider.id
+       WHERE o.id = $1`,
+      [orderId]
+    );
+    const o = order.rows[0];
+    if (!o) return;
+
+    const messages = {
+      completed: `✅ *طلب مكتمل #${orderId}*\n\n👤 العميل: ${o.customer_name}\n🏪 المتجر: ${o.shop_name}\n🛵 السائق: ${o.rider_name || 'غير محدد'}\n💰 الإجمالي: ${o.total_price} ل.س\n📅 التاريخ: ${new Date(o.created_at).toLocaleString('ar-SY')}`
+    };
+    if (messages[status]) {
+      await bot.api.sendMessage(ADMIN_ID, messages[status], { parse_mode: 'Markdown' });
+    }
+  } catch (e) {
+    console.error('Notify admin error:', e);
+  }
+}
+
+// 🆕 إشعار السائق إذا ألغي الطلب من قبل الأدمن أو المتجر
+async function notifyRiderIfCancelled(orderId, reason = '') {
+  try {
+    const order = await pool.query(
+      `SELECT o.rider_id, o.status, u.chat_id FROM orders o
+       JOIN users u ON o.rider_id = u.id
+       WHERE o.id = $1 AND o.rider_id IS NOT NULL`,
+      [orderId]
+    );
+    const o = order.rows[0];
+    if (!o || !o.chat_id) return;
+
+    let message = '';
+    if (o.status === 'rejected') {
+      message = `❌ *تم إلغاء الطلب #${orderId}*\n\nتم إلغاء الطلب من قبل الإدارة أو المتجر.\n${reason ? `السبب: ${reason}` : ''}`;
+    } else if (o.status === 'ready_for_pickup') {
+      message = `🔄 *الطلب #${orderId} عاد متاحاً*\n\nقام السائق السابق بإلغاء الطلب. يمكنك قبوله من جديد.`;
+    }
+
+    if (message) {
+      await bot.api.sendMessage(o.chat_id, message, { parse_mode: 'Markdown' });
+    }
+  } catch (e) {
+    console.error('Notify rider cancellation error:', e);
+  }
+}
+
 bot.command('start', async (ctx) => {
   const telegramId = ctx.from.id; const chatId = ctx.chat.id.toString(); const name = ctx.from.first_name + (ctx.from.last_name ? ' ' + ctx.from.last_name : '');
   await pool.query(`INSERT INTO users (telegram_id, name, role, is_approved, chat_id) VALUES ($1,$2,'customer',true,$3) ON CONFLICT(telegram_id) DO UPDATE SET chat_id=EXCLUDED.chat_id, name=EXCLUDED.name`,[telegramId.toString(), name, chatId]);
@@ -213,9 +267,9 @@ app.get('/api/orders/:orderId/status', optionalAuth, async (req, res) => {
   try {
     const { orderId } = req.params;
     const order = await pool.query(
-      `SELECT o.status, o.code_verified, u_rider.name as rider_name, u_rider.phone as rider_phone 
-       FROM orders o 
-       LEFT JOIN users u_rider ON o.rider_id = u_rider.id 
+      `SELECT o.status, o.code_verified, u_rider.name as rider_name, u_rider.phone as rider_phone
+       FROM orders o
+       LEFT JOIN users u_rider ON o.rider_id = u_rider.id
        WHERE o.id = $1`,
       [orderId]
     );
@@ -285,9 +339,9 @@ app.get('/api/me', async (req, res) => {
   try {
     const tgUser = req.tgUser;
     const result = await pool.query(
-      `INSERT INTO users (telegram_id, name, role, is_approved) 
-       VALUES ($1, $2, 'customer', true) 
-       ON CONFLICT(telegram_id) DO UPDATE SET name = EXCLUDED.name 
+      `INSERT INTO users (telegram_id, name, role, is_approved)
+       VALUES ($1, $2, 'customer', true)
+       ON CONFLICT(telegram_id) DO UPDATE SET name = EXCLUDED.name
        RETURNING *`,
       [tgUser.id.toString(), tgUser.first_name || 'User']
     );
@@ -345,7 +399,7 @@ app.post('/api/orders', async (req, res) => {
     const total = subtotal + calculatedDeliveryFee;
 
     const orderResult = await pool.query(
-      `INSERT INTO orders (customer_id, shop_id, zone_id, items, subtotal, delivery_fee, total_price, address, city_id, delivery_latitude, delivery_longitude, status) 
+      `INSERT INTO orders (customer_id, shop_id, zone_id, items, subtotal, delivery_fee, total_price, address, city_id, delivery_latitude, delivery_longitude, status)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'verifying') RETURNING id`,
       [dbUser.id, shop_id, validZoneId, JSON.stringify(frozenItems), subtotal, calculatedDeliveryFee, total, address, validCityId, delivery_latitude, delivery_longitude]
     );
@@ -370,16 +424,16 @@ app.get('/api/shop/orders', async (req, res) => {
     if (!shop.rows[0]) return res.json([]);
     const shopId = shop.rows[0].id;
     const { archived } = req.query;
-    let statusCondition = archived === 'true' 
+    let statusCondition = archived === 'true'
       ? `o.status IN ('completed', 'rejected')`
       : `o.status IN ('paid', 'preparing', 'ready_for_pickup', 'delivering')`;
     const orders = await pool.query(
-      `SELECT o.*, u_customer.name as customer_name, u_customer.phone as customer_phone, u_rider.name as rider_name 
-       FROM orders o 
-       JOIN users u_customer ON o.customer_id = u_customer.id 
-       LEFT JOIN users u_rider ON o.rider_id = u_rider.id 
-       WHERE o.shop_id = $1 AND ${statusCondition} 
-       ORDER BY o.created_at DESC`, 
+      `SELECT o.*, u_customer.name as customer_name, u_customer.phone as customer_phone, u_rider.name as rider_name
+       FROM orders o
+       JOIN users u_customer ON o.customer_id = u_customer.id
+       LEFT JOIN users u_rider ON o.rider_id = u_rider.id
+       WHERE o.shop_id = $1 AND ${statusCondition}
+       ORDER BY o.created_at DESC`,
       [shopId]
     );
     res.json(orders.rows);
@@ -492,17 +546,17 @@ app.get('/api/rider/available-orders', async (req, res) => {
     const tgUser = req.tgUser;
     const dbUser = await getDbUser(tgUser.id);
     if (dbUser?.role !== 'rider' || !dbUser?.is_approved) return res.status(403).json({ error: 'Forbidden' });
-    
+
     const rider = await pool.query('SELECT is_online FROM rider_details WHERE user_id=$1', [dbUser.id]);
     const isOnline = rider.rows[0]?.is_online ?? true;
-    
+
     if (!isOnline) return res.json([]);
-    
+
     const orders = await pool.query(
-      `SELECT o.*, s.shop_name, s.address as shop_address, s.latitude as shop_lat, s.longitude as shop_lng, c.name as category 
-       FROM orders o 
-       JOIN shops s ON o.shop_id = s.id 
-       LEFT JOIN shop_categories c ON s.category_id = c.id 
+      `SELECT o.*, s.shop_name, s.address as shop_address, s.latitude as shop_lat, s.longitude as shop_lng, c.name as category
+       FROM orders o
+       JOIN shops s ON o.shop_id = s.id
+       LEFT JOIN shop_categories c ON s.category_id = c.id
        WHERE o.status = 'ready_for_pickup' AND o.rider_id IS NULL`
     );
     res.json(orders.rows);
@@ -557,12 +611,26 @@ app.post('/api/rider/complete-order', async (req, res) => {
     await pool.query(`UPDATE orders SET platform_commission=$1, shop_net=$2, rider_fee=$3 WHERE id=$4`, [platformCommission, shopNet, riderFee, order_id]);
     await pool.query(`INSERT INTO financial_transactions (order_id, transaction_type, amount) VALUES ($1,'platform_fee',$2),($1,'shop_payout',$3),($1,'rider_payout',$4)`, [order_id, platformCommission, shopNet, riderFee]);
     await notifyCustomer(order_id, 'completed');
+    await notifyAdmin(order_id, 'completed');   // 🆕 إشعار الأدمن
     const shopOwner = await pool.query(`SELECT u.chat_id FROM users u JOIN shops s ON u.id = s.owner_id WHERE s.id = (SELECT shop_id FROM orders WHERE id = $1)`, [order_id]);
     if (shopOwner.rows[0]?.chat_id) { await bot.api.sendMessage(shopOwner.rows[0].chat_id, `✅ *تم توصيل الطلب #${order_id} بنجاح*\nصافي المبلغ المستحق لك: ${shopNet} ل.س`, { parse_mode: 'Markdown' }); }
     res.json({ success: true });
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
-app.post('/api/rider/cancel-order', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'rider') return res.status(403).json({ error: 'Forbidden' }); const { order_id, reason } = req.body; const result = await pool.query(`UPDATE orders SET rider_id = NULL, status = 'ready_for_pickup' WHERE id = $1 AND rider_id = $2 AND status = 'delivering'`, [order_id, dbUser.id]); if (result.rowCount === 0) return res.status(400).json({ error: 'Order not found or not yours' }); if (reason) await pool.query(`UPDATE orders SET cancel_reason=$1 WHERE id=$2`, [reason, order_id]); await notifyCustomer(order_id, 'ready_for_pickup'); res.json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
+app.post('/api/rider/cancel-order', async (req, res) => {
+  try {
+    const tgUser = req.tgUser;
+    const dbUser = await getDbUser(tgUser.id);
+    if (dbUser?.role !== 'rider') return res.status(403).json({ error: 'Forbidden' });
+    const { order_id, reason } = req.body;
+    const result = await pool.query(`UPDATE orders SET rider_id = NULL, status = 'ready_for_pickup' WHERE id = $1 AND rider_id = $2 AND status = 'delivering'`, [order_id, dbUser.id]);
+    if (result.rowCount === 0) return res.status(400).json({ error: 'Order not found or not yours' });
+    if (reason) await pool.query(`UPDATE orders SET cancel_reason=$1 WHERE id=$2`, [reason, order_id]);
+    await notifyCustomer(order_id, 'ready_for_pickup');
+    await notifyRiders(order_id); // 🆕 إعلام باقي السائقين بالطلب المتاح مجدداً
+    res.json({ success: true });
+  } catch(error) { res.status(500).json({ error: error.message }); }
+});
 
 // ========== ADMIN ==========
 app.get('/api/admin/stats', requireAuth, async (req, res) => {
@@ -585,7 +653,32 @@ app.get('/api/admin/pending', async (req, res) => { try { const tgUser = req.tgU
 app.post('/api/admin/approve', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' }); const { user_id } = req.body; await pool.query(`UPDATE users SET is_approved=true WHERE id=$1`,[user_id]); res.json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.get('/api/admin/orders/pending', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' }); const { page=1, limit=10 } = req.query; const offset = (page-1)*limit; const orders = await pool.query(`SELECT o.*, u.name as customer_name, s.shop_name FROM orders o JOIN users u ON o.customer_id = u.id JOIN shops s ON o.shop_id = s.id WHERE o.status = 'pending' ORDER BY o.created_at DESC LIMIT $1 OFFSET $2`, [limit, offset]); res.json(orders.rows); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.post('/api/admin/orders/:orderId/approve', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' }); const { orderId } = req.params; await pool.query(`UPDATE orders SET status='paid' WHERE id=$1`,[orderId]); await notifyShop(orderId); await notifyCustomer(orderId, 'paid'); res.json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
-app.post('/api/admin/orders/:orderId/reject', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' }); const { orderId } = req.params; await pool.query(`UPDATE orders SET status='rejected' WHERE id=$1`,[orderId]); await notifyCustomer(orderId, 'rejected'); res.json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
+app.post('/api/admin/orders/:orderId/reject', async (req, res) => {
+  try {
+    const tgUser = req.tgUser;
+    const dbUser = await getDbUser(tgUser.id);
+    if (dbUser?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+    const { orderId } = req.params;
+    await pool.query(`UPDATE orders SET status='rejected' WHERE id=$1`, [orderId]);
+    await notifyCustomer(orderId, 'rejected');
+    await notifyRiderIfCancelled(orderId, 'تم رفض الطلب من قبل الإدارة'); // 🆕 إشعار السائق
+    res.json({ success: true });
+  } catch(error) { res.status(500).json({ error: error.message }); }
+});
+app.get('/api/admin/orders/:orderId/screenshot', requireAuth, async (req, res) => {
+  try {
+    const tgUser = req.tgUser;
+    const dbUser = await getDbUser(tgUser.id);
+    if (dbUser?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+    const { orderId } = req.params;
+    const order = await pool.query('SELECT screenshot_file_id FROM orders WHERE id = $1', [orderId]);
+    if (!order.rows[0] || !order.rows[0].screenshot_file_id) return res.status(404).json({ error: 'No screenshot found' });
+    const fileId = order.rows[0].screenshot_file_id;
+    const file = await bot.api.getFile(fileId);
+    const fileUrl = `https://api.telegram.org/file/bot${process.env.BOT_TOKEN}/${file.file_path}`;
+    res.redirect(fileUrl);
+  } catch (error) { console.error('Screenshot fetch error:', error); res.status(500).json({ error: error.message }); }
+});
 app.get('/api/admin/finance', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' }); const summary = await pool.query(`SELECT (SELECT COALESCE(SUM(platform_commission),0) FROM orders WHERE status='completed') as total_platform_fees, (SELECT COALESCE(SUM(amount),0) FROM financial_transactions WHERE transaction_type='shop_payout' AND status='pending') as pending_shop_payouts, (SELECT COALESCE(SUM(amount),0) FROM financial_transactions WHERE transaction_type='rider_payout' AND status='pending') as pending_rider_payouts`); res.json(summary.rows[0]); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.get('/api/admin/shops', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' }); const shops = await pool.query(`SELECT s.*, u.name as owner_name, u.phone as owner_phone, c.name as category_name, ct.name as city_name FROM shops s JOIN users u ON s.owner_id=u.id LEFT JOIN shop_categories c ON s.category_id=c.id LEFT JOIN cities ct ON s.city_id=ct.id ORDER BY s.created_at DESC`); res.json(shops.rows); } catch(error) { res.status(500).json({ error: error.message }); } });
 app.put('/api/admin/shops/:shopId', async (req, res) => { try { const tgUser = req.tgUser; const dbUser = await getDbUser(tgUser.id); if (dbUser?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' }); const { shopId } = req.params; const { shop_name, phone, address, is_open, category_id, city_id } = req.body; await pool.query(`UPDATE shops SET shop_name=$1, phone=$2, address=$3, is_open=$4, category_id=$5, city_id=$6 WHERE id=$7`,[shop_name, phone, address, is_open, category_id, city_id, shopId]); res.json({ success: true }); } catch(error) { res.status(500).json({ error: error.message }); } });
